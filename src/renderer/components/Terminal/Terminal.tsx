@@ -7,9 +7,18 @@ import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
+import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
+import {
+  compileRules,
+  createHighlightState,
+  disposeAllDecorations,
+  rescanViewport,
+  scanAfterWrite,
+  type CompiledRule,
+} from "./keywordHighlight";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -19,6 +28,8 @@ interface Props {
   /** Per-tab color theme override (from TerminalTab.themeId), taking
    * priority over the global Settings choice. undefined defers to it. */
   themeOverrideId?: string;
+  /** Path this tab is currently logging its raw output to, if any (mirrors TerminalTab.logPath). */
+  logPath?: string;
 }
 
 const TERM_CSS_VARS = [
@@ -64,7 +75,7 @@ function resolveXtermTheme(themeId: string): ITheme {
   return preset.theme ?? readAppCssTheme();
 }
 
-export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
+export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termRef = useRef<XTerm | null>(null);
@@ -76,6 +87,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
   const fontFamily = useTerminalPrefsStore((s) => s.fontFamily);
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const setTabThemeId = useAppStore((s) => s.setTabThemeId);
+  const setTabLogPath = useAppStore((s) => s.setTabLogPath);
+  const keywordEnabled = useKeywordHighlightStore((s) => s.enabled);
+  const keywordRules = useKeywordHighlightStore((s) => s.rules);
+  const highlightStateRef = useRef(createHighlightState());
+  const compiledRulesRef = useRef<CompiledRule[]>([]);
   const terminalThemeId = themeOverrideId ?? globalTerminalThemeId;
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -102,6 +118,12 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
       fontSize: useTerminalPrefsStore.getState().fontSize,
       cursorBlink: true,
       theme: initialTheme,
+      // registerMarker/registerDecoration (used for keyword highlighting)
+      // are behind xterm.js's "proposed API" flag — without this they throw
+      // synchronously inside the terminal's own write loop, which doesn't
+      // just fail the highlight: it corrupts mid-flight rendering for
+      // everything else too.
+      allowProposedApi: true,
     });
     // The pane's own background (visible as an 8px border around xterm) is
     // set inline so it tracks a fixed preset's background too — the CSS
@@ -136,7 +158,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
     });
 
     const offData = wharf.ssh.onData((event) => {
-      if (event.sessionId === sessionId) term.write(event.chunk);
+      if (event.sessionId === sessionId) {
+        term.write(event.chunk, () => scanAfterWrite(term, compiledRulesRef.current, highlightStateRef.current));
+      }
     });
     const offClosed = wharf.ssh.onClosed((event) => {
       if (event.sessionId === sessionId) {
@@ -160,6 +184,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
       offClosed();
       dataDisposable.dispose();
       resizeObserver.disconnect();
+      disposeAllDecorations(highlightStateRef.current);
       term.dispose();
       termRef.current = null;
       searchAddonRef.current = null;
@@ -181,6 +206,21 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
     term.options.theme = theme;
     if (containerRef.current && theme.background) containerRef.current.style.background = theme.background;
   }, [resolvedTheme, accent, terminalThemeId]);
+
+  // Recompiles the active rule set whenever Settings' keyword-highlight
+  // toggle or rules change, and immediately re-highlights what's on screen
+  // (off-screen scrollback picks up the new rules the next time it scrolls
+  // past new output, per rescanViewport's contract).
+  useEffect(() => {
+    compiledRulesRef.current = keywordEnabled ? compileRules(keywordRules) : [];
+    const term = termRef.current;
+    if (!term) return;
+    if (compiledRulesRef.current.length > 0) {
+      rescanViewport(term, compiledRulesRef.current, highlightStateRef.current);
+    } else {
+      disposeAllDecorations(highlightStateRef.current);
+    }
+  }, [keywordEnabled, keywordRules]);
 
   // Font size/family changes resize the character cell, so cols/rows change
   // too — refit and tell the remote pty about the new size, same as a
@@ -218,6 +258,16 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
     }
   }, [visible]);
 
+  async function toggleLogging() {
+    if (logPath) {
+      await wharf.ssh.stopLogging(sessionId);
+      setTabLogPath(sessionId, undefined);
+    } else {
+      const path = await wharf.ssh.startLogging(sessionId);
+      if (path) setTabLogPath(sessionId, path);
+    }
+  }
+
   async function handleContextMenu(e: React.MouseEvent) {
     const term = termRef.current;
     if (!term) return;
@@ -239,7 +289,15 @@ export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
       { label: "Find…", onClick: () => setSearchOpen(true) },
       { label: "Insert Snippet…", onClick: () => setSnippetPickerOpen(true) },
       { label: "Select All", onClick: () => term.selectAll() },
-      { label: "Clear", onClick: () => term.clear() },
+      {
+        label: "Clear",
+        onClick: () => {
+          term.clear();
+          disposeAllDecorations(highlightStateRef.current);
+        },
+      },
+      { separator: true },
+      { label: logPath ? "Stop Logging" : "Start Logging…", onClick: toggleLogging },
       // Picking any preset here — "Match App Theme" included — sets an
       // explicit per-tab override, same as picking one always would; a tab
       // only falls back to the global Settings choice until its own menu

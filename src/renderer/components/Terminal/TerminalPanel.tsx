@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAppStore } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
+import { wharf } from "../../api/wharf";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export function TerminalPanel({ hidden }: Props) {
-  const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab, setTabThemeId } =
+  const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab, setTabThemeId, setTabLogPath } =
     useAppStore();
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
@@ -31,6 +32,16 @@ export function TerminalPanel({ hidden }: Props) {
 
   async function closeAll() {
     for (const tab of tabs) await closeTerminal(tab.sessionId);
+  }
+
+  async function toggleLogging(sessionId: string, currentLogPath: string | undefined) {
+    if (currentLogPath) {
+      await wharf.ssh.stopLogging(sessionId);
+      setTabLogPath(sessionId, undefined);
+    } else {
+      const path = await wharf.ssh.startLogging(sessionId);
+      if (path) setTabLogPath(sessionId, path);
+    }
   }
 
   if (tabs.length === 0) {
@@ -80,6 +91,11 @@ export function TerminalPanel({ hidden }: Props) {
                 { label: "Close", onClick: () => closeTerminal(tab.sessionId) },
                 { label: "Close Others", disabled: tabs.length < 2, onClick: () => closeOthers(tab.sessionId) },
                 { label: "Close All", onClick: () => closeAll() },
+                { separator: true },
+                {
+                  label: tab.logPath ? "Stop Logging" : "Start Logging…",
+                  onClick: () => toggleLogging(tab.sessionId, tab.logPath),
+                },
                 ...buildTerminalThemeMenuItems(tab.themeId ?? globalTerminalThemeId, (id) =>
                   setTabThemeId(tab.sessionId, id),
                 ),
@@ -88,6 +104,7 @@ export function TerminalPanel({ hidden }: Props) {
             title={tab.closeError}
           >
             {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
+            {tab.logPath && <span className="tab-logging-dot" title={`Logging to ${tab.logPath}`} />}
             {tab.themeId && (
               <span
                 className="tab-theme-dot"
@@ -133,6 +150,7 @@ export function TerminalPanel({ hidden }: Props) {
             // Terminal.tsx) instead of staying stuck on stale pixels.
             visible={!hidden && tab.sessionId === activeTabId}
             themeOverrideId={tab.themeId}
+            logPath={tab.logPath}
           />
         ))}
       </div>

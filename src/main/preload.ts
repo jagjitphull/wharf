@@ -28,6 +28,12 @@ const api: WharfApi = {
     disconnect: (sessionId) => ipcRenderer.invoke(IPC.ssh.disconnect, sessionId),
     onData: (cb) => on(IPC.ssh.onData, cb as (...args: unknown[]) => void),
     onClosed: (cb) => on(IPC.ssh.onClosed, cb as (...args: unknown[]) => void),
+    startLogging: (sessionId) => ipcRenderer.invoke(IPC.ssh.startLogging, sessionId),
+    stopLogging: (sessionId) => ipcRenderer.invoke(IPC.ssh.stopLogging, sessionId),
+  },
+  sshConfig: {
+    parse: () => ipcRenderer.invoke(IPC.sshConfig.parse),
+    import: (aliases) => ipcRenderer.invoke(IPC.sshConfig.import, aliases),
   },
   sftp: {
     list: (hostId, remotePath) => ipcRenderer.invoke(IPC.sftp.list, hostId, remotePath),

@@ -102,6 +102,32 @@ export interface SessionClosedEvent {
 }
 
 // ---------------------------------------------------------------------------
+// SSH config import (~/.ssh/config)
+// ---------------------------------------------------------------------------
+
+/** One concrete (non-wildcard) `Host` block parsed out of an OpenSSH config
+ * file, ready to review and optionally import as a saved host. */
+export interface SshConfigCandidate {
+  /** The `Host` alias itself — used as the imported host's name. */
+  alias: string;
+  hostname: string;
+  port: number;
+  username?: string;
+  /** Path to a private key file (from `IdentityFile`), `~` already expanded. */
+  identityFile?: string;
+  /** Raw `ProxyJump` alias, unresolved — the importer links it to another
+   * selected candidate by alias if (and only if) both are imported together. */
+  proxyJump?: string;
+  /** True if a host with the same hostname/username/port already exists in
+   * Wharf, so the picker can default it to unchecked. */
+  alreadyImported: boolean;
+}
+
+export interface SshConfigImportResult {
+  importedHosts: number;
+}
+
+// ---------------------------------------------------------------------------
 // SFTP
 // ---------------------------------------------------------------------------
 
@@ -189,6 +215,12 @@ export const IPC = {
     disconnect: "ssh:disconnect",
     onData: "ssh:data",
     onClosed: "ssh:closed",
+    startLogging: "ssh:log-start",
+    stopLogging: "ssh:log-stop",
+  },
+  sshConfig: {
+    parse: "ssh-config:parse",
+    import: "ssh-config:import",
   },
   sftp: {
     list: "sftp:list",

@@ -1,6 +1,17 @@
-import { ipcMain } from "electron";
+import { ipcMain, dialog } from "electron";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { IPC, type SessionStartResult } from "../../shared/types";
 import * as sshManager from "../services/sshManager";
+
+function defaultLogPath(hostName: string): string {
+  const dir = join(homedir(), "Documents", "wharf-logs");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeName = hostName.replace(/[/\\?%*:|"<>]/g, "_");
+  return join(dir, `${safeName}-${stamp}.log`);
+}
 
 export function registerSshIpc(): void {
   ipcMain.handle(
@@ -23,5 +34,24 @@ export function registerSshIpc(): void {
 
   ipcMain.handle(IPC.ssh.disconnect, (_event, sessionId: string) => {
     sshManager.disconnect(sessionId);
+  });
+
+  ipcMain.handle(IPC.ssh.startLogging, async (_event, sessionId: string): Promise<string | null> => {
+    const hostName = sshManager.getHostNameForSession(sessionId) ?? "session";
+    const result = await dialog.showSaveDialog({
+      title: "Save session log",
+      defaultPath: defaultLogPath(hostName),
+      filters: [
+        { name: "Log files", extensions: ["log", "txt"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+    if (result.canceled || !result.filePath) return null;
+    sshManager.startLogging(sessionId, result.filePath);
+    return result.filePath;
+  });
+
+  ipcMain.handle(IPC.ssh.stopLogging, (_event, sessionId: string) => {
+    sshManager.stopLogging(sessionId);
   });
 }

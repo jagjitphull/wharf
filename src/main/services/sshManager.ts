@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { createWriteStream, readFileSync, type WriteStream } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { Client, type ClientChannel, type ConnectConfig, type HostVerifier } from "ssh2";
 import { BrowserWindow } from "electron";
@@ -14,6 +14,8 @@ interface Session {
   channel: ClientChannel;
   /** Set when connected through a jump/bastion host; kept alive for the session's lifetime. */
   jumpClient?: Client;
+  /** Open when this session's raw output is being logged to disk (see startLogging/stopLogging). */
+  logStream?: WriteStream;
 }
 
 const sessions = new Map<string, Session>();
@@ -108,12 +110,14 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
 
   const sessionId = randomUUID();
 
-  channel.on("data", (data: Buffer) => {
+  function emitData(data: Buffer) {
     broadcast(IPC.ssh.onData, { sessionId, chunk: data.toString("utf8") });
-  });
-  channel.stderr.on("data", (data: Buffer) => {
-    broadcast(IPC.ssh.onData, { sessionId, chunk: data.toString("utf8") });
-  });
+    // Raw bytes, ANSI codes included — same as what `script`/`asciinema`
+    // record, and what the user actually sees in the terminal.
+    sessions.get(sessionId)?.logStream?.write(data);
+  }
+  channel.on("data", emitData);
+  channel.stderr.on("data", emitData);
   channel.on("close", () => {
     broadcast(IPC.ssh.onClosed, { sessionId });
     cleanup(sessionId);
@@ -141,6 +145,7 @@ export function disconnect(sessionId: string): void {
   session.channel.end();
   session.client.end();
   session.jumpClient?.end();
+  session.logStream?.end();
   sessions.delete(sessionId);
 }
 
@@ -153,10 +158,38 @@ export function disconnectSessionsForHost(hostId: string): void {
 function cleanup(sessionId: string): void {
   const session = sessions.get(sessionId);
   session?.jumpClient?.end();
+  session?.logStream?.end();
   sessions.delete(sessionId);
 }
 
 /** Returns a live client for an active session, used by the SFTP manager so file browsing reuses the same authenticated connection instead of opening a second one. */
 export function getClientForSession(sessionId: string): Client | undefined {
   return sessions.get(sessionId)?.client;
+}
+
+/** Host name for a session, used to build a sensible default log file name. */
+export function getHostNameForSession(sessionId: string): string | undefined {
+  const session = sessions.get(sessionId);
+  if (!session) return undefined;
+  return getHosts().find((h) => h.id === session.hostId)?.name;
+}
+
+/** Starts teeing this session's raw output to `filePath` (truncating any
+ * existing file at that path) from this point on — logging never replays
+ * already-emitted scrollback. Replaces any log already in progress. */
+export function startLogging(sessionId: string, filePath: string): void {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+  session.logStream?.end();
+  session.logStream = createWriteStream(filePath, { flags: "w" });
+}
+
+export function stopLogging(sessionId: string): void {
+  const session = sessions.get(sessionId);
+  session?.logStream?.end();
+  if (session) session.logStream = undefined;
+}
+
+export function isLogging(sessionId: string): boolean {
+  return !!sessions.get(sessionId)?.logStream;
 }

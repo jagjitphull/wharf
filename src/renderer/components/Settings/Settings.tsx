@@ -4,6 +4,7 @@ import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStor
 import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
 import "../../styles/dialog.css";
 import "./Settings.css";
 
@@ -157,6 +158,9 @@ export function Settings() {
         </div>
         <p className="hint">{TERMINAL_THEME_PRESETS.find((p) => p.id === terminalThemeId)?.blurb}</p>
       </div>
+
+      <h2>Keyword Highlighting</h2>
+      <KeywordHighlightSettings />
 
       <h2>Backup</h2>
       <p className="hint">

@@ -14,6 +14,8 @@ export interface TerminalTab {
    * persisted — tabs are ephemeral (a fresh sessionId per connection), so
    * this resets on reconnect same as everything else about the tab. */
   themeId?: string;
+  /** Path this tab's raw output is currently being logged to, if any. */
+  logPath?: string;
 }
 
 export type ActiveView = "hosts" | "sftp" | "tunnels" | "settings";
@@ -43,6 +45,7 @@ interface AppState {
   reorderTab(sessionId: string, beforeSessionId: string): void;
   setActiveTab(sessionId: string | null): void;
   setTabThemeId(sessionId: string, themeId: string | undefined): void;
+  setTabLogPath(sessionId: string, logPath: string | undefined): void;
 
   setActiveView(view: ActiveView): void;
   setContextHostId(hostId: string | null): void;
@@ -123,6 +126,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTabThemeId(sessionId, themeId) {
     set((s) => ({
       tabs: s.tabs.map((t) => (t.sessionId === sessionId ? { ...t, themeId } : t)),
+    }));
+  },
+
+  setTabLogPath(sessionId, logPath) {
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.sessionId === sessionId ? { ...t, logPath } : t)),
     }));
   },
 

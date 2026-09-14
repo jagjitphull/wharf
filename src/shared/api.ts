@@ -15,6 +15,8 @@ import type {
   SftpTransferProgress,
   SnippetInput,
   SnippetRecord,
+  SshConfigCandidate,
+  SshConfigImportResult,
   TerminalDataEvent,
   TunnelInput,
   TunnelRecord,
@@ -43,6 +45,15 @@ export interface WharfApi {
     disconnect(sessionId: string): Promise<void>;
     onData(cb: (event: TerminalDataEvent) => void): Unsubscribe;
     onClosed(cb: (event: SessionClosedEvent) => void): Unsubscribe;
+    /** Opens a save dialog and tees the session's raw output to that file from here on. Returns the chosen path, or null if canceled. */
+    startLogging(sessionId: string): Promise<string | null>;
+    stopLogging(sessionId: string): Promise<void>;
+  };
+  sshConfig: {
+    /** Parses `~/.ssh/config` (including simple `Include` directives). Returns [] if the file doesn't exist. */
+    parse(): Promise<SshConfigCandidate[]>;
+    /** Creates saved hosts from the given aliases (re-parses the file fresh). ProxyJump links only apply between aliases imported in the same call. */
+    import(aliases: string[]): Promise<SshConfigImportResult>;
   };
   sftp: {
     list(hostId: string, remotePath: string): Promise<SftpEntry[]>;

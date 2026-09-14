@@ -10,6 +10,7 @@ import { registerWindowIpc } from "./ipc/window";
 import { registerClipboardIpc } from "./ipc/clipboard";
 import { registerBackupIpc } from "./ipc/backup";
 import { registerSnippetsIpc } from "./ipc/snippets";
+import { registerSshConfigIpc } from "./ipc/sshConfig";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { getWindowBounds, setWindowBounds } from "./services/store";
@@ -132,6 +133,7 @@ app.whenReady().then(() => {
   registerClipboardIpc();
   registerBackupIpc();
   registerSnippetsIpc();
+  registerSshConfigIpc();
 
   installAppMenu();
   createWindow(true);

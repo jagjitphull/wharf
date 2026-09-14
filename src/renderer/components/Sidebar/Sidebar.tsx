@@ -4,6 +4,7 @@ import { useAppStore, type ActiveView } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
+import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { IconFolder, IconPencil, IconPlay, IconPlus, IconTrash } from "../Icons/Icons";
 import "./Sidebar.css";
@@ -22,6 +23,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     useAppStore();
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
   const [groupDialog, setGroupDialog] = useState<{ group: GroupRecord | null } | null>(null);
+  const [sshConfigImportOpen, setSshConfigImportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
@@ -173,6 +175,13 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
         <button className="btn ghost small" onClick={() => setGroupDialog({ group: null })}>
           + Group
         </button>
+        <button
+          className="btn ghost small"
+          title="Import from ~/.ssh/config"
+          onClick={() => setSshConfigImportOpen(true)}
+        >
+          Import…
+        </button>
       </div>
 
       {error && <div className="sidebar-error">{error}</div>}
@@ -209,6 +218,16 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
           onClose={() => setGroupDialog(null)}
           onSaved={async () => {
             setGroupDialog(null);
+            await loadAll();
+          }}
+        />
+      )}
+
+      {sshConfigImportOpen && (
+        <SshConfigImportDialog
+          onClose={() => setSshConfigImportOpen(false)}
+          onImported={async () => {
+            setSshConfigImportOpen(false);
             await loadAll();
           }}
         />
