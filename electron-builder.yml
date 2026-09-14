@@ -1,0 +1,20 @@
+appId: com.wharf.app
+productName: Wharf
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist-electron/**/*
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development

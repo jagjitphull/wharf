@@ -1,0 +1,10 @@
+.terminal-pane {
+  position: absolute;
+  inset: 0;
+  padding: 8px;
+  background: #0d0f14;
+}
+
+.terminal-pane .xterm {
+  height: 100%;
+}

@@ -1,0 +1,47 @@
+{
+  "name": "wharf",
+  "productName": "Wharf",
+  "version": "0.1.0",
+  "description": "A Termius-like SSH/SFTP terminal client with a starter (free) tier and gated Pro features.",
+  "author": "Wharf",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "dist-electron/main/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c blue,green \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "cross-env NODE_ENV=development wait-on tcp:5173 && npm run build:main && electron .",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:renderer && npm run build:main",
+    "start": "electron .",
+    "package": "npm run build && electron-builder",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "license:generate-keys": "node scripts/generate-signing-keys.mjs",
+    "license:generate": "node scripts/generate-license.mjs"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "electron-store": "^8.2.0",
+    "nanoid": "^5.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ssh2": "^1.16.0",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@types/ssh2": "^1.15.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "wait-on": "^7.2.0"
+  }
+}
