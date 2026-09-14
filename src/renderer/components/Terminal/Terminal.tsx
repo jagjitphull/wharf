@@ -254,6 +254,12 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: P
         fitRef.current?.fit();
         const term = termRef.current;
         if (!term) return;
+        // Becoming the active tab should send keyboard input straight to
+        // this terminal without an extra click — true whether it was
+        // activated by clicking the tab or by a keyboard shortcut
+        // (Ctrl/Cmd+1..9, Ctrl/Cmd+Tab), which otherwise left focus
+        // wherever it was (often nowhere in particular) after switching.
+        term.focus();
         // xterm's renderer stops painting while its container is
         // display:none (a background tab), and FitAddon.fit() is a no-op
         // whenever the computed cols/rows come out unchanged — the common
