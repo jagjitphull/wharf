@@ -8,10 +8,13 @@ import { Settings } from "./components/Settings/Settings";
 import { QuickConnect } from "./components/QuickConnect/QuickConnect";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useAppStore } from "./state/store";
+import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
+import { useUiPrefsStore } from "./state/uiPrefsStore";
 import { ipcErrorMessage } from "./api/wharf";
 
 export default function App() {
   const { activeView, hosts, groups, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
+  const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const [quickConnectOpen, setQuickConnectOpen] = useState(false);
 
   useEffect(() => {
@@ -26,6 +29,28 @@ export default function App() {
       if (e.key.toLowerCase() === "k") {
         e.preventDefault();
         setQuickConnectOpen(true);
+        return;
+      }
+
+      if (e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        useUiPrefsStore.getState().toggleSidebar();
+        return;
+      }
+
+      if (e.key === "=" || e.key === "+") {
+        e.preventDefault();
+        useTerminalPrefsStore.getState().increaseFontSize();
+        return;
+      }
+      if (e.key === "-") {
+        e.preventDefault();
+        useTerminalPrefsStore.getState().decreaseFontSize();
+        return;
+      }
+      if (e.key === "0") {
+        e.preventDefault();
+        useTerminalPrefsStore.getState().resetFontSize();
         return;
       }
 
@@ -74,7 +99,7 @@ export default function App() {
     <div className="app-root">
       <TitleBar />
       <div className="app-shell">
-        <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />
+        {!sidebarCollapsed && <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />}
         <main className="app-main">
           {activeView === "hosts" && <TerminalPanel />}
           {activeView === "sftp" && <SftpBrowser />}

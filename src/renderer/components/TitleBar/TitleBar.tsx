@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
+import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
@@ -9,6 +10,8 @@ export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const setMode = useThemeStore((s) => s.setMode);
+  const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useUiPrefsStore((s) => s.toggleSidebar);
 
   useEffect(() => {
     wharf.window.isMaximized().then(setMaximized);
@@ -21,6 +24,20 @@ export function TitleBar() {
       onDoubleClick={() => wharf.window.toggleMaximize()}
     >
       <div className="title-bar-left">
+        <button
+          className="title-bar-icon-btn"
+          title={sidebarCollapsed ? "Show sidebar (Ctrl/Cmd+B)" : "Hide sidebar (Ctrl/Cmd+B)"}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSidebar();
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <rect x="1" y="2.5" width="14" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+            <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" strokeWidth="1.3" />
+            {sidebarCollapsed && <rect x="8.5" y="5.5" width="4" height="5" fill="currentColor" opacity="0.5" />}
+          </svg>
+        </button>
         <span className="title-bar-brand">⚓ Wharf</span>
         <button
           className="title-bar-icon-btn"

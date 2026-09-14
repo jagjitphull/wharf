@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from "../../state/themeStore";
+import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import "../../styles/dialog.css";
@@ -13,6 +14,7 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 
 export function Settings() {
   const { mode, accent, setMode, setAccent } = useThemeStore();
+  const { fontSize, fontFamily, increaseFontSize, decreaseFontSize, setFontFamily } = useTerminalPrefsStore();
   const { loadAll } = useAppStore();
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
@@ -86,6 +88,37 @@ export function Settings() {
           ))}
         </div>
       </div>
+
+      <h2>Terminal</h2>
+
+      <div className="appearance-row">
+        <span className="appearance-label">Font size</span>
+        <div className="font-size-stepper">
+          <button className="btn ghost small" onClick={decreaseFontSize} disabled={fontSize <= MIN_FONT_SIZE}>
+            −
+          </button>
+          <span className="font-size-value">{fontSize}px</span>
+          <button className="btn ghost small" onClick={increaseFontSize} disabled={fontSize >= MAX_FONT_SIZE}>
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="appearance-row">
+        <span className="appearance-label">Font family</span>
+        <select className="font-family-select" value={fontFamily} onChange={(e) => setFontFamily(e.target.value)}>
+          {FONT_FAMILY_PRESETS.map((preset) => (
+            <option key={preset.value} value={preset.value}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <p className="hint">
+        <code>Ctrl/Cmd +</code>/<code>−</code> to resize on the fly, <code>Ctrl/Cmd 0</code> to reset · applies to
+        every open terminal.
+      </p>
 
       <h2>Backup</h2>
       <p className="hint">

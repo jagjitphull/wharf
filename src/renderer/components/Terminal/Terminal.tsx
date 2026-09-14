@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
+import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import "@xterm/xterm/css/xterm.css";
@@ -58,6 +59,8 @@ export function TerminalView({ sessionId, visible }: Props) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const accent = useThemeStore((s) => s.accent);
+  const fontSize = useTerminalPrefsStore((s) => s.fontSize);
+  const fontFamily = useTerminalPrefsStore((s) => s.fontFamily);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,8 +81,8 @@ export function TerminalView({ sessionId, visible }: Props) {
     if (!el) return;
 
     const term = new XTerm({
-      fontFamily: "'SF Mono', Menlo, Consolas, monospace",
-      fontSize: 13,
+      fontFamily: useTerminalPrefsStore.getState().fontFamily,
+      fontSize: useTerminalPrefsStore.getState().fontSize,
       cursorBlink: true,
       theme: readXtermTheme(),
     });
@@ -149,6 +152,18 @@ export function TerminalView({ sessionId, visible }: Props) {
   useEffect(() => {
     termRef.current && (termRef.current.options.theme = readXtermTheme());
   }, [resolvedTheme, accent]);
+
+  // Font size/family changes resize the character cell, so cols/rows change
+  // too — refit and tell the remote pty about the new size, same as a
+  // window resize would.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.fontFamily = fontFamily;
+    term.options.fontSize = fontSize;
+    fitRef.current?.fit();
+    wharf.ssh.resize(sessionId, term.cols, term.rows);
+  }, [fontSize, fontFamily, sessionId]);
 
   useEffect(() => {
     if (visible) {
