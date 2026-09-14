@@ -33,6 +33,9 @@ const api: WharfApi = {
     startLogging: (sessionId) => ipcRenderer.invoke(IPC.ssh.startLogging, sessionId),
     stopLogging: (sessionId) => ipcRenderer.invoke(IPC.ssh.stopLogging, sessionId),
   },
+  localShell: {
+    connect: (cols, rows) => ipcRenderer.invoke(IPC.localShell.connect, cols, rows),
+  },
   sshConfig: {
     parse: () => ipcRenderer.invoke(IPC.sshConfig.parse),
     import: (aliases) => ipcRenderer.invoke(IPC.sshConfig.import, aliases),

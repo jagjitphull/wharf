@@ -46,6 +46,10 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Keyword highlighting — built-in Error/Warning/OK/Info/Debug/IP-and-MAC
   categories plus custom regex rules, each with its own color, live in every
   terminal
+- Local shell tabs — open a real local shell (your OS default shell, via a
+  pty) as its own tab, no SSH or saved host involved; it's a first-class tab
+  alongside SSH sessions (duplicate, logging, keyword highlighting, themes,
+  all work the same)
 
 ## Getting started
 
@@ -101,10 +105,13 @@ src/
     services/
       store.ts             electron-store wrapper (hosts/groups/tunnels/snippets/window bounds)
       secretStore.ts        safeStorage-backed secret storage (passwords/passphrases)
-      sshManager.ts          ssh2 connection + shell session manager (incl. jump-host chaining)
+      sshManager.ts          ssh2 connection + shell session manager (incl. jump-host chaining,
+                              reconnect-on-drop with backoff)
+      localShellManager.ts    node-pty local shell session manager (Local Shell tabs)
       sftpManager.ts         ssh2 SFTP subsystem wrapper, pooled per host
       tunnelManager.ts       local/remote SSH port forwarding
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
+      sshConfigParser.ts      ~/.ssh/config parser for the import dialog
   renderer/               React UI (Vite)
     components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
                             Tunnels, Settings, QuickConnect, ContextMenu, SnippetPicker,
@@ -134,6 +141,15 @@ src/
   hashed (`HashKnownHosts`) entries, but not the full OpenSSH known_hosts
   spec (no `!negation`, CIDR ranges, or `@cert-authority`/`@revoked`
   markers).
+- Local shell tabs use [`node-pty`](https://github.com/microsoft/node-pty),
+  a native addon that must be compiled against Electron's own Node ABI (not
+  your system Node's). `npm install` does this automatically via
+  `postinstall` (`npm run rebuild-native`, which shells out to
+  `electron-rebuild`); if that step fails — no network access, no build
+  toolchain — Local Shell tabs fail with a clear error instead of crashing
+  the app, and everything else keeps working. Re-run
+  `npm run rebuild-native` after fixing whatever blocked it, or after
+  upgrading Electron.
 
 ## Security notes
 

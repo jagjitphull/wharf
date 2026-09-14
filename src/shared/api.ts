@@ -54,6 +54,10 @@ export interface WharfApi {
     startLogging(sessionId: string): Promise<string | null>;
     stopLogging(sessionId: string): Promise<void>;
   };
+  localShell: {
+    /** Opens a real local shell (the user's default shell, via a pty) as its own tab — no host involved. write/resize/disconnect/logging/onData/onClosed are the same ssh.* calls, keyed by the returned sessionId. */
+    connect(cols: number, rows: number): Promise<SessionStartResult>;
+  };
   sshConfig: {
     /** Parses `~/.ssh/config` (including simple `Include` directives). Returns [] if the file doesn't exist. */
     parse(): Promise<SshConfigCandidate[]>;

@@ -18,19 +18,23 @@
     "build": "npm run build:renderer && npm run build:main && npm run build:preload",
     "start": "electron .",
     "package": "npm run build && electron-builder",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "rebuild-native": "electron-rebuild -f -w node-pty",
+    "postinstall": "npm run rebuild-native || echo \"warning: couldn't rebuild node-pty for Electron (needs network access to electronjs.org) — Local Shell tabs won't work until you run: npm run rebuild-native\""
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/xterm": "^5.5.0",
     "electron-store": "^8.2.0",
+    "node-pty": "^1.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ssh2": "^1.16.0",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@types/ssh2": "^1.15.1",

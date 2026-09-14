@@ -45,10 +45,12 @@ export function StatusBar() {
             ? `Reconnecting… (${activeTab.reconnecting.attempt}/${activeTab.reconnecting.maxAttempts})`
             : "Connected"}
       </span>
-      {host && (
+      {host ? (
         <span className="status-host">
           {host.username}@{host.hostname}:{host.port}
         </span>
+      ) : (
+        activeTab.hostId === null && <span className="status-host">Local shell</span>
       )}
       {!activeTab.closed && <span className="status-duration">{formatDuration(now - activeTab.connectedAt)}</span>}
       {activeTab.closeError && <span className="status-error">{activeTab.closeError}</span>}

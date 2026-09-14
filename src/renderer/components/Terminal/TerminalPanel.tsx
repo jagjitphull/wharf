@@ -17,8 +17,18 @@ interface Props {
 }
 
 export function TerminalPanel({ hidden }: Props) {
-  const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab, setTabThemeId, setTabLogPath } =
-    useAppStore();
+  const {
+    tabs,
+    activeTabId,
+    hosts,
+    setActiveTab,
+    closeTerminal,
+    duplicateTab,
+    reorderTab,
+    setTabThemeId,
+    setTabLogPath,
+    openLocalShell,
+  } = useAppStore();
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -49,6 +59,9 @@ export function TerminalPanel({ hidden }: Props) {
       <div className="terminal-empty" style={hidden ? { display: "none" } : undefined}>
         <p>No open sessions.</p>
         <p className="hint">Double-click a host in the sidebar (or hit ▶) to connect.</p>
+        <button className="btn ghost small" onClick={() => openLocalShell()}>
+          Open Local Shell
+        </button>
       </div>
     );
   }

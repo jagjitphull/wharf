@@ -104,3 +104,12 @@ export function IconArrowLeft({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+export function IconTerminal({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
+      <path d="M4 6l2.8 2.5L4 11M8.5 11h3.5" />
+    </svg>
+  );
+}

@@ -6,7 +6,7 @@ import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import { IconFolder, IconPencil, IconPlay, IconPlus, IconTrash } from "../Icons/Icons";
+import { IconFolder, IconPencil, IconPlay, IconPlus, IconTerminal, IconTrash } from "../Icons/Icons";
 import "./Sidebar.css";
 
 interface Props {
@@ -19,7 +19,7 @@ function hostMatchesFilter(host: HostRecord, filter: string): boolean {
 }
 
 export function Sidebar({ onOpenQuickConnect }: Props) {
-  const { hosts, groups, activeView, setActiveView, contextHostId, setContextHostId, openTerminal, loadAll } =
+  const { hosts, groups, activeView, setActiveView, contextHostId, setContextHostId, openTerminal, openLocalShell, loadAll } =
     useAppStore();
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
   const [groupDialog, setGroupDialog] = useState<{ group: GroupRecord | null } | null>(null);
@@ -39,6 +39,15 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     setError(null);
     try {
       await openTerminal(host);
+    } catch (err) {
+      setError(ipcErrorMessage(err));
+    }
+  }
+
+  async function startLocalShell() {
+    setError(null);
+    try {
+      await openLocalShell();
     } catch (err) {
       setError(ipcErrorMessage(err));
     }
@@ -181,6 +190,9 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
           onClick={() => setSshConfigImportOpen(true)}
         >
           Import…
+        </button>
+        <button className="btn ghost small" title="Open a local shell (no SSH)" onClick={startLocalShell}>
+          <IconTerminal /> Local Shell
         </button>
       </div>
 

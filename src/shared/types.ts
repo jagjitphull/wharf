@@ -236,6 +236,9 @@ export const IPC = {
     startLogging: "ssh:log-start",
     stopLogging: "ssh:log-stop",
   },
+  localShell: {
+    connect: "local-shell:connect",
+  },
   sshConfig: {
     parse: "ssh-config:parse",
     import: "ssh-config:import",

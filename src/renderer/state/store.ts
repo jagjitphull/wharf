@@ -4,7 +4,8 @@ import { wharf } from "../api/wharf";
 
 export interface TerminalTab {
   sessionId: string;
-  hostId: string;
+  /** null for a local shell tab — it isn't connected to any saved host. */
+  hostId: string | null;
   title: string;
   connectedAt: number;
   closed?: boolean;
@@ -44,6 +45,7 @@ interface AppState {
   refreshSnippets(): Promise<void>;
 
   openTerminal(host: HostRecord, themeId?: string): Promise<void>;
+  openLocalShell(themeId?: string): Promise<void>;
   closeTerminal(sessionId: string): Promise<void>;
   duplicateTab(sessionId: string): Promise<void>;
   reorderTab(sessionId: string, beforeSessionId: string): void;
@@ -93,6 +95,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: sessionId, activeView: "hosts" }));
   },
 
+  async openLocalShell(themeId) {
+    const { sessionId } = await wharf.localShell.connect(80, 24);
+    const existingLocalShells = get().tabs.filter((t) => t.hostId === null).length;
+    const title = existingLocalShells === 0 ? "Local Shell" : `Local Shell ${existingLocalShells + 1}`;
+    const tab: TerminalTab = { sessionId, hostId: null, title, connectedAt: Date.now(), themeId };
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: sessionId, activeView: "hosts" }));
+  },
+
   async closeTerminal(sessionId) {
     await wharf.ssh.disconnect(sessionId).catch(() => {});
     set((s) => {
@@ -105,6 +115,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   async duplicateTab(sessionId) {
     const tab = get().tabs.find((t) => t.sessionId === sessionId);
     if (!tab) return;
+    if (tab.hostId === null) {
+      await get().openLocalShell(tab.themeId);
+      return;
+    }
     const host = get().hosts.find((h) => h.id === tab.hostId);
     if (!host) return;
     await get().openTerminal(host, tab.themeId);
