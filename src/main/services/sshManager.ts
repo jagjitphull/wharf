@@ -1,17 +1,18 @@
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { Client, type ClientChannel, type ConnectConfig } from "ssh2";
+import { Client, type ClientChannel, type ConnectConfig, type HostVerifier } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type HostRecord } from "../../shared/types";
 import { readSecret } from "./secretStore";
 import { getHosts } from "./store";
+import { verifyHostKeyInteractive } from "./knownHosts";
 
 interface Session {
   id: string;
   hostId: string;
   client: Client;
   channel: ClientChannel;
-  /** Set when connected through a jump/bastion host (Pro feature); kept alive for the session's lifetime. */
+  /** Set when connected through a jump/bastion host; kept alive for the session's lifetime. */
   jumpClient?: Client;
 }
 
@@ -31,6 +32,11 @@ export function buildConnectConfig(host: HostRecord): ConnectConfig {
     username: host.username,
     readyTimeout: 20_000,
     keepaliveInterval: 15_000,
+    // Verify against ~/.ssh/known_hosts (TOFU) instead of ssh2's default of
+    // silently accepting any server key.
+    hostVerifier: ((keyBlob: Buffer, verify: (valid: boolean) => void) => {
+      void verifyHostKeyInteractive(host.hostname, host.port, keyBlob).then(verify);
+    }) satisfies HostVerifier,
   };
 
   switch (host.authMethod) {

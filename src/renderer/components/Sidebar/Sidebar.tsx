@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { GroupRecord, HostRecord } from "@shared/types";
 import { useAppStore, type ActiveView } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
@@ -6,12 +6,28 @@ import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import "./Sidebar.css";
 
-export function Sidebar() {
+interface Props {
+  onOpenQuickConnect(): void;
+}
+
+function hostMatchesFilter(host: HostRecord, filter: string): boolean {
+  const haystack = `${host.name} ${host.username} ${host.hostname}`.toLowerCase();
+  return haystack.includes(filter);
+}
+
+export function Sidebar({ onOpenQuickConnect }: Props) {
   const { hosts, groups, activeView, setActiveView, contextHostId, setContextHostId, openTerminal, loadAll } =
     useAppStore();
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
   const [groupDialog, setGroupDialog] = useState<{ group: GroupRecord | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
+
+  const normalizedFilter = filter.trim().toLowerCase();
+  const visibleHosts = useMemo(
+    () => (normalizedFilter ? hosts.filter((h) => hostMatchesFilter(h, normalizedFilter)) : hosts),
+    [hosts, normalizedFilter],
+  );
 
   async function connect(host: HostRecord) {
     setContextHostId(host.id);
@@ -70,7 +86,10 @@ export function Sidebar() {
 
   function renderGroup(group: GroupRecord | null, depth = 0): React.ReactNode {
     const childGroups = groups.filter((g) => g.parentId === (group?.id ?? null));
-    const groupHosts = hosts.filter((h) => h.groupId === (group?.id ?? null));
+    const groupHosts = visibleHosts.filter((h) => h.groupId === (group?.id ?? null));
+    const renderedChildGroups = childGroups.map((g) => renderGroup(g, depth + 1)).filter(Boolean);
+    // While filtering, hide groups that have no matching hosts anywhere in their subtree.
+    if (normalizedFilter && groupHosts.length === 0 && renderedChildGroups.length === 0) return null;
     if (!group && childGroups.length === 0 && groupHosts.length === 0) return null;
 
     return (
@@ -92,7 +111,7 @@ export function Sidebar() {
           </div>
         )}
         {groupHosts.map(renderHost)}
-        {childGroups.map((g) => renderGroup(g, depth + 1))}
+        {renderedChildGroups}
       </div>
     );
   }
@@ -105,15 +124,22 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <span className="brand">⚓ Wharf</span>
-      </div>
-
       <nav className="sidebar-nav">
         {navItem("hosts", "Hosts")}
         {navItem("tunnels", "Tunnels")}
         {navItem("settings", "Settings")}
       </nav>
+
+      <div className="sidebar-search">
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter hosts…"
+        />
+        <button className="quick-connect-hint-btn" title="Quick Connect" onClick={onOpenQuickConnect}>
+          ⌘K
+        </button>
+      </div>
 
       <div className="sidebar-toolbar">
         <button className="btn ghost small" onClick={() => setHostDialog({ host: null, groupId: null })}>
@@ -126,7 +152,10 @@ export function Sidebar() {
 
       {error && <div className="sidebar-error">{error}</div>}
 
-      <div className="host-tree">{renderGroup(null)}</div>
+      <div className="host-tree">
+        {renderGroup(null)}
+        {normalizedFilter && visibleHosts.length === 0 && <p className="sidebar-empty">No hosts match "{filter}".</p>}
+      </div>
 
       <div className="sidebar-footer">
         <span className="host-count">

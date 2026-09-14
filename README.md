@@ -11,10 +11,16 @@ A personal SSH/SFTP terminal client, Termius-style.
 
 - Save hosts, organize them into (nested) groups
 - Connect via password, private key, or SSH agent auth
-- Multiple concurrent terminal sessions (tabbed)
+- Multiple concurrent terminal sessions (tabbed), plus duplicate-tab and
+  multiple independent app windows (each with their own tabs)
+- Quick Connect (`Ctrl/Cmd+K`) — jump straight to a host from anywhere;
+  the sidebar also has an inline filter box
 - Full SFTP file browser per host
 - SSH jump hosts — connect through another saved host as a bastion
 - Port forwarding — local & remote SSH tunnels, managed from a Tunnels panel
+- Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
+  with a strong warning if a host's key changes)
+- Custom title bar with working minimize/maximize/close on every platform
 
 ## Getting started
 
@@ -39,15 +45,17 @@ src/
     index.ts             App entry: window creation, IPC registration
     preload.ts            contextBridge: exposes window.wharf to the renderer
                            (bundled to a single file via esbuild — see below)
-    ipc/                  One module per IPC surface (hosts, groups, ssh, sftp, tunnels)
+    ipc/                  One module per IPC surface (hosts, groups, ssh, sftp, tunnels, window)
     services/
       store.ts             electron-store wrapper (hosts/groups/tunnels)
       secretStore.ts        safeStorage-backed secret storage (passwords/passphrases)
       sshManager.ts          ssh2 connection + shell session manager (incl. jump-host chaining)
       sftpManager.ts         ssh2 SFTP subsystem wrapper, pooled per host
       tunnelManager.ts       local/remote SSH port forwarding
+      knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
   renderer/               React UI (Vite)
-    components/            Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser, Tunnels, Settings
+    components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
+                            Tunnels, Settings, QuickConnect
     state/store.ts          zustand store (hosts, groups, tunnels, open terminal tabs)
     api/wharf.ts             Thin wrapper over window.wharf
   shared/                 Types shared between main & renderer (no Node/DOM APIs)
@@ -67,9 +75,18 @@ src/
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.
+- `knownHosts.ts` supports exact-host and simple `*`/`?` glob patterns plus
+  hashed (`HashKnownHosts`) entries, but not the full OpenSSH known_hosts
+  spec (no `!negation`, CIDR ranges, or `@cert-authority`/`@revoked`
+  markers).
 
 ## Security notes
 
+- SSH host keys are checked against `~/.ssh/known_hosts` on every connection
+  (shell, jump-host, SFTP, tunnels all share this via `buildConnectConfig`).
+  A new host prompts a trust-on-first-use dialog; a key that has changed
+  since last time shows a strong "possible MITM" warning instead of
+  silently reconnecting.
 - Renderer runs with `contextIsolation: true`, `nodeIntegration: false`,
   `sandbox: true`; all filesystem/SSH/SFTP access happens in the main
   process behind the typed `window.wharf` bridge in `preload.ts`.
