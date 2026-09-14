@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Terminal as XTerm } from "@xterm/xterm";
+import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { wharf } from "../../api/wharf";
+import { useThemeStore } from "../../state/themeStore";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -10,9 +11,48 @@ interface Props {
   visible: boolean;
 }
 
+const TERM_CSS_VARS = [
+  ["background", "--term-bg"],
+  ["foreground", "--term-fg"],
+  ["cursor", "--term-cursor"],
+  ["selectionBackground", "--term-selection"],
+  ["black", "--term-black"],
+  ["red", "--term-red"],
+  ["green", "--term-green"],
+  ["yellow", "--term-yellow"],
+  ["blue", "--term-blue"],
+  ["magenta", "--term-magenta"],
+  ["cyan", "--term-cyan"],
+  ["white", "--term-white"],
+  ["brightBlack", "--term-bright-black"],
+  ["brightRed", "--term-bright-red"],
+  ["brightGreen", "--term-bright-green"],
+  ["brightYellow", "--term-bright-yellow"],
+  ["brightBlue", "--term-bright-blue"],
+  ["brightMagenta", "--term-bright-magenta"],
+  ["brightCyan", "--term-bright-cyan"],
+  ["brightWhite", "--term-bright-white"],
+] as const;
+
+/** Builds an xterm.js theme from the current CSS custom properties, so the
+ * terminal's colors are a single source of truth (global.css) rather than
+ * duplicated as hex literals in JS. */
+function readXtermTheme(): ITheme {
+  const styles = getComputedStyle(document.documentElement);
+  const theme: Record<string, string> = {};
+  for (const [key, cssVar] of TERM_CSS_VARS) {
+    const value = styles.getPropertyValue(cssVar).trim();
+    if (value) theme[key] = value;
+  }
+  return theme;
+}
+
 export function TerminalView({ sessionId, visible }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const termRef = useRef<XTerm | null>(null);
+  const resolvedTheme = useThemeStore((s) => s.resolved);
+  const accent = useThemeStore((s) => s.accent);
 
   // Mounts the xterm instance exactly once per session (this component is
   // kept alive-but-hidden by the parent while its tab is in the background,
@@ -25,11 +65,9 @@ export function TerminalView({ sessionId, visible }: Props) {
       fontFamily: "'SF Mono', Menlo, Consolas, monospace",
       fontSize: 13,
       cursorBlink: true,
-      theme: {
-        background: "#0d0f14",
-        foreground: "#d8dee9",
-      },
+      theme: readXtermTheme(),
     });
+    termRef.current = term;
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
@@ -63,9 +101,17 @@ export function TerminalView({ sessionId, visible }: Props) {
       dataDisposable.dispose();
       resizeObserver.disconnect();
       term.dispose();
+      termRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // Live theme updates: re-read the CSS vars and hand xterm a new theme
+  // object whenever the resolved light/dark mode or accent color changes,
+  // without recreating the terminal (which would lose scrollback).
+  useEffect(() => {
+    termRef.current && (termRef.current.options.theme = readXtermTheme());
+  }, [resolvedTheme, accent]);
 
   useEffect(() => {
     if (visible) {

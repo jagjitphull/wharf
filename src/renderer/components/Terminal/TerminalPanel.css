@@ -27,7 +27,7 @@
 }
 
 .tab.active {
-  background: #0d0f14;
+  background: var(--bg);
   color: var(--text);
 }
 

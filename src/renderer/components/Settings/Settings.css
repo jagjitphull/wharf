@@ -9,3 +9,63 @@
   font-size: 16px;
   margin: 0 0 10px;
 }
+
+.settings-panel h2:not(:first-child) {
+  margin-top: 28px;
+}
+
+.appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.appearance-label {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.mode-switch {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.accent-swatches {
+  display: flex;
+  gap: 8px;
+}
+
+.accent-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.accent-swatch.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg-panel);
+}

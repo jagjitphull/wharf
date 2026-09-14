@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   padding: 8px;
-  background: #0d0f14;
+  background: var(--term-bg, var(--bg));
 }
 
 .terminal-pane .xterm {

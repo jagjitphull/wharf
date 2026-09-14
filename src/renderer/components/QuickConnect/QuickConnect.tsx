@@ -84,7 +84,7 @@ export function QuickConnect({ hosts, groups, onClose, onConnect }: Props) {
               onMouseEnter={() => setSelected(i)}
               onClick={() => onConnect(host)}
             >
-              <span className="dot" style={{ background: host.color ?? "#5b8def" }} />
+              <span className="dot" style={{ background: host.color ?? "var(--accent)" }} />
               <span className="quick-connect-name">{host.name}</span>
               <span className="quick-connect-sub">
                 {host.username}@{host.hostname}:{host.port}

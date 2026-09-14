@@ -60,7 +60,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     return (
       <div key={host.id} className={`host-row ${contextHostId === host.id ? "active" : ""}`}>
         <button className="host-name" onDoubleClick={() => connect(host)} onClick={() => setContextHostId(host.id)}>
-          <span className="dot" style={{ background: host.color ?? "#5b8def" }} />
+          <span className="dot" style={{ background: host.color ?? "var(--accent)" }} />
           {host.name}
           <span className="host-sub">
             {host.username}@{host.hostname}:{host.port}

@@ -1,4 +1,13 @@
+/* Theme tokens: applied via [data-theme] (set by themeStore.ts, synchronously
+   before first paint). The bare :root + media-query fallback below only
+   covers the ~0ms window before that script runs. --accent-color is set
+   separately (inline on the root element) from the user's accent choice;
+   --accent derives from it so every surface stays in sync. */
 :root {
+  --accent-color: #5b8def;
+}
+
+[data-theme="dark"] {
   --bg: #0d0f14;
   --bg-sidebar: #14171e;
   --bg-panel: #171a21;
@@ -8,11 +17,94 @@
   --border: #262b35;
   --text: #e4e7ec;
   --text-dim: #8a92a3;
-  --accent: #5b8def;
-  --accent-bg: rgba(91, 141, 239, 0.15);
+  --accent: var(--accent-color);
+  --accent-bg: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-fg: #0a0e18;
   --success: #35c76e;
   --danger-bg: rgba(235, 87, 87, 0.15);
-  --danger-text: #eb5757;
+  --danger-text: #ff6b6b;
+
+  /* Terminal (xterm.js) palette — read at runtime via getComputedStyle so
+     JS never duplicates these hex values. */
+  --term-bg: #0d0f14;
+  --term-fg: #d8dee9;
+  --term-cursor: #d8dee9;
+  --term-selection: rgba(91, 141, 239, 0.35);
+  --term-black: #1c1f26;
+  --term-red: #e06c75;
+  --term-green: #98c379;
+  --term-yellow: #e5c07b;
+  --term-blue: #61afef;
+  --term-magenta: #c678dd;
+  --term-cyan: #56b6c2;
+  --term-white: #d8dee9;
+  --term-bright-black: #5c6370;
+  --term-bright-red: #e06c75;
+  --term-bright-green: #98c379;
+  --term-bright-yellow: #e5c07b;
+  --term-bright-blue: #61afef;
+  --term-bright-magenta: #c678dd;
+  --term-bright-cyan: #56b6c2;
+  --term-bright-white: #ffffff;
+}
+
+[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-sidebar: #fbfbfc;
+  --bg-panel: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #eef0f3;
+  --bg-active: #e6e9ed;
+  --border: #dde1e6;
+  --text: #1c1f26;
+  --text-dim: #667085;
+  --accent: var(--accent-color);
+  --accent-bg: color-mix(in srgb, var(--accent) 12%, white);
+  --accent-fg: #ffffff;
+  --success: #17874c;
+  --danger-bg: rgba(209, 55, 63, 0.1);
+  --danger-text: #c8323a;
+
+  --term-bg: #ffffff;
+  --term-fg: #1c1f26;
+  --term-cursor: #1c1f26;
+  --term-selection: rgba(59, 111, 214, 0.25);
+  --term-black: #1c1f26;
+  --term-red: #d1373f;
+  --term-green: #17874c;
+  --term-yellow: #a36a00;
+  --term-blue: #3b6fd6;
+  --term-magenta: #8b3fa6;
+  --term-cyan: #0f8fa3;
+  --term-white: #e4e7ec;
+  --term-bright-black: #667085;
+  --term-bright-red: #e0575f;
+  --term-bright-green: #1f9d55;
+  --term-bright-yellow: #c78a12;
+  --term-bright-blue: #5b8def;
+  --term-bright-magenta: #a55fc4;
+  --term-bright-cyan: #2bb3c4;
+  --term-bright-white: #1c1f26;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0d0f14;
+    --bg-sidebar: #14171e;
+    --bg-panel: #171a21;
+    --bg-input: #0d0f14;
+    --bg-hover: #1d212a;
+    --bg-active: #232833;
+    --border: #262b35;
+    --text: #e4e7ec;
+    --text-dim: #8a92a3;
+    --accent: var(--accent-color);
+    --accent-bg: color-mix(in srgb, var(--accent) 18%, transparent);
+    --accent-fg: #0a0e18;
+    --success: #35c76e;
+    --danger-bg: rgba(235, 87, 87, 0.15);
+    --danger-text: #ff6b6b;
+  }
 }
 
 * {
@@ -80,7 +172,7 @@ button {
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0a0e18;
+  color: var(--accent-fg);
   font-weight: 600;
 }
 
