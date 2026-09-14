@@ -46,6 +46,32 @@ npm run build      # production build of renderer + main into dist-electron/
 npm run package    # build + electron-builder (produces installers in release/)
 ```
 
+## Installing on Ubuntu / Debian
+
+`npm run package` builds both a `.deb` and a portable `AppImage` into `release/` (run this on the
+Ubuntu machine you want to install on — it produces a native x64 Linux build, it doesn't cross-compile):
+
+```bash
+npm run package
+```
+
+**`.deb` (recommended — integrates with the app menu, installs to `/opt/Wharf`):**
+
+```bash
+sudo apt install ./release/wharf_0.1.0_amd64.deb
+# or: sudo dpkg -i release/wharf_0.1.0_amd64.deb && sudo apt-get install -f
+```
+
+Launch it from your app menu ("Wharf") or by running `wharf` in a terminal. Uninstall with
+`sudo apt remove wharf`.
+
+**AppImage (no install, no root needed):**
+
+```bash
+chmod +x release/Wharf-0.1.0.AppImage
+./release/Wharf-0.1.0.AppImage
+```
+
 ## Project structure
 
 ```
