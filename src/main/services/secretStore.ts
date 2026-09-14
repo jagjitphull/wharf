@@ -1,5 +1,5 @@
 import { safeStorage } from "electron";
-import { nanoid } from "nanoid";
+import { randomUUID } from "node:crypto";
 import { store } from "./store";
 
 /**
@@ -11,7 +11,7 @@ import { store } from "./store";
  * enters or reveals a secret.
  */
 export function saveSecret(plaintext: string): string {
-  const id = nanoid();
+  const id = randomUUID();
   const secrets = store.get("secrets");
   secrets[id] = encrypt(plaintext);
   store.set("secrets", secrets);

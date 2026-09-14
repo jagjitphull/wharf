@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { Client, type ClientChannel, type ConnectConfig } from "ssh2";
-import { nanoid } from "nanoid";
 import { BrowserWindow } from "electron";
 import { IPC, type HostRecord } from "../../shared/types";
 import { readSecret } from "./secretStore";
@@ -103,7 +103,7 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
     });
   });
 
-  const sessionId = nanoid();
+  const sessionId = randomUUID();
 
   channel.on("data", (data: Buffer) => {
     broadcast(IPC.ssh.onData, { sessionId, chunk: data.toString("utf8") });

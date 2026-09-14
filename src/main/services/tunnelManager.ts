@@ -1,6 +1,6 @@
 import net from "node:net";
+import { randomUUID } from "node:crypto";
 import { Client } from "ssh2";
-import { nanoid } from "nanoid";
 import { BrowserWindow } from "electron";
 import { IPC, type TunnelInput, type TunnelRecord, type TunnelStatus } from "../../shared/types";
 import { getHosts, getTunnels, setTunnels } from "./store";
@@ -30,7 +30,7 @@ export function list(): TunnelRecord[] {
 
 export function create(input: TunnelInput): TunnelRecord {
   requireFeature(getCurrentLicenseState(), "portForwarding");
-  const record: TunnelRecord = { id: nanoid(), ...input };
+  const record: TunnelRecord = { id: randomUUID(), ...input };
   setTunnels([...getTunnels(), record]);
   return record;
 }

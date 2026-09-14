@@ -1,6 +1,6 @@
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { Client, type SFTPWrapper } from "ssh2";
-import { nanoid } from "nanoid";
 import { BrowserWindow } from "electron";
 import { IPC, type SftpEntry, type SftpEntryType } from "../../shared/types";
 import { getHosts } from "./store";
@@ -131,7 +131,7 @@ export async function rename(hostId: string, oldPath: string, newPath: string): 
 
 export async function upload(hostId: string, localPath: string, remotePath: string): Promise<string> {
   const sftp = await getSftp(hostId);
-  const transferId = nanoid();
+  const transferId = randomUUID();
   const fileName = path.basename(localPath);
 
   sftp.fastPut(
@@ -169,7 +169,7 @@ export async function upload(hostId: string, localPath: string, remotePath: stri
 
 export async function download(hostId: string, remotePath: string, localPath: string): Promise<string> {
   const sftp = await getSftp(hostId);
-  const transferId = nanoid();
+  const transferId = randomUUID();
   const fileName = path.basename(remotePath);
 
   sftp.fastGet(

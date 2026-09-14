@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { nanoid } from "nanoid";
+import { randomUUID } from "node:crypto";
 import { IPC, type GroupInput, type GroupRecord } from "../../shared/types";
 import { getGroups, getHosts, setGroups, setHosts } from "../services/store";
 import { getCurrentLicenseState } from "../licensing/currentLicense";
@@ -20,7 +20,7 @@ export function registerGroupsIpc(): void {
 
     const now = Date.now();
     const record: GroupRecord = {
-      id: nanoid(),
+      id: randomUUID(),
       name: input.name,
       parentId: input.parentId,
       color: input.color,

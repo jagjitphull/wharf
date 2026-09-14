@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { nanoid } from "nanoid";
+import { randomUUID } from "node:crypto";
 import { IPC, type HostInput, type HostRecord } from "../../shared/types";
 import { getHosts, getTunnels, setHosts, setTunnels } from "../services/store";
 import { deleteSecret, saveSecret, updateSecret } from "../services/secretStore";
@@ -24,7 +24,7 @@ export function registerHostsIpc(): void {
     const now = Date.now();
     const secretId = input.secret ? saveSecret(input.secret) : null;
     const record: HostRecord = {
-      id: nanoid(),
+      id: randomUUID(),
       name: input.name,
       hostname: input.hostname,
       port: input.port,
