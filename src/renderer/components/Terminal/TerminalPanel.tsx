@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useAppStore } from "../../state/store";
+import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
+import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
 import "./TerminalPanel.css";
 
 interface Props {
@@ -13,7 +16,9 @@ interface Props {
 }
 
 export function TerminalPanel({ hidden }: Props) {
-  const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab } = useAppStore();
+  const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab, setTabThemeId } =
+    useAppStore();
+  const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -75,11 +80,21 @@ export function TerminalPanel({ hidden }: Props) {
                 { label: "Close", onClick: () => closeTerminal(tab.sessionId) },
                 { label: "Close Others", disabled: tabs.length < 2, onClick: () => closeOthers(tab.sessionId) },
                 { label: "Close All", onClick: () => closeAll() },
+                ...buildTerminalThemeMenuItems(tab.themeId ?? globalTerminalThemeId, (id) =>
+                  setTabThemeId(tab.sessionId, id),
+                ),
               ])
             }
             title={tab.closeError}
           >
             {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
+            {tab.themeId && (
+              <span
+                className="tab-theme-dot"
+                title={`Color theme: ${getTerminalThemePreset(tab.themeId).name}`}
+                style={{ background: getTerminalThemePreset(tab.themeId).theme?.background ?? "var(--term-bg)" }}
+              />
+            )}
             <span>{tab.title}</span>
             {tab.closed && <span className="tab-dot" />}
             <button
@@ -117,6 +132,7 @@ export function TerminalPanel({ hidden }: Props) {
             // its forced-repaint pass (see the `visible` effect in
             // Terminal.tsx) instead of staying stuck on stale pixels.
             visible={!hidden && tab.sessionId === activeTabId}
+            themeOverrideId={tab.themeId}
           />
         ))}
       </div>

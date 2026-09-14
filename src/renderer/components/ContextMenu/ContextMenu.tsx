@@ -7,6 +7,12 @@ export interface ContextMenuItem {
   danger?: boolean;
   disabled?: boolean;
   separator?: boolean;
+  /** Renders arbitrary content in place of the default label button (e.g. a
+   * swatch grid) — a lightweight substitute for submenus, which this
+   * component doesn't otherwise support. The custom content is responsible
+   * for its own click handling and closing the menu (via the `close`
+   * callback it receives). */
+  custom?(close: () => void): React.ReactNode;
 }
 
 export interface ContextMenuState {
@@ -44,7 +50,7 @@ export function ContextMenu({ menu, onClose }: Props) {
 
   if (!menu) return null;
 
-  const estimatedHeight = menu.items.length * 30 + 8;
+  const estimatedHeight = menu.items.reduce((h, item) => h + (item.custom ? 46 : 30), 8);
   const style: React.CSSProperties = {
     left: Math.min(menu.x, window.innerWidth - 200),
     top: Math.min(menu.y, window.innerHeight - estimatedHeight),
@@ -55,6 +61,10 @@ export function ContextMenu({ menu, onClose }: Props) {
       {menu.items.map((item, i) =>
         item.separator ? (
           <div className="context-menu-separator" key={i} />
+        ) : item.custom ? (
+          <div className="context-menu-custom" key={i}>
+            {item.custom(onClose)}
+          </div>
         ) : (
           <button
             key={i}

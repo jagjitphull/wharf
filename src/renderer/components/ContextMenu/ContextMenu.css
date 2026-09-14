@@ -41,3 +41,7 @@
   background: var(--border);
   margin: 4px 2px;
 }
+
+.context-menu-custom {
+  padding: 4px 6px 6px;
+}

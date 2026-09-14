@@ -57,6 +57,14 @@
   flex: none;
 }
 
+.tab-theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
 .tab-close,
 .tab-duplicate {
   background: transparent;

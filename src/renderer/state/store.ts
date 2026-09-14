@@ -9,6 +9,11 @@ export interface TerminalTab {
   connectedAt: number;
   closed?: boolean;
   closeError?: string;
+  /** Per-tab terminal color theme override (a TERMINAL_THEME_PRESETS id).
+   * Undefined means "use the global terminal theme from Settings". Not
+   * persisted — tabs are ephemeral (a fresh sessionId per connection), so
+   * this resets on reconnect same as everything else about the tab. */
+  themeId?: string;
 }
 
 export type ActiveView = "hosts" | "sftp" | "tunnels" | "settings";
@@ -32,11 +37,12 @@ interface AppState {
   refreshTunnels(): Promise<void>;
   refreshSnippets(): Promise<void>;
 
-  openTerminal(host: HostRecord): Promise<void>;
+  openTerminal(host: HostRecord, themeId?: string): Promise<void>;
   closeTerminal(sessionId: string): Promise<void>;
   duplicateTab(sessionId: string): Promise<void>;
   reorderTab(sessionId: string, beforeSessionId: string): void;
   setActiveTab(sessionId: string | null): void;
+  setTabThemeId(sessionId: string, themeId: string | undefined): void;
 
   setActiveView(view: ActiveView): void;
   setContextHostId(hostId: string | null): void;
@@ -74,9 +80,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ snippets: await wharf.snippets.list() });
   },
 
-  async openTerminal(host) {
+  async openTerminal(host, themeId) {
     const { sessionId } = await wharf.ssh.connect(host.id, 80, 24);
-    const tab: TerminalTab = { sessionId, hostId: host.id, title: host.name, connectedAt: Date.now() };
+    const tab: TerminalTab = { sessionId, hostId: host.id, title: host.name, connectedAt: Date.now(), themeId };
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: sessionId, activeView: "hosts" }));
   },
 
@@ -94,7 +100,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!tab) return;
     const host = get().hosts.find((h) => h.id === tab.hostId);
     if (!host) return;
-    await get().openTerminal(host);
+    await get().openTerminal(host, tab.themeId);
   },
 
   reorderTab(sessionId, beforeSessionId) {
@@ -112,6 +118,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab(sessionId) {
     set({ activeTabId: sessionId });
+  },
+
+  setTabThemeId(sessionId, themeId) {
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.sessionId === sessionId ? { ...t, themeId } : t)),
+    }));
   },
 
   setActiveView(view) {

@@ -1,0 +1,30 @@
+.term-theme-swatches-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 2px 4px 6px;
+}
+
+.term-theme-swatches-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.term-theme-swatch-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+
+.term-theme-swatch-dot:hover {
+  filter: brightness(1.15);
+}
+
+.term-theme-swatch-dot.active {
+  border-color: var(--accent);
+}

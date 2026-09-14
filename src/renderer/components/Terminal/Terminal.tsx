@@ -6,14 +6,19 @@ import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
+import { useAppStore } from "../../state/store";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
+import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
 interface Props {
   sessionId: string;
   visible: boolean;
+  /** Per-tab color theme override (from TerminalTab.themeId), taking
+   * priority over the global Settings choice. undefined defers to it. */
+  themeOverrideId?: string;
 }
 
 const TERM_CSS_VARS = [
@@ -59,7 +64,7 @@ function resolveXtermTheme(themeId: string): ITheme {
   return preset.theme ?? readAppCssTheme();
 }
 
-export function TerminalView({ sessionId, visible }: Props) {
+export function TerminalView({ sessionId, visible, themeOverrideId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termRef = useRef<XTerm | null>(null);
@@ -69,7 +74,9 @@ export function TerminalView({ sessionId, visible }: Props) {
   const accent = useThemeStore((s) => s.accent);
   const fontSize = useTerminalPrefsStore((s) => s.fontSize);
   const fontFamily = useTerminalPrefsStore((s) => s.fontFamily);
-  const terminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
+  const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
+  const setTabThemeId = useAppStore((s) => s.setTabThemeId);
+  const terminalThemeId = themeOverrideId ?? globalTerminalThemeId;
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -89,7 +96,7 @@ export function TerminalView({ sessionId, visible }: Props) {
     const el = containerRef.current;
     if (!el) return;
 
-    const initialTheme = resolveXtermTheme(useTerminalPrefsStore.getState().terminalThemeId);
+    const initialTheme = resolveXtermTheme(terminalThemeId);
     const term = new XTerm({
       fontFamily: useTerminalPrefsStore.getState().fontFamily,
       fontSize: useTerminalPrefsStore.getState().fontSize,
@@ -233,6 +240,11 @@ export function TerminalView({ sessionId, visible }: Props) {
       { label: "Insert Snippet…", onClick: () => setSnippetPickerOpen(true) },
       { label: "Select All", onClick: () => term.selectAll() },
       { label: "Clear", onClick: () => term.clear() },
+      // Picking any preset here — "Match App Theme" included — sets an
+      // explicit per-tab override, same as picking one always would; a tab
+      // only falls back to the global Settings choice until its own menu
+      // is used for the first time.
+      ...buildTerminalThemeMenuItems(terminalThemeId, (id) => setTabThemeId(sessionId, id)),
     ]);
   }
 
