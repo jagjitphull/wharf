@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { SftpEntry, SftpTransferProgress } from "@shared/types";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./SftpBrowser.css";
 
 function formatSize(bytes: number): string {
@@ -25,6 +26,7 @@ export function SftpBrowser() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transfers, setTransfers] = useState<Record<string, SftpTransferProgress>>({});
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   useEffect(() => {
     setPath(".");
@@ -178,7 +180,21 @@ export function SftpBrowser() {
         {loading && <div className="sftp-loading">Loading…</div>}
         {!loading &&
           entries.map((entry) => (
-            <div className="sftp-row" key={entry.path} onDoubleClick={() => openEntry(entry)}>
+            <div
+              className="sftp-row"
+              key={entry.path}
+              onDoubleClick={() => openEntry(entry)}
+              onContextMenu={(e) =>
+                openMenu(e, [
+                  ...(entry.type === "directory"
+                    ? [{ label: "Open", onClick: () => openEntry(entry) }]
+                    : [{ label: "Download", onClick: () => handleDownload(entry) }]),
+                  { label: "Rename…", onClick: () => handleRename(entry) },
+                  { separator: true },
+                  { label: "Delete", danger: true, onClick: () => handleDelete(entry) },
+                ])
+              }
+            >
               <span className="sftp-icon">{entry.type === "directory" ? "📁" : "📄"}</span>
               <span className="sftp-name">{entry.name}</span>
               <span className="sftp-size">{entry.type === "directory" ? "" : formatSize(entry.size)}</span>
@@ -193,6 +209,7 @@ export function SftpBrowser() {
           ))}
         {!loading && entries.length === 0 && <div className="sftp-loading">Empty directory.</div>}
       </div>
+      <ContextMenu menu={menu} onClose={closeMenu} />
     </div>
   );
 }

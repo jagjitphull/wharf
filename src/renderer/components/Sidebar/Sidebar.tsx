@@ -4,6 +4,7 @@ import { useAppStore, type ActiveView } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
+import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./Sidebar.css";
 
 interface Props {
@@ -22,6 +23,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
   const [groupDialog, setGroupDialog] = useState<{ group: GroupRecord | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   const normalizedFilter = filter.trim().toLowerCase();
   const visibleHosts = useMemo(
@@ -58,7 +60,19 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
 
   function renderHost(host: HostRecord) {
     return (
-      <div key={host.id} className={`host-row ${contextHostId === host.id ? "active" : ""}`}>
+      <div
+        key={host.id}
+        className={`host-row ${contextHostId === host.id ? "active" : ""}`}
+        onContextMenu={(e) =>
+          openMenu(e, [
+            { label: "Connect", onClick: () => connect(host) },
+            { label: "Files (SFTP)", onClick: () => openFiles(host) },
+            { separator: true },
+            { label: "Edit…", onClick: () => setHostDialog({ host, groupId: host.groupId }) },
+            { label: "Delete", danger: true, onClick: () => deleteHost(host) },
+          ])
+        }
+      >
         <button className="host-name" onDoubleClick={() => connect(host)} onClick={() => setContextHostId(host.id)}>
           <span className="dot" style={{ background: host.color ?? "var(--accent)" }} />
           {host.name}
@@ -95,7 +109,17 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     return (
       <div className="group-node" style={{ marginLeft: depth * 12 }} key={group?.id ?? "root"}>
         {group && (
-          <div className="group-row">
+          <div
+            className="group-row"
+            onContextMenu={(e) =>
+              openMenu(e, [
+                { label: "Add host here", onClick: () => setHostDialog({ host: null, groupId: group.id }) },
+                { separator: true },
+                { label: "Edit…", onClick: () => setGroupDialog({ group }) },
+                { label: "Delete", danger: true, onClick: () => deleteGroup(group) },
+              ])
+            }
+          >
             <span className="group-name">{group.name}</span>
             <div className="group-actions">
               <button title="Add host here" onClick={() => setHostDialog({ host: null, groupId: group.id })}>
@@ -188,6 +212,8 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
           }}
         />
       )}
+
+      <ContextMenu menu={menu} onClose={closeMenu} />
     </aside>
   );
 }

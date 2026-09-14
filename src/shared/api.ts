@@ -69,4 +69,8 @@ export interface WharfApi {
     newWindow(): void;
     onMaximizedChange(cb: (maximized: boolean) => void): Unsubscribe;
   };
+  clipboard: {
+    writeText(text: string): void;
+    readText(): Promise<string>;
+  };
 }

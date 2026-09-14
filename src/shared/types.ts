@@ -193,4 +193,8 @@ export const IPC = {
     newWindow: "window:new",
     onMaximizedChange: "window:maximized-changed",
   },
+  clipboard: {
+    writeText: "clipboard:write-text",
+    readText: "clipboard:read-text",
+  },
 } as const;

@@ -7,6 +7,7 @@ import { registerSshIpc } from "./ipc/ssh";
 import { registerSftpIpc } from "./ipc/sftp";
 import { registerTunnelsIpc } from "./ipc/tunnels";
 import { registerWindowIpc } from "./ipc/window";
+import { registerClipboardIpc } from "./ipc/clipboard";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 
@@ -92,6 +93,7 @@ app.whenReady().then(() => {
   registerSftpIpc();
   registerTunnelsIpc();
   registerWindowIpc(createWindow);
+  registerClipboardIpc();
 
   installAppMenu();
   createWindow();

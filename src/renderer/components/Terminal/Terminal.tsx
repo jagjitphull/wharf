@@ -3,6 +3,7 @@ import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
+import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -53,6 +54,7 @@ export function TerminalView({ sessionId, visible }: Props) {
   const termRef = useRef<XTerm | null>(null);
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const accent = useThemeStore((s) => s.accent);
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   // Mounts the xterm instance exactly once per session (this component is
   // kept alive-but-hidden by the parent while its tab is in the background,
@@ -119,5 +121,41 @@ export function TerminalView({ sessionId, visible }: Props) {
     }
   }, [visible]);
 
-  return <div ref={containerRef} className="terminal-pane" style={{ display: visible ? "block" : "none" }} />;
+  async function handleContextMenu(e: React.MouseEvent) {
+    const term = termRef.current;
+    if (!term) return;
+    const selection = term.getSelection();
+    openMenu(e, [
+      {
+        label: "Copy",
+        disabled: !selection,
+        onClick: () => selection && wharf.clipboard.writeText(selection),
+      },
+      {
+        label: "Paste",
+        onClick: async () => {
+          const text = await wharf.clipboard.readText();
+          if (text) term.paste(text);
+        },
+      },
+      { separator: true },
+      { label: "Select All", onClick: () => term.selectAll() },
+      { label: "Clear", onClick: () => term.clear() },
+    ]);
+  }
+
+  return (
+    <>
+      {/* xterm.js takes direct DOM ownership of this element via term.open() —
+          it must have no React-rendered children, or reconciliation and
+          xterm's own DOM writes will fight each other. */}
+      <div
+        ref={containerRef}
+        className="terminal-pane"
+        style={{ display: visible ? "block" : "none" }}
+        onContextMenu={handleContextMenu}
+      />
+      {visible && <ContextMenu menu={menu} onClose={closeMenu} />}
+    </>
+  );
 }

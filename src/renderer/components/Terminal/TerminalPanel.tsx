@@ -1,9 +1,21 @@
 import { useAppStore } from "../../state/store";
 import { TerminalView } from "./Terminal";
+import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./TerminalPanel.css";
 
 export function TerminalPanel() {
   const { tabs, activeTabId, setActiveTab, closeTerminal, duplicateTab } = useAppStore();
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu();
+
+  async function closeOthers(sessionId: string) {
+    for (const tab of tabs) {
+      if (tab.sessionId !== sessionId) await closeTerminal(tab.sessionId);
+    }
+  }
+
+  async function closeAll() {
+    for (const tab of tabs) await closeTerminal(tab.sessionId);
+  }
 
   if (tabs.length === 0) {
     return (
@@ -22,6 +34,15 @@ export function TerminalPanel() {
             key={tab.sessionId}
             className={`tab ${tab.sessionId === activeTabId ? "active" : ""} ${tab.closed ? "closed" : ""}`}
             onClick={() => setActiveTab(tab.sessionId)}
+            onContextMenu={(e) =>
+              openMenu(e, [
+                { label: "Duplicate", onClick: () => duplicateTab(tab.sessionId) },
+                { separator: true },
+                { label: "Close", onClick: () => closeTerminal(tab.sessionId) },
+                { label: "Close Others", disabled: tabs.length < 2, onClick: () => closeOthers(tab.sessionId) },
+                { label: "Close All", onClick: () => closeAll() },
+              ])
+            }
             title={tab.closeError}
           >
             <span>{tab.title}</span>
@@ -54,6 +75,7 @@ export function TerminalPanel() {
           <TerminalView key={tab.sessionId} sessionId={tab.sessionId} visible={tab.sessionId === activeTabId} />
         ))}
       </div>
+      <ContextMenu menu={menu} onClose={closeMenu} />
     </div>
   );
 }

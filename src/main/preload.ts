@@ -56,6 +56,10 @@ const api: WharfApi = {
     newWindow: () => ipcRenderer.send(IPC.window.newWindow),
     onMaximizedChange: (cb) => on(IPC.window.onMaximizedChange, cb as (...args: unknown[]) => void),
   },
+  clipboard: {
+    writeText: (text) => ipcRenderer.send(IPC.clipboard.writeText, text),
+    readText: () => ipcRenderer.invoke(IPC.clipboard.readText),
+  },
 };
 
 contextBridge.exposeInMainWorld("wharf", api);
