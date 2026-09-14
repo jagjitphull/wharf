@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useAppStore } from "../../state/store";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./TerminalPanel.css";
 
 export function TerminalPanel() {
-  const { tabs, activeTabId, setActiveTab, closeTerminal, duplicateTab } = useAppStore();
+  const { tabs, activeTabId, setActiveTab, closeTerminal, duplicateTab, reorderTab } = useAppStore();
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   async function closeOthers(sessionId: string) {
     for (const tab of tabs) {
@@ -32,7 +35,27 @@ export function TerminalPanel() {
         {tabs.map((tab) => (
           <div
             key={tab.sessionId}
-            className={`tab ${tab.sessionId === activeTabId ? "active" : ""} ${tab.closed ? "closed" : ""}`}
+            draggable
+            onDragStart={() => setDraggingId(tab.sessionId)}
+            onDragEnd={() => {
+              setDraggingId(null);
+              setDropTargetId(null);
+            }}
+            onDragOver={(e) => {
+              if (draggingId && draggingId !== tab.sessionId) {
+                e.preventDefault();
+                setDropTargetId(tab.sessionId);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggingId) reorderTab(draggingId, tab.sessionId);
+              setDraggingId(null);
+              setDropTargetId(null);
+            }}
+            className={`tab ${tab.sessionId === activeTabId ? "active" : ""} ${tab.closed ? "closed" : ""} ${
+              tab.sessionId === draggingId ? "dragging" : ""
+            } ${tab.sessionId === dropTargetId ? "drop-target" : ""}`}
             onClick={() => setActiveTab(tab.sessionId)}
             onContextMenu={(e) =>
               openMenu(e, [

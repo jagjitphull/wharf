@@ -11,16 +11,25 @@ A personal SSH/SFTP terminal client, Termius-style.
 
 - Save hosts, organize them into (nested) groups
 - Connect via password, private key, or SSH agent auth
-- Multiple concurrent terminal sessions (tabbed), plus duplicate-tab and
-  multiple independent app windows (each with their own tabs)
+- Multiple concurrent terminal sessions (tabbed) — duplicate a tab, drag to
+  reorder, switch with `Ctrl/Cmd+1..9` or `Ctrl/Cmd+Tab`, and open multiple
+  independent app windows (each with their own tabs)
 - Quick Connect (`Ctrl/Cmd+K`) — jump straight to a host from anywhere;
   the sidebar also has an inline filter box
-- Full SFTP file browser per host
+- In-terminal find (`Ctrl/Cmd+F`), right-click copy/paste/select-all/clear
+- Snippets library — save frequent commands, insert into any terminal via
+  right-click → Insert Snippet
+- Full SFTP file browser per host, with drag-and-drop upload from the OS
 - SSH jump hosts — connect through another saved host as a bastion
 - Port forwarding — local & remote SSH tunnels, managed from a Tunnels panel
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
-- Custom title bar with working minimize/maximize/close on every platform
+- Status bar showing the active session's connection state and duration
+- Export/import hosts & groups to/from a JSON file (secrets excluded)
+- Custom title bar with working minimize/maximize/close on every platform;
+  remembers window size and position between launches
+- Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)
+- Light/dark/system theme with an accent-color picker
 
 ## Getting started
 
@@ -45,9 +54,10 @@ src/
     index.ts             App entry: window creation, IPC registration
     preload.ts            contextBridge: exposes window.wharf to the renderer
                            (bundled to a single file via esbuild — see below)
-    ipc/                  One module per IPC surface (hosts, groups, ssh, sftp, tunnels, window)
+    ipc/                  One module per IPC surface (hosts, groups, ssh, sftp, tunnels, window,
+                          clipboard, backup, snippets)
     services/
-      store.ts             electron-store wrapper (hosts/groups/tunnels)
+      store.ts             electron-store wrapper (hosts/groups/tunnels/snippets/window bounds)
       secretStore.ts        safeStorage-backed secret storage (passwords/passphrases)
       sshManager.ts          ssh2 connection + shell session manager (incl. jump-host chaining)
       sftpManager.ts         ssh2 SFTP subsystem wrapper, pooled per host
@@ -55,8 +65,11 @@ src/
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
   renderer/               React UI (Vite)
     components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
-                            Tunnels, Settings, QuickConnect
-    state/store.ts          zustand store (hosts, groups, tunnels, open terminal tabs)
+                            Tunnels, Settings, QuickConnect, ContextMenu, SnippetPicker,
+                            StatusBar, Icons
+    state/
+      store.ts              zustand store (hosts, groups, tunnels, snippets, open terminal tabs)
+      themeStore.ts           theme mode + accent color, persisted to localStorage
     api/wharf.ts             Thin wrapper over window.wharf
   shared/                 Types shared between main & renderer (no Node/DOM APIs)
     types.ts                Domain types + IPC channel name constants

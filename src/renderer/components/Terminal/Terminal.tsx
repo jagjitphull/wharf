@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -52,9 +54,21 @@ export function TerminalView({ sessionId, visible }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termRef = useRef<XTerm | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const accent = useThemeStore((s) => s.accent);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
+  const searchOpenRef = useRef(false);
+
+  useEffect(() => {
+    searchOpenRef.current = searchOpen;
+    if (searchOpen) requestAnimationFrame(() => searchInputRef.current?.focus());
+    else termRef.current?.focus();
+  }, [searchOpen]);
 
   // Mounts the xterm instance exactly once per session (this component is
   // kept alive-but-hidden by the parent while its tab is in the background,
@@ -72,10 +86,30 @@ export function TerminalView({ sessionId, visible }: Props) {
     termRef.current = term;
     const fit = new FitAddon();
     term.loadAddon(fit);
+    const search = new SearchAddon();
+    term.loadAddon(search);
+    searchAddonRef.current = search;
     term.open(el);
     fitRef.current = fit;
     fit.fit();
     wharf.ssh.resize(sessionId, term.cols, term.rows);
+
+    // Intercept Ctrl/Cmd+F (open find bar) and Escape (close it) before
+    // xterm forwards the keystroke to the remote shell. Reads searchOpenRef
+    // rather than the `searchOpen` state directly since this handler is
+    // registered once at mount and would otherwise see a stale closure.
+    term.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") return true;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        setSearchOpen(true);
+        return false;
+      }
+      if (event.key === "Escape" && searchOpenRef.current) {
+        setSearchOpen(false);
+        return false;
+      }
+      return true;
+    });
 
     const offData = wharf.ssh.onData((event) => {
       if (event.sessionId === sessionId) term.write(event.chunk);
@@ -104,6 +138,7 @@ export function TerminalView({ sessionId, visible }: Props) {
       resizeObserver.disconnect();
       term.dispose();
       termRef.current = null;
+      searchAddonRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -139,9 +174,18 @@ export function TerminalView({ sessionId, visible }: Props) {
         },
       },
       { separator: true },
+      { label: "Find…", onClick: () => setSearchOpen(true) },
+      { label: "Insert Snippet…", onClick: () => setSnippetPickerOpen(true) },
       { label: "Select All", onClick: () => term.selectAll() },
       { label: "Clear", onClick: () => term.clear() },
     ]);
+  }
+
+  function findNext(query: string) {
+    searchAddonRef.current?.findNext(query, { incremental: true });
+  }
+  function findPrevious(query: string) {
+    searchAddonRef.current?.findPrevious(query);
   }
 
   return (
@@ -156,6 +200,47 @@ export function TerminalView({ sessionId, visible }: Props) {
         onContextMenu={handleContextMenu}
       />
       {visible && <ContextMenu menu={menu} onClose={closeMenu} />}
+      {visible && searchOpen && (
+        <div className="terminal-search-bar">
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              findNext(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (e.shiftKey) findPrevious(searchQuery);
+                else findNext(searchQuery);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setSearchOpen(false);
+              }
+            }}
+            placeholder="Find in terminal…"
+          />
+          <button title="Previous match (Shift+Enter)" onClick={() => findPrevious(searchQuery)}>
+            ↑
+          </button>
+          <button title="Next match (Enter)" onClick={() => findNext(searchQuery)}>
+            ↓
+          </button>
+          <button title="Close (Esc)" onClick={() => setSearchOpen(false)}>
+            ×
+          </button>
+        </div>
+      )}
+      {visible && snippetPickerOpen && (
+        <SnippetPicker
+          onClose={() => setSnippetPickerOpen(false)}
+          onInsert={(command) => {
+            termRef.current?.paste(command);
+            setSnippetPickerOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }

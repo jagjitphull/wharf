@@ -59,6 +59,29 @@ export interface GroupInput {
   color?: string;
 }
 
+/** Result of a successful backup:import; null return from the IPC call means the user canceled the file picker. */
+export interface BackupImportResult {
+  importedGroups: number;
+  importedHosts: number;
+}
+
+// ---------------------------------------------------------------------------
+// Snippets
+// ---------------------------------------------------------------------------
+
+export interface SnippetRecord {
+  id: string;
+  name: string;
+  command: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SnippetInput {
+  name: string;
+  command: string;
+}
+
 // ---------------------------------------------------------------------------
 // SSH sessions / terminal
 // ---------------------------------------------------------------------------
@@ -174,6 +197,7 @@ export const IPC = {
     unlink: "sftp:unlink",
     rename: "sftp:rename",
     upload: "sftp:upload",
+    uploadPath: "sftp:upload-path",
     download: "sftp:download",
     onProgress: "sftp:progress",
   },
@@ -196,5 +220,15 @@ export const IPC = {
   clipboard: {
     writeText: "clipboard:write-text",
     readText: "clipboard:read-text",
+  },
+  backup: {
+    export: "backup:export",
+    import: "backup:import",
+  },
+  snippets: {
+    list: "snippets:list",
+    create: "snippets:create",
+    update: "snippets:update",
+    remove: "snippets:remove",
   },
 } as const;

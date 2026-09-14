@@ -4,6 +4,7 @@
  * agree on the contract without the renderer importing any Node APIs.
  */
 import type {
+  BackupImportResult,
   GroupInput,
   GroupRecord,
   HostInput,
@@ -12,6 +13,8 @@ import type {
   SessionStartResult,
   SftpEntry,
   SftpTransferProgress,
+  SnippetInput,
+  SnippetRecord,
   TerminalDataEvent,
   TunnelInput,
   TunnelRecord,
@@ -48,6 +51,8 @@ export interface WharfApi {
     unlink(hostId: string, remotePath: string): Promise<void>;
     rename(hostId: string, oldPath: string, newPath: string): Promise<void>;
     upload(hostId: string, remoteDir: string): Promise<string | null>;
+    /** Uploads a file already on disk (e.g. from an OS drag-and-drop drop event) without showing a picker. */
+    uploadPath(hostId: string, localPath: string, remoteDir: string): Promise<string>;
     download(hostId: string, remotePath: string): Promise<string | null>;
     onProgress(cb: (event: SftpTransferProgress) => void): Unsubscribe;
   };
@@ -72,5 +77,17 @@ export interface WharfApi {
   clipboard: {
     writeText(text: string): void;
     readText(): Promise<string>;
+  };
+  backup: {
+    /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */
+    export(): Promise<string | null>;
+    /** Opens an open dialog, validates and merges a previously exported file. Returns null if the user canceled; throws on an invalid file. */
+    import(): Promise<BackupImportResult | null>;
+  };
+  snippets: {
+    list(): Promise<SnippetRecord[]>;
+    create(input: SnippetInput): Promise<SnippetRecord>;
+    update(id: string, input: SnippetInput): Promise<SnippetRecord>;
+    remove(id: string): Promise<void>;
   };
 }

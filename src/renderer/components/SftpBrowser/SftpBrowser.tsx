@@ -27,6 +27,7 @@ export function SftpBrowser() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transfers, setTransfers] = useState<Record<string, SftpTransferProgress>>({});
+  const [isDragOver, setIsDragOver] = useState(false);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   useEffect(() => {
@@ -95,6 +96,21 @@ export function SftpBrowser() {
     }
   }
 
+  async function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (!host) return;
+    const files = Array.from(e.dataTransfer.files) as (File & { path?: string })[];
+    for (const file of files) {
+      if (!file.path) continue;
+      try {
+        await wharf.sftp.uploadPath(host.id, file.path, path);
+      } catch (err) {
+        setError(ipcErrorMessage(err));
+      }
+    }
+  }
+
   async function handleDelete(entry: SftpEntry) {
     if (!host) return;
     if (!confirm(`Delete ${entry.type === "directory" ? "folder" : "file"} "${entry.name}"?`)) return;
@@ -141,7 +157,25 @@ export function SftpBrowser() {
   }
 
   return (
-    <div className="sftp-browser">
+    <div
+      className={`sftp-browser ${isDragOver ? "drag-over" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (e.dataTransfer.types.includes("Files")) setIsDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // dragleave fires when the pointer moves over a child element too,
+        // not just when it truly exits the container — only clear the
+        // overlay once the pointer has actually left our bounds.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDragOver(false);
+      }}
+      onDrop={handleFileDrop}
+    >
+      {isDragOver && (
+        <div className="sftp-drop-overlay">
+          <p>Drop to upload to {path === "." ? "this folder" : path}</p>
+        </div>
+      )}
       <div className="sftp-toolbar">
         <button className="btn ghost small" onClick={goUp} disabled={path === "." || path === "/"}>
           ↑ Up

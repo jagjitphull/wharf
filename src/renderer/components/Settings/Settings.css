@@ -69,3 +69,18 @@
   border-color: var(--text);
   box-shadow: 0 0 0 2px var(--bg-panel);
 }
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.backup-message {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--accent-bg);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 12.5px;
+}

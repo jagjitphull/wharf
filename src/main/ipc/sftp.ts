@@ -42,6 +42,14 @@ export function registerSftpIpc(): void {
   );
 
   ipcMain.handle(
+    IPC.sftp.uploadPath,
+    async (_event, hostId: string, localPath: string, remoteDir: string): Promise<string> => {
+      const remotePath = path.posix.join(remoteDir, path.basename(localPath));
+      return sftpManager.upload(hostId, localPath, remotePath);
+    },
+  );
+
+  ipcMain.handle(
     IPC.sftp.download,
     async (_event, hostId: string, remotePath: string): Promise<string | null> => {
       const result = await dialog.showSaveDialog({ defaultPath: path.posix.basename(remotePath) });

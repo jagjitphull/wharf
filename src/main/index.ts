@@ -8,16 +8,34 @@ import { registerSftpIpc } from "./ipc/sftp";
 import { registerTunnelsIpc } from "./ipc/tunnels";
 import { registerWindowIpc } from "./ipc/window";
 import { registerClipboardIpc } from "./ipc/clipboard";
+import { registerBackupIpc } from "./ipc/backup";
+import { registerSnippetsIpc } from "./ipc/snippets";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
+import { getWindowBounds, setWindowBounds } from "./services/store";
 
 const isDev = process.env.NODE_ENV === "development";
 const isMac = process.platform === "darwin";
 
-function createWindow(): BrowserWindow {
+const DEFAULT_WIDTH = 1280;
+const DEFAULT_HEIGHT = 800;
+
+/**
+ * @param primary Restore the exact saved position (x/y) as well as size —
+ * used for the app's first window. Secondary windows ("New Window") only
+ * reuse the saved size so the OS can cascade their position normally
+ * instead of stacking them exactly on top of the first.
+ */
+function createWindow(primary: boolean): BrowserWindow {
+  const saved = getWindowBounds();
+  const sizeAndPosition = saved
+    ? primary
+      ? saved
+      : { width: saved.width, height: saved.height }
+    : { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    ...sizeAndPosition,
     minWidth: 800,
     minHeight: 560,
     backgroundColor: "#111318",
@@ -36,6 +54,24 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: true,
     },
+  });
+
+  // Persist size/position (debounced) as the user resizes or moves the
+  // window, and once more on close so the very last adjustment sticks.
+  // getNormalBounds() (not getBounds()) so a maximized window doesn't
+  // overwrite the saved "restored" size with the full-screen one.
+  let saveBoundsTimer: NodeJS.Timeout | null = null;
+  function scheduleSaveBounds() {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+    saveBoundsTimer = setTimeout(() => {
+      if (!win.isDestroyed() && !win.isMinimized()) setWindowBounds(win.getNormalBounds());
+    }, 400);
+  }
+  win.on("resize", scheduleSaveBounds);
+  win.on("move", scheduleSaveBounds);
+  win.on("close", () => {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+    if (!win.isMinimized()) setWindowBounds(win.getNormalBounds());
   });
 
   // Terminal sessions open arbitrary remote shells; don't let the app spawn
@@ -75,7 +111,7 @@ function installAppMenu(): void {
     {
       label: "File",
       submenu: [
-        { label: "New Window", accelerator: "CmdOrCtrl+N", click: () => createWindow() },
+        { label: "New Window", accelerator: "CmdOrCtrl+N", click: () => createWindow(false) },
         { type: "separator" as const },
         isMac ? { role: "close" as const } : { role: "quit" as const },
       ],
@@ -92,14 +128,16 @@ app.whenReady().then(() => {
   registerSshIpc();
   registerSftpIpc();
   registerTunnelsIpc();
-  registerWindowIpc(createWindow);
+  registerWindowIpc(() => createWindow(false));
   registerClipboardIpc();
+  registerBackupIpc();
+  registerSnippetsIpc();
 
   installAppMenu();
-  createWindow();
+  createWindow(true);
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(true);
   });
 });
 

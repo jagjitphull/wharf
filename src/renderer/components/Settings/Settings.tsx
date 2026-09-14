@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from "../../state/themeStore";
+import { useAppStore } from "../../state/store";
+import { ipcErrorMessage, wharf } from "../../api/wharf";
+import "../../styles/dialog.css";
 import "./Settings.css";
 
 const MODES: { mode: ThemeMode; label: string }[] = [
@@ -9,6 +13,45 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 
 export function Settings() {
   const { mode, accent, setMode, setAccent } = useThemeStore();
+  const { loadAll } = useAppStore();
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleExport() {
+    setBackupError(null);
+    setBackupMessage(null);
+    setBusy(true);
+    try {
+      const path = await wharf.backup.export();
+      if (path) setBackupMessage(`Exported to ${path}`);
+    } catch (err) {
+      setBackupError(ipcErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleImport() {
+    setBackupError(null);
+    setBackupMessage(null);
+    setBusy(true);
+    try {
+      const result = await wharf.backup.import();
+      if (result) {
+        setBackupMessage(
+          `Imported ${result.importedHosts} host${result.importedHosts === 1 ? "" : "s"} and ` +
+            `${result.importedGroups} group${result.importedGroups === 1 ? "" : "s"}. ` +
+            `Passwords/passphrases weren't included in the export — re-enter them via Edit on each host.`,
+        );
+        await loadAll();
+      }
+    } catch (err) {
+      setBackupError(ipcErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="settings-panel">
@@ -43,6 +86,22 @@ export function Settings() {
           ))}
         </div>
       </div>
+
+      <h2>Backup</h2>
+      <p className="hint">
+        Export your hosts and groups to a JSON file, or import one back in. For security, passwords and key
+        passphrases are never included — re-enter them via Edit after importing.
+      </p>
+      <div className="backup-actions">
+        <button className="btn ghost small" onClick={handleExport} disabled={busy}>
+          Export hosts…
+        </button>
+        <button className="btn ghost small" onClick={handleImport} disabled={busy}>
+          Import hosts…
+        </button>
+      </div>
+      {backupMessage && <div className="backup-message">{backupMessage}</div>}
+      {backupError && <div className="dialog-error">{backupError}</div>}
 
       <h2>About</h2>
       <p className="hint">

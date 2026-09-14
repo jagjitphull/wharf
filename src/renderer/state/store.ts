@@ -1,11 +1,12 @@
 import { create } from "zustand";
-import type { GroupRecord, HostRecord, TunnelRecord } from "@shared/types";
+import type { GroupRecord, HostRecord, SnippetRecord, TunnelRecord } from "@shared/types";
 import { wharf } from "../api/wharf";
 
 export interface TerminalTab {
   sessionId: string;
   hostId: string;
   title: string;
+  connectedAt: number;
   closed?: boolean;
   closeError?: string;
 }
@@ -16,6 +17,7 @@ interface AppState {
   hosts: HostRecord[];
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
+  snippets: SnippetRecord[];
 
   tabs: TerminalTab[];
   activeTabId: string | null;
@@ -28,10 +30,12 @@ interface AppState {
   refreshHosts(): Promise<void>;
   refreshGroups(): Promise<void>;
   refreshTunnels(): Promise<void>;
+  refreshSnippets(): Promise<void>;
 
   openTerminal(host: HostRecord): Promise<void>;
   closeTerminal(sessionId: string): Promise<void>;
   duplicateTab(sessionId: string): Promise<void>;
+  reorderTab(sessionId: string, beforeSessionId: string): void;
   setActiveTab(sessionId: string | null): void;
 
   setActiveView(view: ActiveView): void;
@@ -42,6 +46,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   hosts: [],
   groups: [],
   tunnels: [],
+  snippets: [],
 
   tabs: [],
   activeTabId: null,
@@ -50,7 +55,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   contextHostId: null,
 
   async loadAll() {
-    await Promise.all([get().refreshHosts(), get().refreshGroups(), get().refreshTunnels()]);
+    await Promise.all([get().refreshHosts(), get().refreshGroups(), get().refreshTunnels(), get().refreshSnippets()]);
   },
 
   async refreshHosts() {
@@ -65,9 +70,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tunnels: await wharf.tunnels.list() });
   },
 
+  async refreshSnippets() {
+    set({ snippets: await wharf.snippets.list() });
+  },
+
   async openTerminal(host) {
     const { sessionId } = await wharf.ssh.connect(host.id, 80, 24);
-    const tab: TerminalTab = { sessionId, hostId: host.id, title: host.name };
+    const tab: TerminalTab = { sessionId, hostId: host.id, title: host.name, connectedAt: Date.now() };
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: sessionId, activeView: "hosts" }));
   },
 
@@ -86,6 +95,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     const host = get().hosts.find((h) => h.id === tab.hostId);
     if (!host) return;
     await get().openTerminal(host);
+  },
+
+  reorderTab(sessionId, beforeSessionId) {
+    if (sessionId === beforeSessionId) return;
+    set((s) => {
+      const tabs = [...s.tabs];
+      const fromIdx = tabs.findIndex((t) => t.sessionId === sessionId);
+      const toIdx = tabs.findIndex((t) => t.sessionId === beforeSessionId);
+      if (fromIdx === -1 || toIdx === -1) return {};
+      const [moved] = tabs.splice(fromIdx, 1);
+      tabs.splice(toIdx, 0, moved);
+      return { tabs };
+    });
   },
 
   setActiveTab(sessionId) {

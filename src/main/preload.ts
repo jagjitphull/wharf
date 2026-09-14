@@ -36,6 +36,7 @@ const api: WharfApi = {
     unlink: (hostId, remotePath) => ipcRenderer.invoke(IPC.sftp.unlink, hostId, remotePath),
     rename: (hostId, oldPath, newPath) => ipcRenderer.invoke(IPC.sftp.rename, hostId, oldPath, newPath),
     upload: (hostId, remoteDir) => ipcRenderer.invoke(IPC.sftp.upload, hostId, remoteDir),
+    uploadPath: (hostId, localPath, remoteDir) => ipcRenderer.invoke(IPC.sftp.uploadPath, hostId, localPath, remoteDir),
     download: (hostId, remotePath) => ipcRenderer.invoke(IPC.sftp.download, hostId, remotePath),
     onProgress: (cb) => on(IPC.sftp.onProgress, cb as (...args: unknown[]) => void),
   },
@@ -59,6 +60,16 @@ const api: WharfApi = {
   clipboard: {
     writeText: (text) => ipcRenderer.send(IPC.clipboard.writeText, text),
     readText: () => ipcRenderer.invoke(IPC.clipboard.readText),
+  },
+  backup: {
+    export: () => ipcRenderer.invoke(IPC.backup.export),
+    import: () => ipcRenderer.invoke(IPC.backup.import),
+  },
+  snippets: {
+    list: () => ipcRenderer.invoke(IPC.snippets.list),
+    create: (input) => ipcRenderer.invoke(IPC.snippets.create, input),
+    update: (id, input) => ipcRenderer.invoke(IPC.snippets.update, id, input),
+    remove: (id) => ipcRenderer.invoke(IPC.snippets.remove, id),
   },
 };
 

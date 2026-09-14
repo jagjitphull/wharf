@@ -1,19 +1,30 @@
 import Store from "electron-store";
-import type { GroupRecord, HostRecord, TunnelRecord } from "../../shared/types";
+import type { GroupRecord, HostRecord, SnippetRecord, TunnelRecord } from "../../shared/types";
+
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface Schema {
   hosts: HostRecord[];
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
+  snippets: SnippetRecord[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
+  windowBounds: WindowBounds | null;
 }
 
 const defaults: Schema = {
   hosts: [],
   groups: [],
   tunnels: [],
+  snippets: [],
   secrets: {},
+  windowBounds: null,
 };
 
 /**
@@ -49,4 +60,20 @@ export function getTunnels(): TunnelRecord[] {
 
 export function setTunnels(tunnels: TunnelRecord[]): void {
   store.set("tunnels", tunnels);
+}
+
+export function getSnippets(): SnippetRecord[] {
+  return store.get("snippets");
+}
+
+export function setSnippets(snippets: SnippetRecord[]): void {
+  store.set("snippets", snippets);
+}
+
+export function getWindowBounds(): WindowBounds | null {
+  return store.get("windowBounds");
+}
+
+export function setWindowBounds(bounds: WindowBounds): void {
+  store.set("windowBounds", bounds);
 }

@@ -8,3 +8,47 @@
 .terminal-pane .xterm {
   height: 100%;
 }
+
+.terminal-search-bar {
+  position: absolute;
+  top: 10px;
+  right: 24px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.terminal-search-bar input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-size: 12.5px;
+  width: 180px;
+}
+
+.terminal-search-bar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.terminal-search-bar button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
