@@ -33,9 +33,17 @@ body {
   font-size: 14px;
 }
 
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
 .app-shell {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

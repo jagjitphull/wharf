@@ -185,4 +185,12 @@ export const IPC = {
     stop: "tunnels:stop",
     onState: "tunnels:state",
   },
+  window: {
+    minimize: "window:minimize",
+    toggleMaximize: "window:toggle-maximize",
+    close: "window:close",
+    isMaximized: "window:is-maximized",
+    newWindow: "window:new",
+    onMaximizedChange: "window:maximized-changed",
+  },
 } as const;

@@ -59,4 +59,14 @@ export interface WharfApi {
     stop(tunnelId: string): Promise<void>;
     onState(cb: (event: TunnelStateEvent) => void): Unsubscribe;
   };
+  window: {
+    /** "darwin" | "win32" | "linux" | ... — process.platform, read at preload time. */
+    platform: string;
+    minimize(): void;
+    toggleMaximize(): void;
+    close(): void;
+    isMaximized(): Promise<boolean>;
+    newWindow(): void;
+    onMaximizedChange(cb: (maximized: boolean) => void): Unsubscribe;
+  };
 }

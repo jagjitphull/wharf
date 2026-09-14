@@ -47,6 +47,15 @@ const api: WharfApi = {
     stop: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.stop, tunnelId),
     onState: (cb) => on(IPC.tunnels.onState, cb as (...args: unknown[]) => void),
   },
+  window: {
+    platform: process.platform,
+    minimize: () => ipcRenderer.send(IPC.window.minimize),
+    toggleMaximize: () => ipcRenderer.send(IPC.window.toggleMaximize),
+    close: () => ipcRenderer.send(IPC.window.close),
+    isMaximized: () => ipcRenderer.invoke(IPC.window.isMaximized),
+    newWindow: () => ipcRenderer.send(IPC.window.newWindow),
+    onMaximizedChange: (cb) => on(IPC.window.onMaximizedChange, cb as (...args: unknown[]) => void),
+  },
 };
 
 contextBridge.exposeInMainWorld("wharf", api);

@@ -31,6 +31,7 @@ interface AppState {
 
   openTerminal(host: HostRecord): Promise<void>;
   closeTerminal(sessionId: string): Promise<void>;
+  duplicateTab(sessionId: string): Promise<void>;
   setActiveTab(sessionId: string | null): void;
 
   setActiveView(view: ActiveView): void;
@@ -77,6 +78,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const activeTabId = s.activeTabId === sessionId ? (tabs.at(-1)?.sessionId ?? null) : s.activeTabId;
       return { tabs, activeTabId };
     });
+  },
+
+  async duplicateTab(sessionId) {
+    const tab = get().tabs.find((t) => t.sessionId === sessionId);
+    if (!tab) return;
+    const host = get().hosts.find((h) => h.id === tab.hostId);
+    if (!host) return;
+    await get().openTerminal(host);
   },
 
   setActiveTab(sessionId) {

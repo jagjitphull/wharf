@@ -3,7 +3,7 @@ import { TerminalView } from "./Terminal";
 import "./TerminalPanel.css";
 
 export function TerminalPanel() {
-  const { tabs, activeTabId, setActiveTab, closeTerminal } = useAppStore();
+  const { tabs, activeTabId, setActiveTab, closeTerminal, duplicateTab } = useAppStore();
 
   if (tabs.length === 0) {
     return (
@@ -27,7 +27,18 @@ export function TerminalPanel() {
             <span>{tab.title}</span>
             {tab.closed && <span className="tab-dot" />}
             <button
+              className="tab-duplicate"
+              title="Duplicate tab"
+              onClick={(e) => {
+                e.stopPropagation();
+                duplicateTab(tab.sessionId);
+              }}
+            >
+              ⧉
+            </button>
+            <button
               className="tab-close"
+              title="Close tab"
               onClick={(e) => {
                 e.stopPropagation();
                 closeTerminal(tab.sessionId);
