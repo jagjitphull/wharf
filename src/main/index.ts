@@ -41,7 +41,9 @@ function createWindow(): void {
     void win.loadURL("http://localhost:5173");
     win.webContents.openDevTools({ mode: "detach" });
   } else {
-    void win.loadFile(path.join(__dirname, "renderer", "index.html"));
+    // dist-electron/main/index.js's __dirname is dist-electron/main; the
+    // renderer build output is a sibling directory at dist-electron/renderer.
+    void win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
   }
 }
 
