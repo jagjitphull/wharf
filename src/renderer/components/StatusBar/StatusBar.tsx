@@ -35,8 +35,16 @@ export function StatusBar() {
 
   return (
     <div className="status-bar">
-      <span className={`status-dot ${activeTab.closed ? "closed" : "connected"}`} />
-      <span className="status-text">{activeTab.closed ? "Disconnected" : "Connected"}</span>
+      <span
+        className={`status-dot ${activeTab.closed ? "closed" : activeTab.reconnecting ? "reconnecting" : "connected"}`}
+      />
+      <span className="status-text">
+        {activeTab.closed
+          ? "Disconnected"
+          : activeTab.reconnecting
+            ? `Reconnecting… (${activeTab.reconnecting.attempt}/${activeTab.reconnecting.maxAttempts})`
+            : "Connected"}
+      </span>
       {host && (
         <span className="status-host">
           {host.username}@{host.hostname}:{host.port}

@@ -101,6 +101,19 @@ export interface SessionClosedEvent {
   error?: string;
 }
 
+/** Fired when a session drops unexpectedly (not an explicit user
+ * disconnect) and an automatic reconnect attempt is about to run. */
+export interface SessionReconnectingEvent {
+  sessionId: string;
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+}
+
+export interface SessionReconnectedEvent {
+  sessionId: string;
+}
+
 // ---------------------------------------------------------------------------
 // SSH config import (~/.ssh/config)
 // ---------------------------------------------------------------------------
@@ -133,6 +146,9 @@ export interface SshConfigImportResult {
 
 export type SftpEntryType = "file" | "directory" | "symlink" | "other";
 
+/** Also reused as-is for local filesystem listings (the `localFs` API) —
+ * the shapes are identical, so the dual-pane SFTP browser can share one
+ * row-rendering component between its local and remote sides. */
 export interface SftpEntry {
   name: string;
   path: string;
@@ -215,6 +231,8 @@ export const IPC = {
     disconnect: "ssh:disconnect",
     onData: "ssh:data",
     onClosed: "ssh:closed",
+    onReconnecting: "ssh:reconnecting",
+    onReconnected: "ssh:reconnected",
     startLogging: "ssh:log-start",
     stopLogging: "ssh:log-stop",
   },
@@ -231,7 +249,17 @@ export const IPC = {
     upload: "sftp:upload",
     uploadPath: "sftp:upload-path",
     download: "sftp:download",
+    downloadToPath: "sftp:download-to-path",
     onProgress: "sftp:progress",
+    search: "sftp:search",
+  },
+  localFs: {
+    list: "localfs:list",
+    mkdir: "localfs:mkdir",
+    rmdir: "localfs:rmdir",
+    unlink: "localfs:unlink",
+    rename: "localfs:rename",
+    homeDir: "localfs:home-dir",
   },
   tunnels: {
     list: "tunnels:list",

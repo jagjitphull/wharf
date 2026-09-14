@@ -1,8 +1,73 @@
-.sftp-browser {
+.sftp-browser-split {
+  display: flex;
+  height: 100%;
+  position: relative;
+}
+
+.sftp-transfer-error {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  max-width: min(90%, 520px);
+  padding: 8px 14px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-radius: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.sftp-pane {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
+  flex: 1 1 50%;
   position: relative;
+}
+
+.sftp-pane + .sftp-pane {
+  border-left: 1px solid var(--border);
+}
+
+.sftp-pane-header {
+  padding: 8px 10px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
+.sftp-search-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+
+.sftp-search-bar input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .sftp-drop-overlay {
@@ -98,13 +163,26 @@
 
 .sftp-row {
   display: grid;
-  grid-template-columns: 20px 1fr 80px 160px 90px auto;
+  grid-template-columns: 18px 1fr 60px 130px 70px auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 6px 8px;
   border-radius: 6px;
   font-size: 12.5px;
   cursor: default;
+}
+
+/* A pane this narrow (each pane gets ~half the app window) has no room
+   for modified-time/permissions columns without truncating the name —
+   drop them rather than let the name column collapse to nothing. */
+@media (max-width: 1100px) {
+  .sftp-row {
+    grid-template-columns: 18px 1fr 60px auto;
+  }
+  .sftp-modified,
+  .sftp-perms {
+    display: none;
+  }
 }
 
 .sftp-icon {

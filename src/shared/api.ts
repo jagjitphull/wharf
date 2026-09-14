@@ -10,6 +10,8 @@ import type {
   HostInput,
   HostRecord,
   SessionClosedEvent,
+  SessionReconnectedEvent,
+  SessionReconnectingEvent,
   SessionStartResult,
   SftpEntry,
   SftpTransferProgress,
@@ -45,6 +47,9 @@ export interface WharfApi {
     disconnect(sessionId: string): Promise<void>;
     onData(cb: (event: TerminalDataEvent) => void): Unsubscribe;
     onClosed(cb: (event: SessionClosedEvent) => void): Unsubscribe;
+    /** Fired when a session drops unexpectedly and an automatic reconnect attempt is about to run. */
+    onReconnecting(cb: (event: SessionReconnectingEvent) => void): Unsubscribe;
+    onReconnected(cb: (event: SessionReconnectedEvent) => void): Unsubscribe;
     /** Opens a save dialog and tees the session's raw output to that file from here on. Returns the chosen path, or null if canceled. */
     startLogging(sessionId: string): Promise<string | null>;
     stopLogging(sessionId: string): Promise<void>;
@@ -65,7 +70,20 @@ export interface WharfApi {
     /** Uploads a file already on disk (e.g. from an OS drag-and-drop drop event) without showing a picker. */
     uploadPath(hostId: string, localPath: string, remoteDir: string): Promise<string>;
     download(hostId: string, remotePath: string): Promise<string | null>;
+    /** Downloads straight into `localDir` (basename kept, no picker) — used by the dual-pane browser to transfer directly between panes. */
+    downloadToPath(hostId: string, remotePath: string, localDir: string): Promise<string>;
     onProgress(cb: (event: SftpTransferProgress) => void): Unsubscribe;
+    /** Recursively searches under `rootPath` for entries whose name contains `query` (case-insensitive), capped to a bounded scan. */
+    search(hostId: string, rootPath: string, query: string): Promise<SftpEntry[]>;
+  };
+  localFs: {
+    list(dirPath: string): Promise<SftpEntry[]>;
+    mkdir(dirPath: string): Promise<void>;
+    rmdir(dirPath: string): Promise<void>;
+    unlink(filePath: string): Promise<void>;
+    rename(oldPath: string, newPath: string): Promise<void>;
+    /** The user's home directory — the local pane's starting path. */
+    homeDir(): Promise<string>;
   };
   tunnels: {
     list(): Promise<TunnelRecord[]>;

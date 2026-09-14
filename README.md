@@ -19,7 +19,13 @@ A personal SSH/SFTP terminal client, Termius-style.
 - In-terminal find (`Ctrl/Cmd+F`), right-click copy/paste/select-all/clear
 - Snippets library — save frequent commands, insert into any terminal via
   right-click → Insert Snippet
-- Full SFTP file browser per host, with drag-and-drop upload from the OS
+- Dual-pane SFTP (local + remote side by side) — transfer either direction
+  via a row's send button or by dragging it onto the other pane, drag-and-
+  drop upload from the OS still works too; recursive filename search under
+  a remote folder with "reveal in folder" on a result
+- Reconnect on drop — an SSH session that dies unexpectedly (network blip,
+  etc.) auto-retries with backoff instead of just going dead, reusing the
+  same tab; a deliberate disconnect never triggers this
 - SSH jump hosts — connect through another saved host as a bastion
 - Port forwarding — local & remote SSH tunnels, managed from a Tunnels panel
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,

@@ -50,11 +50,28 @@ export function registerSftpIpc(): void {
   );
 
   ipcMain.handle(
+    IPC.sftp.search,
+    async (_event, hostId: string, rootPath: string, query: string): Promise<SftpEntry[]> => {
+      return sftpManager.search(hostId, rootPath, query);
+    },
+  );
+
+  ipcMain.handle(
     IPC.sftp.download,
     async (_event, hostId: string, remotePath: string): Promise<string | null> => {
       const result = await dialog.showSaveDialog({ defaultPath: path.posix.basename(remotePath) });
       if (result.canceled || !result.filePath) return null;
       return sftpManager.download(hostId, remotePath, result.filePath);
+    },
+  );
+
+  // Direct-path counterpart of download — no picker, straight into
+  // `localDir` — used by the dual-pane browser to transfer between panes.
+  ipcMain.handle(
+    IPC.sftp.downloadToPath,
+    async (_event, hostId: string, remotePath: string, localDir: string): Promise<string> => {
+      const localPath = path.join(localDir, path.posix.basename(remotePath));
+      return sftpManager.download(hostId, remotePath, localPath);
     },
   );
 }

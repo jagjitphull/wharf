@@ -167,6 +167,18 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: P
         term.write(`\r\n\x1b[31m[session closed${event.error ? `: ${event.error}` : ""}]\x1b[0m\r\n`);
       }
     });
+    const offReconnecting = wharf.ssh.onReconnecting((event) => {
+      if (event.sessionId === sessionId) {
+        term.write(
+          `\r\n\x1b[33m[connection lost — reconnecting… (attempt ${event.attempt}/${event.maxAttempts})]\x1b[0m\r\n`,
+        );
+      }
+    });
+    const offReconnected = wharf.ssh.onReconnected((event) => {
+      if (event.sessionId === sessionId) {
+        term.write(`\r\n\x1b[32m[reconnected]\x1b[0m\r\n`);
+      }
+    });
 
     const dataDisposable = term.onData((data) => {
       wharf.ssh.write(sessionId, data);
@@ -182,6 +194,8 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: P
     return () => {
       offData();
       offClosed();
+      offReconnecting();
+      offReconnected();
       dataDisposable.dispose();
       resizeObserver.disconnect();
       disposeAllDecorations(highlightStateRef.current);

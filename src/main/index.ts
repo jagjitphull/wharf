@@ -5,6 +5,7 @@ import { registerHostsIpc } from "./ipc/hosts";
 import { registerGroupsIpc } from "./ipc/groups";
 import { registerSshIpc } from "./ipc/ssh";
 import { registerSftpIpc } from "./ipc/sftp";
+import { registerLocalFsIpc } from "./ipc/localFs";
 import { registerTunnelsIpc } from "./ipc/tunnels";
 import { registerWindowIpc } from "./ipc/window";
 import { registerClipboardIpc } from "./ipc/clipboard";
@@ -128,6 +129,7 @@ app.whenReady().then(() => {
   registerGroupsIpc();
   registerSshIpc();
   registerSftpIpc();
+  registerLocalFsIpc();
   registerTunnelsIpc();
   registerWindowIpc(() => createWindow(false));
   registerClipboardIpc();

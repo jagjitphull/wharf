@@ -167,6 +167,63 @@ export async function upload(hostId: string, localPath: string, remotePath: stri
   return transferId;
 }
 
+// Recursive search is capped on three axes so a huge or oddly-structured
+// remote tree (or a typo'd root like "/") can't turn one search into a
+// runaway scan: how many matches to collect, how many entries to look at
+// in total, and how deep to recurse.
+const SEARCH_MAX_RESULTS = 200;
+const SEARCH_MAX_SCANNED = 5000;
+const SEARCH_MAX_DEPTH = 12;
+
+/** Recursively searches under `rootPath` for entries whose name contains
+ * `query` (case-insensitive substring). Directories that error out while
+ * being read (permission denied, a broken symlink target, etc.) are
+ * skipped rather than failing the whole search. */
+export async function search(hostId: string, rootPath: string, query: string): Promise<SftpEntry[]> {
+  const sftp = await getSftp(hostId);
+  const needle = query.toLowerCase();
+  const results: SftpEntry[] = [];
+  let scanned = 0;
+
+  async function walk(dir: string, depth: number): Promise<void> {
+    if (results.length >= SEARCH_MAX_RESULTS || scanned >= SEARCH_MAX_SCANNED || depth > SEARCH_MAX_DEPTH) return;
+
+    let entries: import("ssh2").FileEntry[];
+    try {
+      entries = await new Promise((resolve, reject) => {
+        sftp.readdir(dir, (err, list) => (err ? reject(err) : resolve(list)));
+      });
+    } catch {
+      return; // permission denied, broken symlink, etc. — skip this branch
+    }
+
+    const subdirs: string[] = [];
+    for (const e of entries) {
+      if (results.length >= SEARCH_MAX_RESULTS || scanned >= SEARCH_MAX_SCANNED) return;
+      scanned++;
+      const type = entryType(e.attrs.mode ?? 0);
+      const fullPath = path.posix.join(dir, e.filename);
+      if (e.filename.toLowerCase().includes(needle)) {
+        results.push({
+          name: e.filename,
+          path: fullPath,
+          type,
+          size: e.attrs.size ?? 0,
+          modifiedAt: (e.attrs.mtime ?? 0) * 1000,
+          permissions: permissionsString(e.attrs.mode ?? 0),
+        });
+      }
+      // Symlinks aren't followed — a symlink pointing back up the tree
+      // would otherwise recurse forever.
+      if (type === "directory") subdirs.push(fullPath);
+    }
+    for (const subdir of subdirs) await walk(subdir, depth + 1);
+  }
+
+  await walk(rootPath, 0);
+  return results;
+}
+
 export async function download(hostId: string, remotePath: string, localPath: string): Promise<string> {
   const sftp = await getSftp(hostId);
   const transferId = randomUUID();

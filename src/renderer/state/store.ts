@@ -16,6 +16,10 @@ export interface TerminalTab {
   themeId?: string;
   /** Path this tab's raw output is currently being logged to, if any. */
   logPath?: string;
+  /** Set while an automatic reconnect (after an unexpected drop) is in
+   * progress; cleared on success or on giving up (the latter also sets
+   * `closed`). */
+  reconnecting?: { attempt: number; maxAttempts: number };
 }
 
 export type ActiveView = "hosts" | "sftp" | "tunnels" | "settings";
@@ -149,6 +153,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 // that in the tab immediately rather than leaving a dead terminal open.
 wharf.ssh.onClosed(({ sessionId, error }) => {
   useAppStore.setState((s) => ({
-    tabs: s.tabs.map((t) => (t.sessionId === sessionId ? { ...t, closed: true, closeError: error } : t)),
+    tabs: s.tabs.map((t) =>
+      t.sessionId === sessionId ? { ...t, closed: true, closeError: error, reconnecting: undefined } : t,
+    ),
+  }));
+});
+
+// A drop that's mid-reconnect isn't "closed" — the tab stays open and
+// usable (and doesn't show a scary closed indicator) while sshManager
+// retries with backoff; onClosed above only fires once it truly gives up.
+wharf.ssh.onReconnecting(({ sessionId, attempt, maxAttempts }) => {
+  useAppStore.setState((s) => ({
+    tabs: s.tabs.map((t) => (t.sessionId === sessionId ? { ...t, reconnecting: { attempt, maxAttempts } } : t)),
+  }));
+});
+
+wharf.ssh.onReconnected(({ sessionId }) => {
+  useAppStore.setState((s) => ({
+    tabs: s.tabs.map((t) => (t.sessionId === sessionId ? { ...t, reconnecting: undefined } : t)),
   }));
 });

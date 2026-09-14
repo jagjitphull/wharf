@@ -71,3 +71,36 @@ export function IconDownload({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+export function IconUpload({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M8 13.5V6M4.5 9l3.5-3 3.5 3M3 13h10" />
+    </svg>
+  );
+}
+
+export function IconSearch({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M13 13l-2.7-2.7" />
+    </svg>
+  );
+}
+
+export function IconArrowRight({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M2.5 8h11M9.5 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+export function IconArrowLeft({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M13.5 8h-11M6.5 4l-4 4 4 4" />
+    </svg>
+  );
+}

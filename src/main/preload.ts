@@ -28,6 +28,8 @@ const api: WharfApi = {
     disconnect: (sessionId) => ipcRenderer.invoke(IPC.ssh.disconnect, sessionId),
     onData: (cb) => on(IPC.ssh.onData, cb as (...args: unknown[]) => void),
     onClosed: (cb) => on(IPC.ssh.onClosed, cb as (...args: unknown[]) => void),
+    onReconnecting: (cb) => on(IPC.ssh.onReconnecting, cb as (...args: unknown[]) => void),
+    onReconnected: (cb) => on(IPC.ssh.onReconnected, cb as (...args: unknown[]) => void),
     startLogging: (sessionId) => ipcRenderer.invoke(IPC.ssh.startLogging, sessionId),
     stopLogging: (sessionId) => ipcRenderer.invoke(IPC.ssh.stopLogging, sessionId),
   },
@@ -44,7 +46,18 @@ const api: WharfApi = {
     upload: (hostId, remoteDir) => ipcRenderer.invoke(IPC.sftp.upload, hostId, remoteDir),
     uploadPath: (hostId, localPath, remoteDir) => ipcRenderer.invoke(IPC.sftp.uploadPath, hostId, localPath, remoteDir),
     download: (hostId, remotePath) => ipcRenderer.invoke(IPC.sftp.download, hostId, remotePath),
+    downloadToPath: (hostId, remotePath, localDir) =>
+      ipcRenderer.invoke(IPC.sftp.downloadToPath, hostId, remotePath, localDir),
     onProgress: (cb) => on(IPC.sftp.onProgress, cb as (...args: unknown[]) => void),
+    search: (hostId, rootPath, query) => ipcRenderer.invoke(IPC.sftp.search, hostId, rootPath, query),
+  },
+  localFs: {
+    list: (dirPath) => ipcRenderer.invoke(IPC.localFs.list, dirPath),
+    mkdir: (dirPath) => ipcRenderer.invoke(IPC.localFs.mkdir, dirPath),
+    rmdir: (dirPath) => ipcRenderer.invoke(IPC.localFs.rmdir, dirPath),
+    unlink: (filePath) => ipcRenderer.invoke(IPC.localFs.unlink, filePath),
+    rename: (oldPath, newPath) => ipcRenderer.invoke(IPC.localFs.rename, oldPath, newPath),
+    homeDir: () => ipcRenderer.invoke(IPC.localFs.homeDir),
   },
   tunnels: {
     list: () => ipcRenderer.invoke(IPC.tunnels.list),
