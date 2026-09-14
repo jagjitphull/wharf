@@ -122,12 +122,14 @@
 
 .group-actions button,
 .host-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 12px;
-  padding: 2px 4px;
+  padding: 4px;
   border-radius: 4px;
 }
 
@@ -172,12 +174,21 @@
   flex: none;
 }
 
+.host-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 24px;
+  flex-shrink: 1;
+}
+
 .host-sub {
   color: var(--text-dim);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 2;
 }
 
 .sidebar-footer {

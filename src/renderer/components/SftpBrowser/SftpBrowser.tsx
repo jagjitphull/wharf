@@ -3,6 +3,7 @@ import type { SftpEntry, SftpTransferProgress } from "@shared/types";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { IconDownload, IconFile, IconFolder, IconPencil, IconTrash } from "../Icons/Icons";
 import "./SftpBrowser.css";
 
 function formatSize(bytes: number): string {
@@ -134,7 +135,7 @@ export function SftpBrowser() {
   if (!host) {
     return (
       <div className="sftp-empty">
-        <p>Select a host in the sidebar and click 📁 to browse its files.</p>
+        <p>Select a host in the sidebar and click its Files icon to browse its files.</p>
       </div>
     );
   }
@@ -195,15 +196,23 @@ export function SftpBrowser() {
                 ])
               }
             >
-              <span className="sftp-icon">{entry.type === "directory" ? "📁" : "📄"}</span>
+              <span className="sftp-icon">{entry.type === "directory" ? <IconFolder /> : <IconFile />}</span>
               <span className="sftp-name">{entry.name}</span>
               <span className="sftp-size">{entry.type === "directory" ? "" : formatSize(entry.size)}</span>
               <span className="sftp-modified">{new Date(entry.modifiedAt).toLocaleString()}</span>
               <span className="sftp-perms">{entry.permissions}</span>
               <div className="sftp-row-actions">
-                {entry.type !== "directory" && <button onClick={() => handleDownload(entry)}>↓</button>}
-                <button onClick={() => handleRename(entry)}>✎</button>
-                <button onClick={() => handleDelete(entry)}>🗑</button>
+                {entry.type !== "directory" && (
+                  <button onClick={() => handleDownload(entry)}>
+                    <IconDownload />
+                  </button>
+                )}
+                <button onClick={() => handleRename(entry)}>
+                  <IconPencil />
+                </button>
+                <button onClick={() => handleDelete(entry)}>
+                  <IconTrash />
+                </button>
               </div>
             </div>
           ))}

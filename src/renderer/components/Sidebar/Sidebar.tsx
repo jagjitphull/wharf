@@ -5,6 +5,7 @@ import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { IconFolder, IconPencil, IconPlay, IconPlus, IconTrash } from "../Icons/Icons";
 import "./Sidebar.css";
 
 interface Props {
@@ -75,23 +76,23 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
       >
         <button className="host-name" onDoubleClick={() => connect(host)} onClick={() => setContextHostId(host.id)}>
           <span className="dot" style={{ background: host.color ?? "var(--accent)" }} />
-          {host.name}
+          <span className="host-title">{host.name}</span>
           <span className="host-sub">
             {host.username}@{host.hostname}:{host.port}
           </span>
         </button>
         <div className="host-actions">
           <button title="Connect" onClick={() => connect(host)}>
-            ▶
+            <IconPlay />
           </button>
           <button title="Files (SFTP)" onClick={() => openFiles(host)}>
-            📁
+            <IconFolder />
           </button>
           <button title="Edit" onClick={() => setHostDialog({ host, groupId: host.groupId })}>
-            ✎
+            <IconPencil />
           </button>
           <button title="Delete" onClick={() => deleteHost(host)}>
-            🗑
+            <IconTrash />
           </button>
         </div>
       </div>
@@ -123,13 +124,13 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
             <span className="group-name">{group.name}</span>
             <div className="group-actions">
               <button title="Add host here" onClick={() => setHostDialog({ host: null, groupId: group.id })}>
-                +
+                <IconPlus />
               </button>
               <button title="Edit group" onClick={() => setGroupDialog({ group })}>
-                ✎
+                <IconPencil />
               </button>
               <button title="Delete group" onClick={() => deleteGroup(group)}>
-                🗑
+                <IconTrash />
               </button>
             </div>
           </div>

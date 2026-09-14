@@ -82,6 +82,11 @@
   cursor: default;
 }
 
+.sftp-icon {
+  display: flex;
+  color: var(--text-dim);
+}
+
 .sftp-row:hover {
   background: var(--bg-hover);
 }
@@ -112,11 +117,14 @@
 }
 
 .sftp-row-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  padding: 2px 5px;
+  padding: 4px;
   border-radius: 4px;
 }
 
