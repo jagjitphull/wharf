@@ -5,7 +5,7 @@ import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./TerminalPanel.css";
 
 export function TerminalPanel() {
-  const { tabs, activeTabId, setActiveTab, closeTerminal, duplicateTab, reorderTab } = useAppStore();
+  const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab } = useAppStore();
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -32,7 +32,9 @@ export function TerminalPanel() {
   return (
     <div className="terminal-panel">
       <div className="tab-bar">
-        {tabs.map((tab) => (
+        {tabs.map((tab) => {
+          const hostColor = hosts.find((h) => h.id === tab.hostId)?.color;
+          return (
           <div
             key={tab.sessionId}
             draggable
@@ -56,6 +58,7 @@ export function TerminalPanel() {
             className={`tab ${tab.sessionId === activeTabId ? "active" : ""} ${tab.closed ? "closed" : ""} ${
               tab.sessionId === draggingId ? "dragging" : ""
             } ${tab.sessionId === dropTargetId ? "drop-target" : ""}`}
+            style={hostColor ? { boxShadow: `inset 0 2px 0 ${hostColor}` } : undefined}
             onClick={() => setActiveTab(tab.sessionId)}
             onContextMenu={(e) =>
               openMenu(e, [
@@ -68,6 +71,7 @@ export function TerminalPanel() {
             }
             title={tab.closeError}
           >
+            {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
             <span>{tab.title}</span>
             {tab.closed && <span className="tab-dot" />}
             <button
@@ -91,7 +95,8 @@ export function TerminalPanel() {
               ×
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="terminal-stack">
         {tabs.map((tab) => (

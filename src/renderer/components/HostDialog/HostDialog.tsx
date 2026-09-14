@@ -2,6 +2,24 @@ import { useEffect, useState } from "react";
 import type { AuthMethod, GroupRecord, HostInput, HostRecord } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import "../../styles/dialog.css";
+import "./HostDialog.css";
+
+/** Distinct hues for telling hosts apart at a glance in the sidebar and on
+ * terminal tabs — deliberately a separate, wider palette from the app's
+ * accent-color presets (theme accent is one color for the whole UI; this
+ * is per-host identity). */
+export const HOST_COLOR_PRESETS = [
+  "#e0575f", // red
+  "#e08a3c", // orange
+  "#dbb642", // yellow
+  "#35c76e", // green
+  "#2bb3a3", // teal
+  "#5b8def", // blue
+  "#6c7ce0", // indigo
+  "#8b6cef", // purple
+  "#e0619f", // pink
+  "#8a92a3", // gray
+] as const;
 
 interface Props {
   host: HostRecord | null;
@@ -96,6 +114,28 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
         <label>
           Username
           <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="root" />
+        </label>
+
+        <label>
+          Color
+          <div className="host-color-swatches">
+            <button
+              type="button"
+              className={`host-color-swatch none ${!form.color ? "active" : ""}`}
+              title="Default (no color)"
+              onClick={() => setForm({ ...form, color: undefined })}
+            />
+            {HOST_COLOR_PRESETS.map((c) => (
+              <button
+                type="button"
+                key={c}
+                className={`host-color-swatch ${form.color === c ? "active" : ""}`}
+                style={{ background: c }}
+                title={c}
+                onClick={() => setForm({ ...form, color: c })}
+              />
+            ))}
+          </div>
         </label>
 
         <label>
