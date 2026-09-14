@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { DEFAULT_TERMINAL_THEME_ID, TERMINAL_THEME_PRESETS } from "./terminalThemes";
 
 const FONT_SIZE_KEY = "wharf-terminal-font-size";
 const FONT_FAMILY_KEY = "wharf-terminal-font-family";
+const TERMINAL_THEME_KEY = "wharf-terminal-theme";
 
 export const DEFAULT_FONT_SIZE = 13;
 export const MIN_FONT_SIZE = 9;
@@ -38,19 +40,32 @@ function readStoredFontFamily(): string {
   }
 }
 
+function readStoredTerminalTheme(): string {
+  try {
+    const v = localStorage.getItem(TERMINAL_THEME_KEY);
+    if (v && TERMINAL_THEME_PRESETS.some((p) => p.id === v)) return v;
+  } catch {
+    /* localStorage unavailable */
+  }
+  return DEFAULT_TERMINAL_THEME_ID;
+}
+
 interface TerminalPrefsState {
   fontSize: number;
   fontFamily: string;
+  terminalThemeId: string;
   setFontSize(size: number): void;
   increaseFontSize(): void;
   decreaseFontSize(): void;
   resetFontSize(): void;
   setFontFamily(family: string): void;
+  setTerminalThemeId(id: string): void;
 }
 
 export const useTerminalPrefsStore = create<TerminalPrefsState>((set, get) => ({
   fontSize: readStoredFontSize(),
   fontFamily: readStoredFontFamily(),
+  terminalThemeId: readStoredTerminalTheme(),
 
   setFontSize(size) {
     const clamped = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(size)));
@@ -81,5 +96,14 @@ export const useTerminalPrefsStore = create<TerminalPrefsState>((set, get) => ({
       /* best-effort persistence only */
     }
     set({ fontFamily: family });
+  },
+
+  setTerminalThemeId(id) {
+    try {
+      localStorage.setItem(TERMINAL_THEME_KEY, id);
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ terminalThemeId: id });
   },
 }));

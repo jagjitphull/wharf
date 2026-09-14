@@ -5,6 +5,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
+import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import "@xterm/xterm/css/xterm.css";
@@ -40,8 +41,8 @@ const TERM_CSS_VARS = [
 
 /** Builds an xterm.js theme from the current CSS custom properties, so the
  * terminal's colors are a single source of truth (global.css) rather than
- * duplicated as hex literals in JS. */
-function readXtermTheme(): ITheme {
+ * duplicated as hex literals in JS. Used for the "Match App Theme" preset. */
+function readAppCssTheme(): ITheme {
   const styles = getComputedStyle(document.documentElement);
   const theme: Record<string, string> = {};
   for (const [key, cssVar] of TERM_CSS_VARS) {
@@ -49,6 +50,13 @@ function readXtermTheme(): ITheme {
     if (value) theme[key] = value;
   }
   return theme;
+}
+
+/** Resolves the active xterm theme: a fixed preset palette, or (for the
+ * "app" preset) the app's own light/dark + accent CSS custom properties. */
+function resolveXtermTheme(themeId: string): ITheme {
+  const preset = getTerminalThemePreset(themeId);
+  return preset.theme ?? readAppCssTheme();
 }
 
 export function TerminalView({ sessionId, visible }: Props) {
@@ -61,6 +69,7 @@ export function TerminalView({ sessionId, visible }: Props) {
   const accent = useThemeStore((s) => s.accent);
   const fontSize = useTerminalPrefsStore((s) => s.fontSize);
   const fontFamily = useTerminalPrefsStore((s) => s.fontFamily);
+  const terminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,12 +89,17 @@ export function TerminalView({ sessionId, visible }: Props) {
     const el = containerRef.current;
     if (!el) return;
 
+    const initialTheme = resolveXtermTheme(useTerminalPrefsStore.getState().terminalThemeId);
     const term = new XTerm({
       fontFamily: useTerminalPrefsStore.getState().fontFamily,
       fontSize: useTerminalPrefsStore.getState().fontSize,
       cursorBlink: true,
-      theme: readXtermTheme(),
+      theme: initialTheme,
     });
+    // The pane's own background (visible as an 8px border around xterm) is
+    // set inline so it tracks a fixed preset's background too — the CSS
+    // var it defaults to (--term-bg) never changes for a non-"app" preset.
+    if (initialTheme.background) el.style.background = initialTheme.background;
     termRef.current = term;
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -146,12 +160,20 @@ export function TerminalView({ sessionId, visible }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // Live theme updates: re-read the CSS vars and hand xterm a new theme
-  // object whenever the resolved light/dark mode or accent color changes,
+  // Live theme updates: recompute the xterm theme whenever the resolved
+  // light/dark mode, accent color, or chosen terminal color theme changes,
   // without recreating the terminal (which would lose scrollback).
+  // resolvedTheme/accent only matter when terminalThemeId is "app" (they
+  // drive the CSS custom properties resolveXtermTheme reads in that case),
+  // but re-running on every dependency change is cheap and keeps this
+  // simple.
   useEffect(() => {
-    termRef.current && (termRef.current.options.theme = readXtermTheme());
-  }, [resolvedTheme, accent]);
+    const term = termRef.current;
+    if (!term) return;
+    const theme = resolveXtermTheme(terminalThemeId);
+    term.options.theme = theme;
+    if (containerRef.current && theme.background) containerRef.current.style.background = theme.background;
+  }, [resolvedTheme, accent, terminalThemeId]);
 
   // Font size/family changes resize the character cell, so cols/rows change
   // too — refit and tell the remote pty about the new size, same as a
@@ -167,7 +189,25 @@ export function TerminalView({ sessionId, visible }: Props) {
 
   useEffect(() => {
     if (visible) {
-      requestAnimationFrame(() => fitRef.current?.fit());
+      requestAnimationFrame(() => {
+        fitRef.current?.fit();
+        const term = termRef.current;
+        if (!term) return;
+        // xterm's renderer stops painting while its container is
+        // display:none (a background tab), and FitAddon.fit() is a no-op
+        // whenever the computed cols/rows come out unchanged — the common
+        // case here, since hiding/showing doesn't resize the pane. So a
+        // theme, font, or scrollback change that happened off-screen never
+        // gets repainted once the tab comes back. term.refresh() alone
+        // doesn't force it either. The reliable fix (a known xterm.js
+        // workaround): drive the core Terminal.resize() directly with a
+        // dimension that's actually different, then resize back — two real
+        // resizes the renderer can't treat as no-ops, guaranteeing a full
+        // repaint against the current theme/content.
+        const { cols, rows } = term;
+        term.resize(cols + 1, rows);
+        term.resize(cols, rows);
+      });
     }
   }, [visible]);
 

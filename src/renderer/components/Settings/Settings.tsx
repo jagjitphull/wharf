@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from "../../state/themeStore";
 import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStore } from "../../state/terminalPrefsStore";
+import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import "../../styles/dialog.css";
@@ -14,7 +15,8 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 
 export function Settings() {
   const { mode, accent, setMode, setAccent } = useThemeStore();
-  const { fontSize, fontFamily, increaseFontSize, decreaseFontSize, setFontFamily } = useTerminalPrefsStore();
+  const { fontSize, fontFamily, terminalThemeId, increaseFontSize, decreaseFontSize, setFontFamily, setTerminalThemeId } =
+    useTerminalPrefsStore();
   const { loadAll } = useAppStore();
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
@@ -119,6 +121,42 @@ export function Settings() {
         <code>Ctrl/Cmd +</code>/<code>−</code> to resize on the fly, <code>Ctrl/Cmd 0</code> to reset · applies to
         every open terminal.
       </p>
+
+      <div className="appearance-row column">
+        <span className="appearance-label">Terminal color theme</span>
+        <div className="term-theme-grid">
+          {TERMINAL_THEME_PRESETS.map((preset) => {
+            const swatch = preset.theme;
+            return (
+              <button
+                key={preset.id}
+                className={`term-theme-card ${terminalThemeId === preset.id ? "active" : ""}`}
+                style={
+                  swatch
+                    ? { background: swatch.background, color: swatch.foreground }
+                    : { background: "var(--term-bg)", color: "var(--term-fg)" }
+                }
+                onClick={() => setTerminalThemeId(preset.id)}
+                title={preset.blurb}
+              >
+                {swatch ? (
+                  <span className="term-theme-dots">
+                    {[swatch.red, swatch.green, swatch.yellow, swatch.blue, swatch.magenta, swatch.cyan].map(
+                      (c, i) => (
+                        <span key={i} className="term-theme-dot" style={{ background: c }} />
+                      ),
+                    )}
+                  </span>
+                ) : (
+                  <span className="term-theme-dots term-theme-dots-app">Aa</span>
+                )}
+                <span className="term-theme-name">{preset.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="hint">{TERMINAL_THEME_PRESETS.find((p) => p.id === terminalThemeId)?.blurb}</p>
+      </div>
 
       <h2>Backup</h2>
       <p className="hint">

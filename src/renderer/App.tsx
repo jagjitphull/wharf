@@ -101,7 +101,10 @@ export default function App() {
       <div className="app-shell">
         {!sidebarCollapsed && <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />}
         <main className="app-main">
-          {activeView === "hosts" && <TerminalPanel />}
+          {/* Always mounted (display:none rather than unmounted) — switching
+              to Settings/SFTP/Tunnels and back must not tear down and
+              recreate every open terminal, which would destroy scrollback. */}
+          <TerminalPanel hidden={activeView !== "hosts"} />
           {activeView === "sftp" && <SftpBrowser />}
           {activeView === "tunnels" && <Tunnels />}
           {activeView === "settings" && <Settings />}

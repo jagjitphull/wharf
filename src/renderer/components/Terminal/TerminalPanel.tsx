@@ -4,7 +4,15 @@ import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./TerminalPanel.css";
 
-export function TerminalPanel() {
+interface Props {
+  /** Kept mounted but display:none rather than unmounted while another view
+   * (Settings, SFTP, Tunnels) is active, so switching away and back doesn't
+   * tear down and recreate every open xterm instance — which would destroy
+   * their scrollback and, for a moment, the underlying SSH data listeners. */
+  hidden: boolean;
+}
+
+export function TerminalPanel({ hidden }: Props) {
   const { tabs, activeTabId, hosts, setActiveTab, closeTerminal, duplicateTab, reorderTab } = useAppStore();
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -22,7 +30,7 @@ export function TerminalPanel() {
 
   if (tabs.length === 0) {
     return (
-      <div className="terminal-empty">
+      <div className="terminal-empty" style={hidden ? { display: "none" } : undefined}>
         <p>No open sessions.</p>
         <p className="hint">Double-click a host in the sidebar (or hit ▶) to connect.</p>
       </div>
@@ -30,7 +38,7 @@ export function TerminalPanel() {
   }
 
   return (
-    <div className="terminal-panel">
+    <div className="terminal-panel" style={hidden ? { display: "none" } : undefined}>
       <div className="tab-bar">
         {tabs.map((tab) => {
           const hostColor = hosts.find((h) => h.id === tab.hostId)?.color;
@@ -100,7 +108,16 @@ export function TerminalPanel() {
       </div>
       <div className="terminal-stack">
         {tabs.map((tab) => (
-          <TerminalView key={tab.sessionId} sessionId={tab.sessionId} visible={tab.sessionId === activeTabId} />
+          <TerminalView
+            key={tab.sessionId}
+            sessionId={tab.sessionId}
+            // Folds in the panel's own hidden state (set when a different
+            // top-level view like Settings is active) so returning to it
+            // is treated the same as switching back to this tab: xterm gets
+            // its forced-repaint pass (see the `visible` effect in
+            // Terminal.tsx) instead of staying stuck on stale pixels.
+            visible={!hidden && tab.sessionId === activeTabId}
+          />
         ))}
       </div>
       <ContextMenu menu={menu} onClose={closeMenu} />
