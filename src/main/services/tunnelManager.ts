@@ -11,8 +11,96 @@ interface RunningTunnel {
   server?: net.Server;
 }
 
-// Local/remote SSH port forwarding.
+// Local/remote/dynamic (SOCKS5) SSH port forwarding.
 const running = new Map<string, RunningTunnel>();
+
+function socksReply(rep: number): Buffer {
+  // VER, REP, RSV, ATYP(IPv4), BND.ADDR (0.0.0.0), BND.PORT (0) — the bind
+  // address/port in the reply are informational only for a CONNECT-only
+  // proxy like this one, so zeros are fine (every real client ignores them).
+  return Buffer.from([0x05, rep, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
+}
+
+/**
+ * Minimal SOCKS5 server (RFC 1928): no-auth only, CONNECT command only —
+ * exactly what `ssh -D` dynamic forwarding needs. Each accepted connection
+ * gets its own outbound channel opened through `sshClient.forwardOut`
+ * (i.e. relayed through the SSH server), so the tunnel's destination is
+ * chosen per-connection by whatever's using the proxy (browser, curl, …)
+ * rather than being fixed like local/remote forwarding.
+ */
+function pipeSocksConnection(socket: net.Socket, sshClient: Client): void {
+  let buffer = Buffer.alloc(0);
+  let awaitingRequest = false;
+
+  function onData(chunk: Buffer): void {
+    buffer = Buffer.concat([buffer, chunk]);
+
+    if (!awaitingRequest) {
+      // Greeting: VER, NMETHODS, METHODS[NMETHODS]
+      if (buffer.length < 2) return;
+      const nmethods = buffer[1];
+      if (buffer.length < 2 + nmethods) return;
+      buffer = buffer.subarray(2 + nmethods);
+      socket.write(Buffer.from([0x05, 0x00])); // no authentication required
+      awaitingRequest = true;
+      if (buffer.length === 0) return;
+    }
+
+    // Request: VER, CMD, RSV, ATYP, DST.ADDR, DST.PORT
+    if (buffer.length < 4) return;
+    const atyp = buffer[3];
+    let addrLen: number;
+    if (atyp === 0x01) addrLen = 4;
+    else if (atyp === 0x04) addrLen = 16;
+    else if (atyp === 0x03) {
+      if (buffer.length < 5) return;
+      addrLen = 1 + buffer[4];
+    } else {
+      socket.end(socksReply(0x08)); // address type not supported
+      socket.removeListener("data", onData);
+      return;
+    }
+    const total = 4 + addrLen + 2;
+    if (buffer.length < total) return;
+
+    const cmd = buffer[1];
+    let addr: string;
+    if (atyp === 0x01) {
+      addr = `${buffer[4]}.${buffer[5]}.${buffer[6]}.${buffer[7]}`;
+    } else if (atyp === 0x03) {
+      addr = buffer.subarray(5, 5 + buffer[4]).toString("utf8");
+    } else {
+      const bytes = buffer.subarray(4, 20);
+      const parts: string[] = [];
+      for (let i = 0; i < 16; i += 2) parts.push(bytes.readUInt16BE(i).toString(16));
+      addr = parts.join(":");
+    }
+    const port = buffer.readUInt16BE(total - 2);
+    socket.removeListener("data", onData);
+
+    if (cmd !== 0x01) {
+      socket.end(socksReply(0x07)); // command not supported (only CONNECT)
+      return;
+    }
+
+    sshClient.forwardOut("127.0.0.1", 0, addr, port, (err, stream) => {
+      if (err) {
+        socket.end(socksReply(0x05)); // connection refused
+        return;
+      }
+      socket.write(socksReply(0x00)); // succeeded
+      socket.pipe(stream).pipe(socket);
+      stream.on("error", () => socket.destroy());
+      socket.on("error", () => stream.end());
+    });
+  }
+
+  socket.on("data", onData);
+  socket.on("error", () => {
+    /* let the outer server's "close"/"error" plumbing handle teardown */
+  });
+}
 
 function broadcastState(tunnelId: string, status: TunnelStatus, error?: string): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -40,9 +128,6 @@ export async function start(tunnelId: string): Promise<void> {
 
   const tunnel = getTunnels().find((t) => t.id === tunnelId);
   if (!tunnel) throw new Error(`Tunnel ${tunnelId} not found`);
-  if (tunnel.type === "dynamic") {
-    throw new Error("Dynamic (SOCKS5) tunnels aren't implemented in this starter yet — use local or remote forwarding.");
-  }
 
   const host = getHosts().find((h) => h.id === tunnel.hostId);
   if (!host) throw new Error(`Host ${tunnel.hostId} not found`);
@@ -69,6 +154,13 @@ export async function start(tunnelId: string): Promise<void> {
           socket.on("error", () => stream.end());
         });
       });
+      await new Promise<void>((resolve, reject) => {
+        server.on("error", reject);
+        server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
+      });
+      running.set(tunnelId, { client, server });
+    } else if (tunnel.type === "dynamic") {
+      const server = net.createServer((socket) => pipeSocksConnection(socket, client));
       await new Promise<void>((resolve, reject) => {
         server.on("error", reject);
         server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());

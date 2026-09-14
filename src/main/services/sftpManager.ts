@@ -4,16 +4,18 @@ import { Client, type SFTPWrapper } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type SftpEntry, type SftpEntryType } from "../../shared/types";
 import { getHosts } from "./store";
-import { buildConnectConfig } from "./sshManager";
+import { connectHostClient } from "./sshManager";
 
 interface Pooled {
   client: Client;
+  /** Kept alive alongside `client` for the pooled connection's lifetime when the host connects through a jump host. */
+  jumpClient?: Client;
   sftp: SFTPWrapper;
 }
 
 // Lazily-opened, cached SFTP connection per host so repeated browsing
-// doesn't re-authenticate on every directory listing. Direct connections
-// only (no jump-host chaining yet — see README "Known limitations").
+// doesn't re-authenticate on every directory listing. Chains through the
+// host's jump host (if any) via the same logic shell sessions use.
 const pool = new Map<string, Pooled>();
 
 function broadcast(channel: string, payload: unknown): void {
@@ -29,19 +31,24 @@ async function getSftp(hostId: string): Promise<SFTPWrapper> {
   const host = getHosts().find((h) => h.id === hostId);
   if (!host) throw new Error(`Host ${hostId} not found`);
 
-  const client = await new Promise<Client>((resolve, reject) => {
-    const c = new Client();
-    c.on("ready", () => resolve(c));
-    c.on("error", reject);
-    c.connect(buildConnectConfig(host));
-  });
+  const { client, jumpClient } = await connectHostClient(host);
 
-  const sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
-    client.sftp((err, s) => (err ? reject(err) : resolve(s)));
-  });
+  let sftp: SFTPWrapper;
+  try {
+    sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
+      client.sftp((err, s) => (err ? reject(err) : resolve(s)));
+    });
+  } catch (err) {
+    client.end();
+    jumpClient?.end();
+    throw err;
+  }
 
-  client.on("close", () => pool.delete(hostId));
-  pool.set(hostId, { client, sftp });
+  client.on("close", () => {
+    jumpClient?.end();
+    pool.delete(hostId);
+  });
+  pool.set(hostId, { client, jumpClient, sftp });
   return sftp;
 }
 
@@ -49,6 +56,7 @@ export function closeSftpForHost(hostId: string): void {
   const entry = pool.get(hostId);
   if (!entry) return;
   entry.client.end();
+  entry.jumpClient?.end();
   pool.delete(hostId);
 }
 

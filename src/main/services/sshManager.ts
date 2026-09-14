@@ -75,16 +75,16 @@ function connectClient(config: ConnectConfig): Promise<Client> {
   });
 }
 
-interface EstablishedConnection {
+interface EstablishedClient {
   client: Client;
-  channel: ClientChannel;
   jumpClient?: Client;
 }
 
-/** Opens a fresh authenticated shell channel against `host` (through its
- * jump host, if any). Shared by the initial connect() and by reconnect
- * attempts, so both go through the exact same chain-building logic. */
-async function establishConnection(host: HostRecord, cols: number, rows: number): Promise<EstablishedConnection> {
+/** Opens an authenticated `Client` for `host`, chaining through its jump
+ * host first if one is configured. Shared by shell sessions, reconnect
+ * attempts, and the SFTP manager, so every caller that needs a live
+ * connection to a host goes through the same chain-building logic. */
+export async function connectHostClient(host: HostRecord): Promise<EstablishedClient> {
   let jumpClient: Client | undefined;
   let sock: ConnectConfig["sock"];
 
@@ -101,13 +101,26 @@ async function establishConnection(host: HostRecord, cols: number, rows: number)
     });
   }
 
-  let client: Client;
   try {
-    client = await connectClient({ ...buildConnectConfig(host), sock });
+    const client = await connectClient({ ...buildConnectConfig(host), sock });
+    return { client, jumpClient };
   } catch (err) {
     jumpClient?.end();
     throw err;
   }
+}
+
+interface EstablishedConnection {
+  client: Client;
+  channel: ClientChannel;
+  jumpClient?: Client;
+}
+
+/** Opens a fresh authenticated shell channel against `host` (through its
+ * jump host, if any). Shared by the initial connect() and by reconnect
+ * attempts, so both go through the exact same chain-building logic. */
+async function establishConnection(host: HostRecord, cols: number, rows: number): Promise<EstablishedConnection> {
+  const { client, jumpClient } = await connectHostClient(host);
 
   let channel: ClientChannel;
   try {

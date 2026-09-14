@@ -26,8 +26,10 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Reconnect on drop — an SSH session that dies unexpectedly (network blip,
   etc.) auto-retries with backoff instead of just going dead, reusing the
   same tab; a deliberate disconnect never triggers this
-- SSH jump hosts — connect through another saved host as a bastion
-- Port forwarding — local & remote SSH tunnels, managed from a Tunnels panel
+- SSH jump hosts — connect through another saved host as a bastion, for
+  both terminal sessions and SFTP
+- Port forwarding — local, remote & dynamic (SOCKS5) SSH tunnels, managed
+  from a Tunnels panel
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
@@ -127,13 +129,6 @@ src/
 
 ## Known limitations
 
-- **Dynamic (SOCKS5) tunnels** are defined in the data model (`TunnelType`)
-  but `tunnelManager.start()` throws for them — only `local` and `remote`
-  forwarding are implemented. A SOCKS5 listener is a reasonable next step.
-- **SFTP doesn't chain through jump hosts** — it opens a direct connection
-  to the target host. Shell sessions do support jump hosts via
-  `client.forwardOut`; extending that to `sftpManager` is a small follow-up
-  (reuse `sshManager.getClientForSession`-style plumbing).
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.

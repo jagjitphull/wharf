@@ -33,7 +33,8 @@ export function Tunnels() {
     e.preventDefault();
     setError(null);
     try {
-      await wharf.tunnels.create(form);
+      const input = form.type === "dynamic" ? { ...form, dstHost: undefined, dstPort: undefined } : form;
+      await wharf.tunnels.create(input);
       setShowForm(false);
       await refreshTunnels();
     } catch (err) {
@@ -90,6 +91,7 @@ export function Tunnels() {
             <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as TunnelType })}>
               <option value="local">Local (bind here → forward to remote)</option>
               <option value="remote">Remote (bind on remote → forward to here)</option>
+              <option value="dynamic">Dynamic / SOCKS5 (bind here → proxy, destination chosen per-connection)</option>
             </select>
           </label>
           <div className="dialog-row">
@@ -102,16 +104,18 @@ export function Tunnels() {
               <input type="number" value={form.srcPort} onChange={(e) => setForm({ ...form, srcPort: Number(e.target.value) })} />
             </label>
           </div>
-          <div className="dialog-row">
-            <label className="grow">
-              Destination host
-              <input value={form.dstHost} onChange={(e) => setForm({ ...form, dstHost: e.target.value })} />
-            </label>
-            <label className="narrow">
-              Destination port
-              <input type="number" value={form.dstPort} onChange={(e) => setForm({ ...form, dstPort: Number(e.target.value) })} />
-            </label>
-          </div>
+          {form.type !== "dynamic" && (
+            <div className="dialog-row">
+              <label className="grow">
+                Destination host
+                <input value={form.dstHost} onChange={(e) => setForm({ ...form, dstHost: e.target.value })} />
+              </label>
+              <label className="narrow">
+                Destination port
+                <input type="number" value={form.dstPort} onChange={(e) => setForm({ ...form, dstPort: Number(e.target.value) })} />
+              </label>
+            </div>
+          )}
           <div className="dialog-actions">
             <button type="button" className="btn ghost" onClick={() => setShowForm(false)}>
               Cancel
@@ -134,7 +138,9 @@ export function Tunnels() {
                 <div>
                   <div className="tunnel-name">{t.name}</div>
                   <div className="tunnel-sub">
-                    {t.type} · {t.srcHost}:{t.srcPort} → {t.dstHost}:{t.dstPort}
+                    {t.type === "dynamic"
+                      ? `dynamic (SOCKS5) · listening on ${t.srcHost}:${t.srcPort}`
+                      : `${t.type} · ${t.srcHost}:${t.srcPort} → ${t.dstHost}:${t.dstPort}`}
                   </div>
                   {state?.error && <div className="tunnel-error">{state.error}</div>}
                 </div>
