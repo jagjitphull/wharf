@@ -7,7 +7,6 @@ interface Props {
   host: HostRecord | null;
   groups: GroupRecord[];
   hosts: HostRecord[];
-  isPro: boolean;
   defaultGroupId: string | null;
   onClose(): void;
   onSaved(): void;
@@ -25,7 +24,7 @@ const emptyForm = (defaultGroupId: string | null): HostInput => ({
   jumpHostId: null,
 });
 
-export function HostDialog({ host, groups, hosts, isPro, defaultGroupId, onClose, onSaved }: Props) {
+export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSaved }: Props) {
   const [form, setForm] = useState<HostInput>(() =>
     host
       ? {
@@ -162,9 +161,8 @@ export function HostDialog({ host, groups, hosts, isPro, defaultGroupId, onClose
         )}
 
         <label>
-          Jump host {!isPro && <span className="pro-badge">PRO</span>}
+          Jump host
           <select
-            disabled={!isPro}
             value={form.jumpHostId ?? ""}
             onChange={(e) => setForm({ ...form, jumpHostId: e.target.value || null })}
           >

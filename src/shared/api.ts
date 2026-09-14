@@ -8,8 +8,6 @@ import type {
   GroupRecord,
   HostInput,
   HostRecord,
-  LicenseKey,
-  LicenseState,
   SessionClosedEvent,
   SessionStartResult,
   SftpEntry,
@@ -60,10 +58,5 @@ export interface WharfApi {
     start(tunnelId: string): Promise<void>;
     stop(tunnelId: string): Promise<void>;
     onState(cb: (event: TunnelStateEvent) => void): Unsubscribe;
-  };
-  license: {
-    getState(): Promise<LicenseState>;
-    activate(licenseKey: LicenseKey): Promise<LicenseState>;
-    deactivate(): Promise<LicenseState>;
   };
 }

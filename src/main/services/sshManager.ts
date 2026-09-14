@@ -5,8 +5,6 @@ import { BrowserWindow } from "electron";
 import { IPC, type HostRecord } from "../../shared/types";
 import { readSecret } from "./secretStore";
 import { getHosts } from "./store";
-import { getCurrentLicenseState } from "../licensing/currentLicense";
-import { requireFeature } from "../licensing/featureFlags";
 
 interface Session {
   id: string;
@@ -75,7 +73,6 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
   let sock: ConnectConfig["sock"];
 
   if (host.jumpHostId) {
-    requireFeature(getCurrentLicenseState(), "jumpHosts");
     const jumpHost = getHosts().find((h) => h.id === host.jumpHostId);
     if (!jumpHost) throw new Error(`Jump host ${host.jumpHostId} not found`);
 

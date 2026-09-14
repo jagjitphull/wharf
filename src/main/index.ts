@@ -5,7 +5,6 @@ import { registerGroupsIpc } from "./ipc/groups";
 import { registerSshIpc } from "./ipc/ssh";
 import { registerSftpIpc } from "./ipc/sftp";
 import { registerTunnelsIpc } from "./ipc/tunnels";
-import { registerLicenseIpc } from "./ipc/license";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 
@@ -53,7 +52,6 @@ app.whenReady().then(() => {
   registerSshIpc();
   registerSftpIpc();
   registerTunnelsIpc();
-  registerLicenseIpc();
 
   createWindow();
 

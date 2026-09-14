@@ -3,8 +3,6 @@ import { randomUUID } from "node:crypto";
 import { IPC, type HostInput, type HostRecord } from "../../shared/types";
 import { getHosts, getTunnels, setHosts, setTunnels } from "../services/store";
 import { deleteSecret, saveSecret, updateSecret } from "../services/secretStore";
-import { getCurrentLicenseState } from "../licensing/currentLicense";
-import { getHostLimit, LimitReachedError } from "../licensing/featureFlags";
 import { disconnectSessionsForHost } from "../services/sshManager";
 import { closeSftpForHost } from "../services/sftpManager";
 
@@ -15,12 +13,6 @@ export function registerHostsIpc(): void {
 
   ipcMain.handle(IPC.hosts.create, (_event, input: HostInput): HostRecord => {
     const hosts = getHosts();
-
-    const limit = getHostLimit(getCurrentLicenseState());
-    if (limit !== null && hosts.length >= limit) {
-      throw new LimitReachedError("hosts", limit);
-    }
-
     const now = Date.now();
     const secretId = input.secret ? saveSecret(input.secret) : null;
     const record: HostRecord = {

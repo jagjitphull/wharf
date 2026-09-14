@@ -154,19 +154,7 @@
   border-top: 1px solid var(--border);
 }
 
-.plan-badge {
+.host-count {
   font-size: 11.5px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.plan-badge.pro {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
-.plan-badge.free {
-  background: var(--bg-active);
   color: var(--text-dim);
 }

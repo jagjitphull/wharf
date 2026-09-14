@@ -23,7 +23,7 @@ export interface HostRecord {
   privateKeyPath?: string;
   color?: string;
   tags?: string[];
-  /** Pro feature: connect through another saved host as an SSH jump/bastion host. */
+  /** Connect through another saved host as an SSH jump/bastion host. */
   jumpHostId?: string | null;
   createdAt: number;
   updatedAt: number;
@@ -105,7 +105,7 @@ export interface SftpTransferProgress {
 }
 
 // ---------------------------------------------------------------------------
-// Port forwarding tunnels (Pro feature)
+// Port forwarding tunnels
 // ---------------------------------------------------------------------------
 
 export type TunnelType = "local" | "remote" | "dynamic";
@@ -141,62 +141,6 @@ export interface TunnelStateEvent {
   status: TunnelStatus;
   error?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Licensing
-// ---------------------------------------------------------------------------
-
-export type LicensePlan = "free" | "pro";
-
-/** The signed payload embedded in a license key. */
-export interface LicensePayload {
-  licenseId: string;
-  email: string;
-  plan: LicensePlan;
-  seats: number;
-  /** Unix ms. null means perpetual / no expiry. */
-  issuedAt: number;
-  expiresAt: number | null;
-  /** Explicit feature grants, in case a plan is later split into add-ons. */
-  features: FeatureId[];
-}
-
-/** A license key as distributed to users: base64url(payload json) + "." + base64url(signature). */
-export type LicenseKey = string;
-
-export type LicenseValidity = "unactivated" | "valid" | "expired" | "invalid" | "revoked";
-
-export interface LicenseState {
-  validity: LicenseValidity;
-  plan: LicensePlan;
-  licenseKey: LicenseKey | null;
-  payload: LicensePayload | null;
-  activatedAt: number | null;
-}
-
-// ---------------------------------------------------------------------------
-// Feature flags
-// ---------------------------------------------------------------------------
-
-export type FeatureId =
-  | "unlimitedHosts"
-  | "unlimitedGroups"
-  | "portForwarding"
-  | "jumpHosts"
-  | "teamSync";
-
-export const FREE_TIER_LIMITS = {
-  maxHosts: 5,
-  maxGroups: 2,
-} as const;
-
-export const PRO_FEATURES: readonly FeatureId[] = [
-  "unlimitedHosts",
-  "unlimitedGroups",
-  "portForwarding",
-  "jumpHosts",
-  "teamSync",
-];
 
 // ---------------------------------------------------------------------------
 // IPC channel names
@@ -240,10 +184,5 @@ export const IPC = {
     start: "tunnels:start",
     stop: "tunnels:stop",
     onState: "tunnels:state",
-  },
-  license: {
-    getState: "license:getState",
-    activate: "license:activate",
-    deactivate: "license:deactivate",
   },
 } as const;

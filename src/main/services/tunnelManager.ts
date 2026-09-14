@@ -5,17 +5,13 @@ import { BrowserWindow } from "electron";
 import { IPC, type TunnelInput, type TunnelRecord, type TunnelStatus } from "../../shared/types";
 import { getHosts, getTunnels, setTunnels } from "./store";
 import { buildConnectConfig } from "./sshManager";
-import { getCurrentLicenseState } from "../licensing/currentLicense";
-import { requireFeature } from "../licensing/featureFlags";
 
 interface RunningTunnel {
   client: Client;
   server?: net.Server;
 }
 
-// Pro feature: local/remote SSH port forwarding. Gated by requireFeature()
-// on every mutating/start call, not just in the renderer, so the guard
-// holds even if the UI gate is ever bypassed.
+// Local/remote SSH port forwarding.
 const running = new Map<string, RunningTunnel>();
 
 function broadcastState(tunnelId: string, status: TunnelStatus, error?: string): void {
@@ -29,7 +25,6 @@ export function list(): TunnelRecord[] {
 }
 
 export function create(input: TunnelInput): TunnelRecord {
-  requireFeature(getCurrentLicenseState(), "portForwarding");
   const record: TunnelRecord = { id: randomUUID(), ...input };
   setTunnels([...getTunnels(), record]);
   return record;
@@ -41,7 +36,6 @@ export function remove(tunnelId: string): void {
 }
 
 export async function start(tunnelId: string): Promise<void> {
-  requireFeature(getCurrentLicenseState(), "portForwarding");
   if (running.has(tunnelId)) return;
 
   const tunnel = getTunnels().find((t) => t.id === tunnelId);

@@ -2,8 +2,6 @@ import { ipcMain } from "electron";
 import { randomUUID } from "node:crypto";
 import { IPC, type GroupInput, type GroupRecord } from "../../shared/types";
 import { getGroups, getHosts, setGroups, setHosts } from "../services/store";
-import { getCurrentLicenseState } from "../licensing/currentLicense";
-import { getGroupLimit, LimitReachedError } from "../licensing/featureFlags";
 
 export function registerGroupsIpc(): void {
   ipcMain.handle(IPC.groups.list, (): GroupRecord[] => {
@@ -12,12 +10,6 @@ export function registerGroupsIpc(): void {
 
   ipcMain.handle(IPC.groups.create, (_event, input: GroupInput): GroupRecord => {
     const groups = getGroups();
-
-    const limit = getGroupLimit(getCurrentLicenseState());
-    if (limit !== null && groups.length >= limit) {
-      throw new LimitReachedError("groups", limit);
-    }
-
     const now = Date.now();
     const record: GroupRecord = {
       id: randomUUID(),

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GroupRecord, HostRecord, LicenseState, TunnelRecord } from "@shared/types";
+import type { GroupRecord, HostRecord, TunnelRecord } from "@shared/types";
 import { wharf } from "../api/wharf";
 
 export interface TerminalTab {
@@ -16,7 +16,6 @@ interface AppState {
   hosts: HostRecord[];
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
-  license: LicenseState | null;
 
   tabs: TerminalTab[];
   activeTabId: string | null;
@@ -29,7 +28,6 @@ interface AppState {
   refreshHosts(): Promise<void>;
   refreshGroups(): Promise<void>;
   refreshTunnels(): Promise<void>;
-  refreshLicense(): Promise<void>;
 
   openTerminal(host: HostRecord): Promise<void>;
   closeTerminal(sessionId: string): Promise<void>;
@@ -43,7 +41,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   hosts: [],
   groups: [],
   tunnels: [],
-  license: null,
 
   tabs: [],
   activeTabId: null,
@@ -52,7 +49,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   contextHostId: null,
 
   async loadAll() {
-    await Promise.all([get().refreshHosts(), get().refreshGroups(), get().refreshTunnels(), get().refreshLicense()]);
+    await Promise.all([get().refreshHosts(), get().refreshGroups(), get().refreshTunnels()]);
   },
 
   async refreshHosts() {
@@ -65,10 +62,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async refreshTunnels() {
     set({ tunnels: await wharf.tunnels.list() });
-  },
-
-  async refreshLicense() {
-    set({ license: await wharf.license.getState() });
   },
 
   async openTerminal(host) {

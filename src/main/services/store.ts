@@ -1,11 +1,10 @@
 import Store from "electron-store";
-import type { GroupRecord, HostRecord, LicenseState, TunnelRecord } from "../../shared/types";
+import type { GroupRecord, HostRecord, TunnelRecord } from "../../shared/types";
 
 interface Schema {
   hosts: HostRecord[];
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
-  license: LicenseState | null;
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
 }
@@ -14,7 +13,6 @@ const defaults: Schema = {
   hosts: [],
   groups: [],
   tunnels: [],
-  license: null,
   secrets: {},
 };
 
@@ -51,12 +49,4 @@ export function getTunnels(): TunnelRecord[] {
 
 export function setTunnels(tunnels: TunnelRecord[]): void {
   store.set("tunnels", tunnels);
-}
-
-export function getLicenseState(): LicenseState | null {
-  return store.get("license");
-}
-
-export function setLicenseState(state: LicenseState | null): void {
-  store.set("license", state);
 }

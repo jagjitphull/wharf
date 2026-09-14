@@ -16,8 +16,7 @@ const emptyForm = (hostId: string): TunnelInput => ({
 });
 
 export function Tunnels() {
-  const { hosts, tunnels, license, refreshTunnels } = useAppStore();
-  const isPro = license?.validity === "valid" && license.plan === "pro";
+  const { hosts, tunnels, refreshTunnels } = useAppStore();
 
   const [statuses, setStatuses] = useState<Record<string, { status: TunnelStatus; error?: string }>>({});
   const [showForm, setShowForm] = useState(false);
@@ -25,24 +24,10 @@ export function Tunnels() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isPro) return;
     return wharf.tunnels.onState(({ tunnelId, status, error }) => {
       setStatuses((prev) => ({ ...prev, [tunnelId]: { status, error } }));
     });
-  }, [isPro]);
-
-  if (!isPro) {
-    return (
-      <div className="tunnels-upsell">
-        <h2>Port forwarding is a Pro feature</h2>
-        <p>Create local &amp; remote SSH tunnels to reach services behind your hosts.</p>
-        <p className="hint">
-          Activate a Pro license from <b>Settings</b> to unlock this. For local testing, run{" "}
-          <code>npm run license:generate -- --email you@example.com --plan pro</code> and paste the key in Settings.
-        </p>
-      </div>
-    );
-  }
+  }, []);
 
   async function createTunnel(e: React.FormEvent) {
     e.preventDefault();

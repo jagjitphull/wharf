@@ -47,11 +47,6 @@ const api: WharfApi = {
     stop: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.stop, tunnelId),
     onState: (cb) => on(IPC.tunnels.onState, cb as (...args: unknown[]) => void),
   },
-  license: {
-    getState: () => ipcRenderer.invoke(IPC.license.getState),
-    activate: (licenseKey) => ipcRenderer.invoke(IPC.license.activate, licenseKey),
-    deactivate: () => ipcRenderer.invoke(IPC.license.deactivate),
-  },
 };
 
 contextBridge.exposeInMainWorld("wharf", api);
