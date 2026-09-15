@@ -11,19 +11,23 @@ import { dialog } from "electron";
  * entries) so hosts already trusted via the regular `ssh` CLI aren't
  * re-prompted; new trust decisions made here are appended in plain form.
  *
- * Deliberately scoped down from full OpenSSH semantics: only exact-host or
- * `*`/`?` glob patterns are matched (no `!negation`, no CIDR, no
- * @cert-authority/@revoked markers) — enough to interoperate with typical
- * known_hosts files without reimplementing the whole spec.
+ * Deliberately scoped down from full OpenSSH semantics: exact-host or
+ * `*`/`?` glob patterns (including `!negation`) and the `@revoked` marker
+ * are handled, but not CIDR ranges or `@cert-authority` (CA-signed host
+ * certificates) — enough to interoperate with typical known_hosts files
+ * without reimplementing the whole spec.
  */
 
 const KNOWN_HOSTS_PATH = path.join(homedir(), ".ssh", "known_hosts");
 
 interface ParsedEntry {
+  /** Raw comma-split patterns, `!`-prefix (negation) intact — see labelMatchesEntry. */
   hostPatterns: string[];
   hashedHosts: { salt: Buffer; hash: Buffer }[];
   keyType: string;
   keyBlob: Buffer;
+  /** True for a line marked `@revoked` — this key must never be trusted for this host, full stop. */
+  revoked: boolean;
 }
 
 function hostPortLabel(hostname: string, port: number): string {
@@ -57,7 +61,15 @@ function parseKnownHostsFile(): ParsedEntry[] {
 
     const parts = line.split(/\s+/);
     let idx = 0;
-    if (parts[idx]?.startsWith("@")) idx += 1; // skip @cert-authority / @revoked markers — not supported, entry ignored below if too short
+    let revoked = false;
+    if (parts[idx]?.startsWith("@")) {
+      // @revoked is handled below; @cert-authority (CA-signed host certs) is
+      // a different trust model entirely and stays unsupported — an entry
+      // marked with it is skipped rather than mismatched into.
+      if (parts[idx] !== "@revoked") continue;
+      revoked = true;
+      idx += 1;
+    }
 
     const hostsField = parts[idx];
     const keyType = parts[idx + 1];
@@ -81,26 +93,43 @@ function parseKnownHostsFile(): ParsedEntry[] {
           hashedHosts: [{ salt: Buffer.from(segs[2], "base64"), hash: Buffer.from(segs[3], "base64") }],
           keyType,
           keyBlob,
+          revoked,
         });
       } catch {
         continue;
       }
     } else {
-      entries.push({ hostPatterns: hostsField.split(","), hashedHosts: [], keyType, keyBlob });
+      entries.push({ hostPatterns: hostsField.split(","), hashedHosts: [], keyType, keyBlob, revoked });
     }
   }
   return entries;
 }
 
+/** Matches a comma-split OpenSSH pattern list against a host label, honoring
+ * `!pattern` negation: if any negated pattern matches, the whole list is
+ * rejected for this host — even if a non-negated pattern on the same line
+ * also matched — same as `ssh`/`sshd` itself. */
+function patternListMatches(label: string, patterns: string[]): boolean {
+  let matched = false;
+  for (const raw of patterns) {
+    const negated = raw.startsWith("!");
+    const pattern = negated ? raw.slice(1) : raw;
+    if (!pattern || !globToRegExp(pattern).test(label)) continue;
+    if (negated) return false;
+    matched = true;
+  }
+  return matched;
+}
+
 function labelMatchesEntry(label: string, entry: ParsedEntry): boolean {
-  if (entry.hostPatterns.some((p) => globToRegExp(p).test(label))) return true;
+  if (patternListMatches(label, entry.hostPatterns)) return true;
   return entry.hashedHosts.some(({ salt, hash }) => {
     const computed = createHmac("sha1", salt).update(label).digest();
     return computed.length === hash.length && computed.equals(hash);
   });
 }
 
-export type HostKeyStatus = "match" | "new" | "mismatch";
+export type HostKeyStatus = "match" | "new" | "mismatch" | "revoked";
 
 export function checkHostKey(hostname: string, port: number, keyBlob: Buffer): HostKeyStatus {
   const label = hostPortLabel(hostname, port);
@@ -111,7 +140,18 @@ export function checkHostKey(hostname: string, port: number, keyBlob: Buffer): H
   for (const entry of entries) {
     if (entry.keyType !== keyType) continue;
     if (!labelMatchesEntry(label, entry)) continue;
+    if (entry.keyBlob.equals(keyBlob)) {
+      // A key can be trusted by one line and separately revoked by another
+      // (e.g. after `ssh-keygen -R` + re-adding, or a manually maintained
+      // revocation line) — revoked always wins, checked across every
+      // matching entry before falling back to an ordinary match.
+      if (entry.revoked) return "revoked";
+    }
     sameHostSameTypeSeen = true;
+  }
+  for (const entry of entries) {
+    if (entry.keyType !== keyType || entry.revoked) continue;
+    if (!labelMatchesEntry(label, entry)) continue;
     if (entry.keyBlob.equals(keyBlob)) return "match";
   }
   return sameHostSameTypeSeen ? "mismatch" : "new";
@@ -143,6 +183,27 @@ export async function verifyHostKeyInteractive(hostname: string, port: number, k
 
     const label = hostPortLabel(hostname, port);
     const fingerprint = fingerprintSha256(keyBlob);
+
+    if (status === "revoked") {
+      // No "trust anyway" option, deliberately — a key explicitly marked
+      // @revoked in known_hosts must never be accepted here, matching
+      // OpenSSH's own refusal (RevokedHostKeys) rather than offering an
+      // override that would defeat the point of revoking it.
+      await dialog.showMessageBox({
+        type: "error",
+        title: "REVOKED HOST KEY",
+        message: `The key offered by ${label} is marked as REVOKED in known_hosts.`,
+        detail:
+          `Fingerprint:\n${fingerprint}\n\n` +
+          "This key was explicitly revoked and must not be trusted, even though it matches this host. " +
+          "Refusing to connect. If you believe this is wrong, check the @revoked line for this host in " +
+          "~/.ssh/known_hosts and remove it only if you're certain the revocation no longer applies.",
+        buttons: ["OK"],
+        defaultId: 0,
+        noLink: true,
+      });
+      return false;
+    }
 
     if (status === "mismatch") {
       const result = await dialog.showMessageBox({

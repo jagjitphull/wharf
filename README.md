@@ -169,10 +169,11 @@ src/
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.
-- `knownHosts.ts` supports exact-host and simple `*`/`?` glob patterns plus
-  hashed (`HashKnownHosts`) entries, but not the full OpenSSH known_hosts
-  spec (no `!negation`, CIDR ranges, or `@cert-authority`/`@revoked`
-  markers).
+- `knownHosts.ts` supports exact-host and `*`/`?` glob patterns (including
+  `!negation`), hashed (`HashKnownHosts`) entries, and `@revoked` (a
+  revoked key is always refused, with no "trust anyway" option, even if
+  it matches the host), but not the full OpenSSH known_hosts spec — no
+  CIDR ranges or `@cert-authority` (CA-signed host certificates).
 - Local shell tabs use [`node-pty`](https://github.com/microsoft/node-pty),
   a native addon that must be compiled against Electron's own Node ABI (not
   your system Node's). `npm install` does this automatically via
