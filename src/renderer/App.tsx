@@ -65,7 +65,7 @@ export default function App() {
         const tab = tabs[Number(e.key) - 1];
         if (tab) {
           e.preventDefault();
-          setActiveTab(tab.sessionId);
+          setActiveTab(tab.tabId);
           setActiveView("hosts");
         }
         return;
@@ -73,9 +73,9 @@ export default function App() {
 
       if (e.key === "Tab") {
         e.preventDefault();
-        const idx = tabs.findIndex((t) => t.sessionId === activeTabId);
+        const idx = tabs.findIndex((t) => t.tabId === activeTabId);
         const nextIdx = e.shiftKey ? (idx - 1 + tabs.length) % tabs.length : (idx + 1) % tabs.length;
-        setActiveTab(tabs[nextIdx].sessionId);
+        setActiveTab(tabs[nextIdx].tabId);
         setActiveView("hosts");
       }
     }

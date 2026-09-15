@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAppStore } from "../../state/store";
+import { useAppStore, type PaneNode } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { wharf } from "../../api/wharf";
@@ -16,41 +16,90 @@ interface Props {
   hidden: boolean;
 }
 
+/** Renders a tab's split tree: a leaf becomes one TerminalView, a split
+ * becomes a flex row/column of its children (recursively, so nested splits
+ * — e.g. a column split with one of its rows further split — just work).
+ * Every leaf in the tree is rendered regardless of which tab is active;
+ * `tabVisible` (not this component's own state) decides whether any of
+ * them are actually shown, so backgrounded tabs keep their xterm instances
+ * alive exactly like before splits existed. */
+function PaneTree({ node, tabVisible, activePaneId, tabId }: { node: PaneNode; tabVisible: boolean; activePaneId: string; tabId: string }) {
+  const setActivePane = useAppStore((s) => s.setActivePane);
+
+  if (node.type === "leaf") {
+    return (
+      <div
+        className="pane-leaf"
+        // Multi-pane tabs need a way to tell which pane keystrokes go to;
+        // mousedown (not click) so focusing follows the same gesture xterm
+        // itself uses to grab focus, not a separate step after it.
+        onMouseDown={() => setActivePane(tabId, node.sessionId)}
+      >
+        <PaneLeafView sessionId={node.sessionId} visible={tabVisible} tabId={tabId} />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`pane-split pane-split-${node.direction}`}>
+      {node.children.map((child, i) => {
+        // The active-pane highlight lives on this wrapper (not .pane-leaf
+        // itself) because .pane-leaf's xterm canvas fills it edge-to-edge —
+        // an outline/shadow on .pane-leaf gets fully covered. This wrapper's
+        // background shows through the small margin .pane-leaf leaves around
+        // itself instead (see the CSS), which nothing paints over.
+        const isActiveBranch = child.type === "leaf" && child.sessionId === activePaneId;
+        return (
+          <div className={`pane-split-child ${isActiveBranch ? "active" : ""}`} key={i}>
+            <PaneTree node={child} tabVisible={tabVisible} activePaneId={activePaneId} tabId={tabId} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Thin wrapper pulling this one pane's PaneMeta (theme/logPath) out of the
+ * store, so PaneTree itself doesn't need to thread that through. */
+function PaneLeafView({ sessionId, visible, tabId }: { sessionId: string; visible: boolean; tabId: string }) {
+  const meta = useAppStore((s) => s.paneMeta[sessionId]);
+  if (!meta) return null;
+  return (
+    <TerminalView
+      sessionId={sessionId}
+      visible={visible}
+      themeOverrideId={meta.themeId}
+      logPath={meta.logPath}
+      tabId={tabId}
+    />
+  );
+}
+
 export function TerminalPanel({ hidden }: Props) {
-  const {
-    tabs,
-    activeTabId,
-    hosts,
-    setActiveTab,
-    closeTerminal,
-    duplicateTab,
-    reorderTab,
-    setTabThemeId,
-    setTabLogPath,
-    openLocalShell,
-  } = useAppStore();
+  const { tabs, activeTabId, paneMeta, setActiveTab, closeTab, duplicateTab, reorderTab, setPaneThemeId, setPaneLogPath, openLocalShell } =
+    useAppStore();
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
-  async function closeOthers(sessionId: string) {
+  async function closeOthers(tabId: string) {
     for (const tab of tabs) {
-      if (tab.sessionId !== sessionId) await closeTerminal(tab.sessionId);
+      if (tab.tabId !== tabId) await closeTab(tab.tabId);
     }
   }
 
   async function closeAll() {
-    for (const tab of tabs) await closeTerminal(tab.sessionId);
+    for (const tab of tabs) await closeTab(tab.tabId);
   }
 
   async function toggleLogging(sessionId: string, currentLogPath: string | undefined) {
     if (currentLogPath) {
       await wharf.ssh.stopLogging(sessionId);
-      setTabLogPath(sessionId, undefined);
+      setPaneLogPath(sessionId, undefined);
     } else {
       const path = await wharf.ssh.startLogging(sessionId);
-      if (path) setTabLogPath(sessionId, path);
+      if (path) setPaneLogPath(sessionId, path);
     }
   }
 
@@ -70,104 +119,162 @@ export function TerminalPanel({ hidden }: Props) {
     <div className="terminal-panel" style={hidden ? { display: "none" } : undefined}>
       <div className="tab-bar">
         {tabs.map((tab) => {
-          const hostColor = hosts.find((h) => h.id === tab.hostId)?.color;
+          const activeMeta = paneMeta[tab.activePaneId];
           return (
-          <div
-            key={tab.sessionId}
-            draggable
-            onDragStart={() => setDraggingId(tab.sessionId)}
-            onDragEnd={() => {
-              setDraggingId(null);
-              setDropTargetId(null);
-            }}
-            onDragOver={(e) => {
-              if (draggingId && draggingId !== tab.sessionId) {
-                e.preventDefault();
-                setDropTargetId(tab.sessionId);
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (draggingId) reorderTab(draggingId, tab.sessionId);
-              setDraggingId(null);
-              setDropTargetId(null);
-            }}
-            className={`tab ${tab.sessionId === activeTabId ? "active" : ""} ${tab.closed ? "closed" : ""} ${
-              tab.sessionId === draggingId ? "dragging" : ""
-            } ${tab.sessionId === dropTargetId ? "drop-target" : ""}`}
-            style={hostColor ? { boxShadow: `inset 0 2px 0 ${hostColor}` } : undefined}
-            onClick={() => setActiveTab(tab.sessionId)}
-            onContextMenu={(e) =>
-              openMenu(e, [
-                { label: "Duplicate", onClick: () => duplicateTab(tab.sessionId) },
-                { separator: true },
-                { label: "Close", onClick: () => closeTerminal(tab.sessionId) },
-                { label: "Close Others", disabled: tabs.length < 2, onClick: () => closeOthers(tab.sessionId) },
-                { label: "Close All", onClick: () => closeAll() },
-                { separator: true },
-                {
-                  label: tab.logPath ? "Stop Logging" : "Start Logging…",
-                  onClick: () => toggleLogging(tab.sessionId, tab.logPath),
-                },
-                ...buildTerminalThemeMenuItems(tab.themeId ?? globalTerminalThemeId, (id) =>
-                  setTabThemeId(tab.sessionId, id),
-                ),
-              ])
-            }
-            title={tab.closeError}
-          >
-            {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
-            {tab.logPath && <span className="tab-logging-dot" title={`Logging to ${tab.logPath}`} />}
-            {tab.themeId && (
-              <span
-                className="tab-theme-dot"
-                title={`Color theme: ${getTerminalThemePreset(tab.themeId).name}`}
-                style={{ background: getTerminalThemePreset(tab.themeId).theme?.background ?? "var(--term-bg)" }}
-              />
-            )}
-            <span>{tab.title}</span>
-            {tab.closed && <span className="tab-dot" />}
-            <button
-              className="tab-duplicate"
-              title="Duplicate tab"
-              onClick={(e) => {
-                e.stopPropagation();
-                duplicateTab(tab.sessionId);
+            <TabButton
+              key={tab.tabId}
+              tabId={tab.tabId}
+              title={activeMeta?.title ?? "…"}
+              hostId={activeMeta?.hostId ?? null}
+              closed={activeMeta?.closed ?? false}
+              closeError={activeMeta?.closeError}
+              logPath={activeMeta?.logPath}
+              themeId={activeMeta?.themeId}
+              isActive={tab.tabId === activeTabId}
+              draggingId={draggingId}
+              dropTargetId={dropTargetId}
+              tabCount={tabs.length}
+              globalTerminalThemeId={globalTerminalThemeId}
+              onDragStart={() => setDraggingId(tab.tabId)}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setDropTargetId(null);
               }}
-            >
-              ⧉
-            </button>
-            <button
-              className="tab-close"
-              title="Close tab"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeTerminal(tab.sessionId);
+              onDragOver={() => setDropTargetId(tab.tabId)}
+              onDrop={() => {
+                if (draggingId) reorderTab(draggingId, tab.tabId);
+                setDraggingId(null);
+                setDropTargetId(null);
               }}
-            >
-              ×
-            </button>
-          </div>
+              onClick={() => setActiveTab(tab.tabId)}
+              onDuplicate={() => duplicateTab(tab.tabId)}
+              onClose={() => closeTab(tab.tabId)}
+              onCloseOthers={() => closeOthers(tab.tabId)}
+              onCloseAll={closeAll}
+              onToggleLogging={() => activeMeta && toggleLogging(tab.activePaneId, activeMeta.logPath)}
+              onSetTheme={(id) => setPaneThemeId(tab.activePaneId, id)}
+              openMenu={openMenu}
+            />
           );
         })}
       </div>
       <div className="terminal-stack">
         {tabs.map((tab) => (
-          <TerminalView
-            key={tab.sessionId}
-            sessionId={tab.sessionId}
-            // Folds in the panel's own hidden state (set when a different
-            // top-level view like Settings is active) so returning to it
-            // is treated the same as switching back to this tab: xterm gets
-            // its forced-repaint pass (see the `visible` effect in
-            // Terminal.tsx) instead of staying stuck on stale pixels.
-            visible={!hidden && tab.sessionId === activeTabId}
-            themeOverrideId={tab.themeId}
-            logPath={tab.logPath}
-          />
+          <div
+            key={tab.tabId}
+            className="tab-pane-container"
+            style={{ display: !hidden && tab.tabId === activeTabId ? "flex" : "none" }}
+          >
+            <PaneTree
+              node={tab.layout}
+              tabVisible={!hidden && tab.tabId === activeTabId}
+              activePaneId={tab.activePaneId}
+              tabId={tab.tabId}
+            />
+          </div>
         ))}
       </div>
       <ContextMenu menu={menu} onClose={closeMenu} />
+    </div>
+  );
+}
+
+interface TabButtonProps {
+  tabId: string;
+  title: string;
+  hostId: string | null;
+  closed: boolean;
+  closeError?: string;
+  logPath?: string;
+  themeId?: string;
+  isActive: boolean;
+  draggingId: string | null;
+  dropTargetId: string | null;
+  tabCount: number;
+  globalTerminalThemeId: string;
+  onDragStart(): void;
+  onDragEnd(): void;
+  onDragOver(): void;
+  onDrop(): void;
+  onClick(): void;
+  onDuplicate(): void;
+  onClose(): void;
+  onCloseOthers(): void;
+  onCloseAll(): void;
+  onToggleLogging(): void;
+  onSetTheme(id: string): void;
+  openMenu: ReturnType<typeof useContextMenu>["open"];
+}
+
+function TabButton(p: TabButtonProps) {
+  const hosts = useAppStore((s) => s.hosts);
+  const hostColor = hosts.find((h) => h.id === p.hostId)?.color;
+
+  return (
+    <div
+      draggable
+      onDragStart={p.onDragStart}
+      onDragEnd={p.onDragEnd}
+      onDragOver={(e) => {
+        if (p.draggingId && p.draggingId !== p.tabId) {
+          e.preventDefault();
+          p.onDragOver();
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        p.onDrop();
+      }}
+      className={`tab ${p.isActive ? "active" : ""} ${p.closed ? "closed" : ""} ${
+        p.tabId === p.draggingId ? "dragging" : ""
+      } ${p.tabId === p.dropTargetId ? "drop-target" : ""}`}
+      style={hostColor ? { boxShadow: `inset 0 2px 0 ${hostColor}` } : undefined}
+      onClick={p.onClick}
+      onContextMenu={(e) =>
+        p.openMenu(e, [
+          { label: "Duplicate", onClick: p.onDuplicate },
+          { separator: true },
+          { label: "Close", onClick: p.onClose },
+          { label: "Close Others", disabled: p.tabCount < 2, onClick: p.onCloseOthers },
+          { label: "Close All", onClick: p.onCloseAll },
+          { separator: true },
+          { label: p.logPath ? "Stop Logging" : "Start Logging…", onClick: p.onToggleLogging },
+          ...buildTerminalThemeMenuItems(p.themeId ?? p.globalTerminalThemeId, p.onSetTheme),
+        ])
+      }
+      title={p.closeError}
+    >
+      {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
+      {p.logPath && <span className="tab-logging-dot" title={`Logging to ${p.logPath}`} />}
+      {p.themeId && (
+        <span
+          className="tab-theme-dot"
+          title={`Color theme: ${getTerminalThemePreset(p.themeId).name}`}
+          style={{ background: getTerminalThemePreset(p.themeId).theme?.background ?? "var(--term-bg)" }}
+        />
+      )}
+      <span>{p.title}</span>
+      {p.closed && <span className="tab-dot" />}
+      <button
+        className="tab-duplicate"
+        title="Duplicate tab"
+        onClick={(e) => {
+          e.stopPropagation();
+          p.onDuplicate();
+        }}
+      >
+        ⧉
+      </button>
+      <button
+        className="tab-close"
+        title="Close tab"
+        onClick={(e) => {
+          e.stopPropagation();
+          p.onClose();
+        }}
+      >
+        ×
+      </button>
     </div>
   );
 }

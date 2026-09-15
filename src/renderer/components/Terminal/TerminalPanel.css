@@ -114,6 +114,57 @@
   min-height: 0;
 }
 
+/* Each tab gets its own absolutely-positioned layer filling .terminal-stack
+   (same trick .terminal-pane always used) — only the active tab's is
+   display:flex, the rest display:none, so their xterm instances stay alive
+   in the background without needing to be laid out. */
+.tab-pane-container {
+  position: absolute;
+  inset: 0;
+}
+
+.pane-split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane-split-row {
+  flex-direction: row;
+}
+
+.pane-split-column {
+  flex-direction: column;
+}
+
+/* This wrapper's own background is what actually shows: .pane-leaf inside
+   it leaves a small margin (below) rather than filling it completely, so
+   this always-visible 2px ring both separates adjacent panes and — turning
+   var(--accent) via .active — highlights whichever one has focus. A
+   shadow/outline directly on .pane-leaf doesn't work here: its xterm canvas
+   fills it edge-to-edge and paints over it. */
+.pane-split-child {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  background: var(--border);
+}
+
+.pane-split-child.active {
+  background: var(--accent);
+}
+
+.pane-leaf {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  margin: 2px;
+}
+
 .terminal-empty {
   display: flex;
   flex-direction: column;

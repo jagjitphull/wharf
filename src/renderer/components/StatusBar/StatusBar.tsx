@@ -12,18 +12,23 @@ function formatDuration(ms: number): string {
 }
 
 export function StatusBar() {
-  const { tabs, activeTabId, hosts } = useAppStore();
+  const { tabs, activeTabId, paneMeta, hosts } = useAppStore();
   const [now, setNow] = useState(Date.now());
 
-  const activeTab = tabs.find((t) => t.sessionId === activeTabId) ?? null;
+  const activeTab = tabs.find((t) => t.tabId === activeTabId) ?? null;
+  // The status bar reflects whichever pane has focus within the active tab
+  // — a multi-pane tab has no single "the" session, so this is the one
+  // that's actually receiving keystrokes right now.
+  const activeMeta = activeTab ? paneMeta[activeTab.activePaneId] : null;
+  const sessionCount = Object.keys(paneMeta).length;
 
   useEffect(() => {
-    if (!activeTab || activeTab.closed) return;
+    if (!activeMeta || activeMeta.closed) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [activeTab?.sessionId, activeTab?.closed]);
+  }, [activeTab?.activePaneId, activeMeta?.closed]);
 
-  if (!activeTab) {
+  if (!activeTab || !activeMeta) {
     return (
       <div className="status-bar">
         <span className="status-dim">No active session</span>
@@ -31,18 +36,18 @@ export function StatusBar() {
     );
   }
 
-  const host = hosts.find((h) => h.id === activeTab.hostId);
+  const host = hosts.find((h) => h.id === activeMeta.hostId);
 
   return (
     <div className="status-bar">
       <span
-        className={`status-dot ${activeTab.closed ? "closed" : activeTab.reconnecting ? "reconnecting" : "connected"}`}
+        className={`status-dot ${activeMeta.closed ? "closed" : activeMeta.reconnecting ? "reconnecting" : "connected"}`}
       />
       <span className="status-text">
-        {activeTab.closed
+        {activeMeta.closed
           ? "Disconnected"
-          : activeTab.reconnecting
-            ? `Reconnecting… (${activeTab.reconnecting.attempt}/${activeTab.reconnecting.maxAttempts})`
+          : activeMeta.reconnecting
+            ? `Reconnecting… (${activeMeta.reconnecting.attempt}/${activeMeta.reconnecting.maxAttempts})`
             : "Connected"}
       </span>
       {host ? (
@@ -50,13 +55,13 @@ export function StatusBar() {
           {host.username}@{host.hostname}:{host.port}
         </span>
       ) : (
-        activeTab.hostId === null && <span className="status-host">Local shell</span>
+        activeMeta.hostId === null && <span className="status-host">Local shell</span>
       )}
-      {!activeTab.closed && <span className="status-duration">{formatDuration(now - activeTab.connectedAt)}</span>}
-      {activeTab.closeError && <span className="status-error">{activeTab.closeError}</span>}
+      {!activeMeta.closed && <span className="status-duration">{formatDuration(now - activeMeta.connectedAt)}</span>}
+      {activeMeta.closeError && <span className="status-error">{activeMeta.closeError}</span>}
       <span className="status-spacer" />
       <span className="status-dim">
-        {tabs.length} session{tabs.length === 1 ? "" : "s"}
+        {sessionCount} session{sessionCount === 1 ? "" : "s"}
       </span>
     </div>
   );

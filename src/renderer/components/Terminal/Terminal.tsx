@@ -25,11 +25,14 @@ import "./Terminal.css";
 interface Props {
   sessionId: string;
   visible: boolean;
-  /** Per-tab color theme override (from TerminalTab.themeId), taking
+  /** Per-pane color theme override (from PaneMeta.themeId), taking
    * priority over the global Settings choice. undefined defers to it. */
   themeOverrideId?: string;
-  /** Path this tab is currently logging its raw output to, if any (mirrors TerminalTab.logPath). */
+  /** Path this pane is currently logging its raw output to, if any (mirrors PaneMeta.logPath). */
   logPath?: string;
+  /** Id of the tab this pane lives in — needed for the Split Right/Down
+   * context-menu actions, which add a new pane into this tab's layout. */
+  tabId: string;
 }
 
 const TERM_CSS_VARS = [
@@ -75,7 +78,7 @@ function resolveXtermTheme(themeId: string): ITheme {
   return preset.theme ?? readAppCssTheme();
 }
 
-export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: Props) {
+export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tabId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termRef = useRef<XTerm | null>(null);
@@ -86,8 +89,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: P
   const fontSize = useTerminalPrefsStore((s) => s.fontSize);
   const fontFamily = useTerminalPrefsStore((s) => s.fontFamily);
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
-  const setTabThemeId = useAppStore((s) => s.setTabThemeId);
-  const setTabLogPath = useAppStore((s) => s.setTabLogPath);
+  const setPaneThemeId = useAppStore((s) => s.setPaneThemeId);
+  const setPaneLogPath = useAppStore((s) => s.setPaneLogPath);
+  const splitPane = useAppStore((s) => s.splitPane);
+  const closeTerminal = useAppStore((s) => s.closeTerminal);
   const keywordEnabled = useKeywordHighlightStore((s) => s.enabled);
   const keywordRules = useKeywordHighlightStore((s) => s.rules);
   const highlightStateRef = useRef(createHighlightState());
@@ -281,10 +286,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: P
   async function toggleLogging() {
     if (logPath) {
       await wharf.ssh.stopLogging(sessionId);
-      setTabLogPath(sessionId, undefined);
+      setPaneLogPath(sessionId, undefined);
     } else {
       const path = await wharf.ssh.startLogging(sessionId);
-      if (path) setTabLogPath(sessionId, path);
+      if (path) setPaneLogPath(sessionId, path);
     }
   }
 
@@ -317,12 +322,16 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath }: P
         },
       },
       { separator: true },
+      { label: "Split Right", onClick: () => splitPane(tabId, sessionId, "row") },
+      { label: "Split Down", onClick: () => splitPane(tabId, sessionId, "column") },
+      { label: "Close Pane", onClick: () => closeTerminal(sessionId) },
+      { separator: true },
       { label: logPath ? "Stop Logging" : "Start Logging…", onClick: toggleLogging },
       // Picking any preset here — "Match App Theme" included — sets an
-      // explicit per-tab override, same as picking one always would; a tab
-      // only falls back to the global Settings choice until its own menu
-      // is used for the first time.
-      ...buildTerminalThemeMenuItems(terminalThemeId, (id) => setTabThemeId(sessionId, id)),
+      // explicit per-pane override, same as picking one always would; a
+      // pane only falls back to the global Settings choice until its own
+      // menu is used for the first time.
+      ...buildTerminalThemeMenuItems(terminalThemeId, (id) => setPaneThemeId(sessionId, id)),
     ]);
   }
 
