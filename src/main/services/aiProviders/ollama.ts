@@ -24,6 +24,33 @@ interface OllamaChatResponse {
   message?: { content?: string };
 }
 
+/** Node's fetch (undici) collapses every network-level failure into the
+ * unhelpful top-level message "fetch failed" — the actual reason lives in
+ * `err.cause`, a regular Node/OpenSSL error with its own `.code`. This pulls
+ * that out, and specifically recognizes the signature of sending an
+ * `https://` request at a server that's actually speaking plain HTTP (the
+ * OpenSSL handshake fails oddly rather than just refusing the connection) —
+ * a very easy mistake since Ollama serves plain HTTP by default and the
+ * error otherwise gives no hint what's wrong. */
+function describeFetchFailure(err: unknown, baseUrl: string): string {
+  const cause = err instanceof Error && "cause" in err ? (err.cause as { code?: string; message?: string } | undefined) : undefined;
+  const code = cause?.code;
+  const causeMessage = cause?.message ?? (cause as unknown as Error | undefined)?.toString();
+
+  const looksLikeTlsMismatch =
+    baseUrl.startsWith("https://") &&
+    (code?.startsWith("ERR_SSL_") || code === "EPROTO" || /wrong version number|ssl routines/i.test(causeMessage ?? ""));
+  if (looksLikeTlsMismatch) {
+    return (
+      `couldn't reach Ollama at ${baseUrl} — got a TLS/SSL error talking to it over https://, but Ollama serves ` +
+      `plain HTTP by default. Try http:// instead of https:// in the base URL.`
+    );
+  }
+
+  const detail = causeMessage || (err instanceof Error ? err.message : String(err));
+  return `couldn't reach Ollama at ${baseUrl} (${detail}) — is it running (\`ollama serve\`)?`;
+}
+
 /**
  * Ollama runs locally with no API key — just a base URL (default
  * http://localhost:11434) and whatever model the user has already pulled
@@ -52,8 +79,7 @@ async function suggest(_apiKey: string | null, config: AiProviderConfig, request
       }),
     });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`AI suggestion failed: couldn't reach Ollama at ${baseUrl} (${detail}) — is it running (\`ollama serve\`)?`);
+    throw new Error(`AI suggestion failed: ${describeFetchFailure(err, baseUrl)}`);
   }
 
   if (!res.ok) {
