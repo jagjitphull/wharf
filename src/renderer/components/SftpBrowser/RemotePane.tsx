@@ -3,6 +3,7 @@ import type { HostRecord, SftpEntry, SftpTransferProgress } from "@shared/types"
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { IconDownload, IconFile, IconFolder, IconPencil, IconSearch, IconTrash } from "../Icons/Icons";
+import { FileEditorDialog } from "../FileEditor/FileEditorDialog";
 import { formatSize } from "./formatSize";
 import { readTransferData, setTransferData, TRANSFER_MIME } from "./dragTransfer";
 import "./SftpBrowser.css";
@@ -26,6 +27,7 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SftpEntry[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [editingPath, setEditingPath] = useState<string | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
 
   function openEntry(entry: SftpEntry) {
     if (entry.type === "directory") onPathChange(entry.path);
+    else if (entry.type === "file") setEditingPath(entry.path);
   }
 
   async function handleDownload(entry: SftpEntry) {
@@ -282,11 +285,14 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
               onDoubleClick={() => (inSearchMode ? revealResult(entry) : openEntry(entry))}
               onContextMenu={(e) =>
                 openMenu(e, [
-                  inSearchMode
-                    ? { label: "Reveal in folder", onClick: () => revealResult(entry) }
+                  ...(inSearchMode
+                    ? [{ label: "Reveal in folder", onClick: () => revealResult(entry) }]
                     : entry.type === "directory"
-                      ? { label: "Open", onClick: () => openEntry(entry) }
-                      : { label: "Download…", onClick: () => handleDownload(entry) },
+                      ? [{ label: "Open", onClick: () => openEntry(entry) }]
+                      : [
+                          ...(entry.type === "file" ? [{ label: "Edit…", onClick: () => setEditingPath(entry.path) }] : []),
+                          { label: "Download…", onClick: () => handleDownload(entry) },
+                        ]),
                   ...(entry.type !== "directory"
                     ? [{ label: "Send to local pane", onClick: () => onTransferToLocal(entry.path) }]
                     : []),
@@ -328,6 +334,14 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
         )}
       </div>
       <ContextMenu menu={menu} onClose={closeMenu} />
+      {editingPath && (
+        <FileEditorDialog
+          hostId={host.id}
+          remotePath={editingPath}
+          onClose={() => setEditingPath(null)}
+          onSaved={refresh}
+        />
+      )}
     </div>
   );
 }

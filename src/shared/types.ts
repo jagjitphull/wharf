@@ -255,6 +255,8 @@ export const IPC = {
     downloadToPath: "sftp:download-to-path",
     onProgress: "sftp:progress",
     search: "sftp:search",
+    readFile: "sftp:read-file",
+    writeFile: "sftp:write-file",
   },
   localFs: {
     list: "localfs:list",

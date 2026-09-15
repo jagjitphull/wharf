@@ -27,6 +27,10 @@ A personal SSH/SFTP terminal client, Termius-style.
   via a row's send button or by dragging it onto the other pane, drag-and-
   drop upload from the OS still works too; recursive filename search under
   a remote folder with "reveal in folder" on a result
+- Built-in remote file editor — double-click a text file in the SFTP
+  browser (or right-click → Edit…) to edit it in place and save straight
+  back over SFTP, no download/re-upload round trip (plain text, capped at
+  ~2 MB — larger files still need a real download)
 - Reconnect on drop — an SSH session that dies unexpectedly (network blip,
   etc.) auto-retries with backoff instead of just going dead, reusing the
   same tab; a deliberate disconnect never triggers this

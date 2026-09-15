@@ -53,6 +53,8 @@ const api: WharfApi = {
       ipcRenderer.invoke(IPC.sftp.downloadToPath, hostId, remotePath, localDir),
     onProgress: (cb) => on(IPC.sftp.onProgress, cb as (...args: unknown[]) => void),
     search: (hostId, rootPath, query) => ipcRenderer.invoke(IPC.sftp.search, hostId, rootPath, query),
+    readFile: (hostId, remotePath) => ipcRenderer.invoke(IPC.sftp.readFile, hostId, remotePath),
+    writeFile: (hostId, remotePath, content) => ipcRenderer.invoke(IPC.sftp.writeFile, hostId, remotePath, content),
   },
   localFs: {
     list: (dirPath) => ipcRenderer.invoke(IPC.localFs.list, dirPath),

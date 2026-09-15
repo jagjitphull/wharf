@@ -79,6 +79,10 @@ export interface WharfApi {
     onProgress(cb: (event: SftpTransferProgress) => void): Unsubscribe;
     /** Recursively searches under `rootPath` for entries whose name contains `query` (case-insensitive), capped to a bounded scan. */
     search(hostId: string, rootPath: string, query: string): Promise<SftpEntry[]>;
+    /** Reads a remote file's contents as UTF-8 text, for the built-in editor. Throws if the file is over ~2 MB — too large to edit here. */
+    readFile(hostId: string, remotePath: string): Promise<string>;
+    /** Overwrites a remote file with UTF-8 `content`, for the built-in editor's Save. */
+    writeFile(hostId: string, remotePath: string, content: string): Promise<void>;
   };
   localFs: {
     list(dirPath: string): Promise<SftpEntry[]>;

@@ -27,6 +27,17 @@ export function registerSftpIpc(): void {
     },
   );
 
+  ipcMain.handle(IPC.sftp.readFile, async (_event, hostId: string, remotePath: string): Promise<string> => {
+    return sftpManager.readFile(hostId, remotePath);
+  });
+
+  ipcMain.handle(
+    IPC.sftp.writeFile,
+    async (_event, hostId: string, remotePath: string, content: string): Promise<void> => {
+      return sftpManager.writeFile(hostId, remotePath, content);
+    },
+  );
+
   // Uploads/downloads pick the local side of the transfer via a native
   // dialog in the main process (renderer has no filesystem access), and
   // return null if the user cancels.

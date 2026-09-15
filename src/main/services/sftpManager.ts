@@ -115,6 +115,34 @@ export async function list(hostId: string, remotePath: string): Promise<SftpEntr
     .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "directory" ? -1 : 1));
 }
 
+// A plain-textarea editor isn't the place to open something huge — this is
+// a generous cap for source/config files while still guarding against
+// accidentally loading a multi-hundred-MB file into a renderer string.
+const MAX_EDITABLE_FILE_SIZE = 2 * 1024 * 1024;
+
+/** Reads a remote file's contents as UTF-8 text, for the built-in editor.
+ * Throws if the file is larger than MAX_EDITABLE_FILE_SIZE — download it
+ * instead of editing in-app past that size. */
+export async function readFile(hostId: string, remotePath: string): Promise<string> {
+  const sftp = await getSftp(hostId);
+  const buf = await new Promise<Buffer>((resolve, reject) => {
+    sftp.readFile(remotePath, (err, data) => (err ? reject(err) : resolve(data)));
+  });
+  if (buf.length > MAX_EDITABLE_FILE_SIZE) {
+    const mb = (buf.length / (1024 * 1024)).toFixed(1);
+    throw new Error(`File is too large to edit here (${mb} MB, limit 2 MB) — download it instead.`);
+  }
+  return buf.toString("utf8");
+}
+
+/** Overwrites a remote file with `content` (UTF-8), for the built-in editor's Save. */
+export async function writeFile(hostId: string, remotePath: string, content: string): Promise<void> {
+  const sftp = await getSftp(hostId);
+  await new Promise<void>((resolve, reject) => {
+    sftp.writeFile(remotePath, Buffer.from(content, "utf8"), (err) => (err ? reject(err) : resolve()));
+  });
+}
+
 export async function mkdir(hostId: string, remotePath: string): Promise<void> {
   const sftp = await getSftp(hostId);
   await new Promise<void>((resolve, reject) => sftp.mkdir(remotePath, (err) => (err ? reject(err) : resolve())));
