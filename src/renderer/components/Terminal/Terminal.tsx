@@ -147,7 +147,8 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     if (!requestLine) return; // nothing to complete
     setAiPopup({ status: "loading", suggestions: [], requestLine });
     try {
-      const hasKey = await wharf.ai.hasApiKey();
+      const provider = await wharf.ai.getProvider();
+      const hasKey = await wharf.ai.hasApiKey(provider);
       if (!hasKey) {
         setAiPopup({ status: "error", suggestions: [], requestLine, error: "No API key configured — add one in Settings." });
         return;

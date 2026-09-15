@@ -108,9 +108,10 @@ export type CommandHistoryInput = Omit<CommandHistoryEntry, "id" | "timestamp">;
 // AI autocomplete
 // ---------------------------------------------------------------------------
 
-/** Sent to Claude for one autocomplete request — the current unsent line
- * plus enough context (recent commands, host, platform) for the suggestion
- * to be grounded in what the user's actually doing, not a generic guess. */
+/** Sent to the active AI provider for one autocomplete request — the current
+ * unsent line plus enough context (recent commands, host, platform) for the
+ * suggestion to be grounded in what the user's actually doing, not a generic
+ * guess. */
 export interface AiSuggestRequest {
   currentLine: string;
   /** Most-recent-last, capped client-side before sending. */
@@ -118,6 +119,21 @@ export interface AiSuggestRequest {
   hostName: string;
   /** "darwin" | "win32" | "linux" | ... — from window.wharf.window.platform. */
   platform: string;
+}
+
+/** Which backend answers autocomplete requests. Claude/OpenAI/Gemini are
+ * cloud providers authenticated with an API key (stored encrypted at rest,
+ * same as host passwords); Ollama talks to a local server (no key, just a
+ * base URL) — whatever model the user already has pulled there. */
+export type AiProvider = "claude" | "openai" | "gemini" | "ollama";
+
+/** Per-provider settings beyond the API key: an optional model override for
+ * the cloud providers (each has a sensible built-in default), and the
+ * base URL + required model name for Ollama (no universal default — depends
+ * entirely on what the user has pulled locally). */
+export interface AiProviderConfig {
+  model?: string;
+  baseUrl?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,8 +357,12 @@ export const IPC = {
   },
   ai: {
     suggest: "ai:suggest",
+    getProvider: "ai:get-provider",
+    setProvider: "ai:set-provider",
     hasApiKey: "ai:has-api-key",
     setApiKey: "ai:set-api-key",
     clearApiKey: "ai:clear-api-key",
+    getProviderConfig: "ai:get-provider-config",
+    setProviderConfig: "ai:set-provider-config",
   },
 } as const;

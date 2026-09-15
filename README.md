@@ -72,13 +72,21 @@ A personal SSH/SFTP terminal client, Termius-style.
   completion aren't captured exactly as run), with one-click copy and a
   Clear History button
 - AI-powered autocomplete — press `Ctrl/Cmd+Space` in any terminal to ask
-  Claude for up to 3 completions of the command you're typing, grounded in
+  your choice of **Claude, OpenAI (ChatGPT), Gemini, or a local Ollama
+  server** for up to 3 completions of the command you're typing, grounded in
   your recent commands from that session; accept one with a click,
-  `Tab`/`Enter`, or `1`-`3`, or dismiss with `Esc`. Off by default until you
-  add a Claude API key in Settings → AI Autocomplete (stored encrypted at
-  rest the same way host passwords are); nothing is sent until you trigger
-  a suggestion, and each request includes only the current line, recent
-  command history, the host name, and your OS — never full command output
+  `Tab`/`Enter`, or `1`-`3`, or dismiss with `Esc`. Pick the provider and
+  add its API key in Settings → AI Autocomplete — a no-op until one is
+  configured; keys are stored encrypted at rest the same way host passwords
+  are, and switching providers keeps every other provider's key/settings
+  intact, so you can flip back without re-entering anything. Ollama needs
+  no key at all — just a base URL (defaults to `http://localhost:11434`)
+  and the name of a model you've already pulled there, so autocomplete can
+  run fully offline/local if you'd rather not send anything to a cloud
+  provider. Every provider has an optional model override in Settings.
+  Nothing is sent until you trigger a suggestion, and each request includes
+  only the current line, recent command history, the host name, and your
+  OS — never full command output
 
 ## Getting started
 
@@ -183,12 +191,18 @@ src/
   the app, and everything else keeps working. Re-run
   `npm run rebuild-native` after fixing whatever blocked it, or after
   upgrading Electron.
-- AI autocomplete requires your own Claude API key and outbound network
-  access to `api.anthropic.com`; it costs a small amount of API usage per
-  suggestion you trigger (nothing runs automatically). Suggestions are only
-  as good as the model's read of your current line and recent commands —
-  always review a suggestion before accepting it, the same as you would
-  tab-completion.
+- AI autocomplete requires your own API key for whichever cloud provider
+  you pick (Claude, OpenAI, or Gemini) plus outbound network access to
+  that provider's API — Ollama is the exception, running fully local
+  against a server you start yourself (`ollama serve`) with a model you've
+  pulled (`ollama pull <model>`). Cloud providers cost a small amount of
+  API usage per suggestion you trigger (nothing runs automatically). The
+  built-in default model per provider is a reasonable, fast/cheap choice
+  as of this app's release, but provider model lineups change — override
+  it in Settings if a default ever 404s or is deprecated. Suggestions are
+  only as good as the model's read of your current line and recent
+  commands — always review a suggestion before accepting it, the same as
+  you would tab-completion.
 - No Mosh support — sessions are plain SSH only, so a connection drop over
   a flaky network relies on the reconnect-on-drop retry above rather than
   Mosh's roaming/local-echo model. Planned for a future version.

@@ -20,6 +20,8 @@ import type {
   CommandHistoryEntry,
   CommandHistoryInput,
   AiSuggestRequest,
+  AiProvider,
+  AiProviderConfig,
   SshConfigCandidate,
   SshConfigImportResult,
   TerminalDataEvent,
@@ -137,10 +139,15 @@ export interface WharfApi {
     clear(): Promise<void>;
   };
   ai: {
-    /** Asks Claude for up to 3 likely completions of the current line. Throws if no API key is configured. */
+    /** Asks the active provider for up to 3 likely completions of the current line. Throws if that provider isn't configured. */
     suggest(request: AiSuggestRequest): Promise<string[]>;
-    hasApiKey(): Promise<boolean>;
-    setApiKey(key: string): Promise<void>;
-    clearApiKey(): Promise<void>;
+    getProvider(): Promise<AiProvider>;
+    setProvider(provider: AiProvider): Promise<void>;
+    /** Not meaningful for "ollama" (no key) — always resolves true there. */
+    hasApiKey(provider: AiProvider): Promise<boolean>;
+    setApiKey(provider: AiProvider, key: string): Promise<void>;
+    clearApiKey(provider: AiProvider): Promise<void>;
+    getProviderConfig(provider: AiProvider): Promise<AiProviderConfig>;
+    setProviderConfig(provider: AiProvider, config: AiProviderConfig): Promise<void>;
   };
 }

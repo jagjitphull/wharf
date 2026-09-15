@@ -1,5 +1,13 @@
 import Store from "electron-store";
-import type { CommandHistoryEntry, GroupRecord, HostRecord, SnippetRecord, TunnelRecord } from "../../shared/types";
+import type {
+  AiProvider,
+  AiProviderConfig,
+  CommandHistoryEntry,
+  GroupRecord,
+  HostRecord,
+  SnippetRecord,
+  TunnelRecord,
+} from "../../shared/types";
 
 export interface WindowBounds {
   x: number;
@@ -16,8 +24,12 @@ interface Schema {
   commandHistory: CommandHistoryEntry[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
-  /** Id of the AI autocomplete API key in `secrets`, same encrypted-at-rest storage as host passwords. Null if not configured. */
-  aiApiKeySecretId: string | null;
+  /** Which AI autocomplete backend is active. */
+  aiProvider: AiProvider;
+  /** Per-cloud-provider API key id in `secrets` (same encrypted-at-rest storage as host passwords) — Ollama has no key, so it never appears here. */
+  aiApiKeySecretIds: Partial<Record<Exclude<AiProvider, "ollama">, string>>;
+  /** Per-provider settings beyond the key: an optional model override for the cloud providers, and Ollama's base URL + model. */
+  aiProviderConfig: Partial<Record<AiProvider, AiProviderConfig>>;
   windowBounds: WindowBounds | null;
 }
 
@@ -28,7 +40,9 @@ const defaults: Schema = {
   snippets: [],
   commandHistory: [],
   secrets: {},
-  aiApiKeySecretId: null,
+  aiProvider: "claude",
+  aiApiKeySecretIds: {},
+  aiProviderConfig: {},
   windowBounds: null,
 };
 
@@ -42,6 +56,22 @@ export const store = new Store<Schema>({
   name: "wharf-data",
   defaults,
 });
+
+// One-time migration from the pre-multi-provider single Claude key field
+// (`aiApiKeySecretId`, now removed from Schema) into the new per-provider
+// map, so upgrading doesn't silently drop an already-configured Claude key.
+// Reads/writes the legacy field via an untyped cast since it no longer
+// exists on Schema; safe because electron-store's underlying store is just
+// a plain JSON file, and `store.delete` on a since-removed key is a no-op
+// if it's already gone (e.g. on every later launch, once migrated).
+{
+  const legacy = (store as unknown as { get(key: string): unknown }).get("aiApiKeySecretId") as string | null | undefined;
+  if (legacy) {
+    const ids = store.get("aiApiKeySecretIds");
+    if (!ids.claude) store.set("aiApiKeySecretIds", { ...ids, claude: legacy });
+  }
+  (store as unknown as { delete(key: string): void }).delete("aiApiKeySecretId");
+}
 
 export function getHosts(): HostRecord[] {
   return store.get("hosts");
@@ -93,12 +123,31 @@ export function clearCommandHistory(): void {
   store.set("commandHistory", []);
 }
 
-export function getAiApiKeySecretId(): string | null {
-  return store.get("aiApiKeySecretId");
+export function getAiProvider(): AiProvider {
+  return store.get("aiProvider");
 }
 
-export function setAiApiKeySecretId(secretId: string | null): void {
-  store.set("aiApiKeySecretId", secretId);
+export function setAiProvider(provider: AiProvider): void {
+  store.set("aiProvider", provider);
+}
+
+export function getAiApiKeySecretId(provider: Exclude<AiProvider, "ollama">): string | null {
+  return store.get("aiApiKeySecretIds")[provider] ?? null;
+}
+
+export function setAiApiKeySecretId(provider: Exclude<AiProvider, "ollama">, secretId: string | null): void {
+  const ids = { ...store.get("aiApiKeySecretIds") };
+  if (secretId) ids[provider] = secretId;
+  else delete ids[provider];
+  store.set("aiApiKeySecretIds", ids);
+}
+
+export function getAiProviderConfig(provider: AiProvider): AiProviderConfig {
+  return store.get("aiProviderConfig")[provider] ?? {};
+}
+
+export function setAiProviderConfig(provider: AiProvider, config: AiProviderConfig): void {
+  store.set("aiProviderConfig", { ...store.get("aiProviderConfig"), [provider]: config });
 }
 
 export function getWindowBounds(): WindowBounds | null {
