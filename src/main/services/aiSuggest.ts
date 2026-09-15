@@ -101,7 +101,18 @@ export async function suggest(request: AiSuggestRequest): Promise<string[]> {
       throw new Error("AI suggestion failed: rate limited — try again shortly.");
     }
     if (err instanceof Anthropic.APIError) {
-      throw new Error(`AI suggestion failed: ${err.message}`);
+      // err.message is "<status> <raw JSON body>" — not fit to show a user.
+      // The API's own nested error.message (e.g. "Your credit balance is
+      // too low...") is the part actually worth surfacing.
+      const body = err.error as { error?: { message?: string } } | null | undefined;
+      const detail = body?.error?.message ?? err.message;
+      if (err.status === 400 && /credit balance/i.test(detail)) {
+        throw new Error(
+          "AI suggestion failed: this Anthropic account has no API credit — add a payment method or " +
+            "credits at console.anthropic.com under Plans & Billing.",
+        );
+      }
+      throw new Error(`AI suggestion failed: ${detail}`);
     }
     throw err;
   }
