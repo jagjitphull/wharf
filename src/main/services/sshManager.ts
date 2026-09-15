@@ -2,9 +2,8 @@ import { createWriteStream, type WriteStream } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { Client, type ClientChannel } from "ssh2";
 import { BrowserWindow } from "electron";
-import { IPC, type HostRecord } from "../../shared/types";
+import { IPC } from "../../shared/types";
 import { getHosts } from "./store";
-import { connectHostClient } from "./sshConnect";
 import { acquireClient, isPooledClient, releaseClient } from "./connectionPool";
 
 export { buildConnectConfig, connectHostClient } from "./sshConnect";
@@ -35,33 +34,40 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
-interface EstablishedConnection {
-  client: Client;
-  channel: ClientChannel;
-  jumpClient?: Client;
+/** Opens a shell channel on an already-authenticated client. Shared by the
+ * initial connect() and by reconnect attempts, so both go through the exact
+ * same channel-opening logic. */
+function openShell(client: Client, cols: number, rows: number): Promise<ClientChannel> {
+  return new Promise((resolve, reject) => {
+    client.shell({ term: "xterm-256color", cols, rows }, (err, stream) => {
+      if (err) reject(err);
+      else resolve(stream);
+    });
+  });
 }
 
-/** Opens a fresh authenticated shell channel against `host` (through its
- * jump host, if any). Shared by the initial connect() and by reconnect
- * attempts, so both go through the exact same chain-building logic. */
-async function establishConnection(host: HostRecord, cols: number, rows: number): Promise<EstablishedConnection> {
-  const { client, jumpClient } = await connectHostClient(host);
-
-  let channel: ClientChannel;
-  try {
-    channel = await new Promise<ClientChannel>((resolve, reject) => {
-      client.shell({ term: "xterm-256color", cols, rows }, (err, stream) => {
-        if (err) reject(err);
-        else resolve(stream);
-      });
-    });
-  } catch (err) {
-    client.end();
-    jumpClient?.end();
-    throw err;
+/** Releases a session's reference to its client the right way for how it
+ * was obtained: a shared connectionPool slot (releaseClient — torn down
+ * only once every other sharer has released too) or a private connection
+ * that was never registered with the pool (ended directly). Used by both
+ * disconnect() and reconnect-on-drop's cleanup, so a session's client is
+ * never leaked and a still-shared pooled connection is never yanked out
+ * from under sessions still using it. */
+function releasePossiblyPooledClient(hostId: string, client: Client, jumpClient?: Client): void {
+  if (isPooledClient(hostId, client)) {
+    releaseClient(hostId);
+  } else {
+    try {
+      client.end();
+    } catch {
+      /* already dead */
+    }
+    try {
+      jumpClient?.end();
+    } catch {
+      /* already dead */
+    }
   }
-
-  return { client, channel, jumpClient };
 }
 
 // Backoff schedule for reconnect-on-drop: 2s, 4s, 8s, 16s, 30s, then give up.
@@ -132,27 +138,36 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
     return;
   }
 
-  // The old client/channel are already dead (that's why we're here) — end
-  // them defensively so a still-limping jump-host connection doesn't leak.
-  try {
-    stillTracked.client.end();
-  } catch {
-    /* already dead */
-  }
-  try {
-    stillTracked.jumpClient?.end();
-  } catch {
-    /* already dead */
-  }
+  // The old client/channel are already dead (that's why we're here) —
+  // release our reference the right way (a shared pool slot vs. a private
+  // post-reconnect connection) so nothing leaks.
+  releasePossiblyPooledClient(stillTracked.hostId, stillTracked.client, stillTracked.jumpClient);
 
   try {
-    const { client, channel, jumpClient } = await establishConnection(host, stillTracked.cols, stillTracked.rows);
+    // Reconnect through the shared pool, same as a fresh connect() — so
+    // sessions/SFTP-browses/tunnels that were multiplexed onto the same
+    // connection before it dropped can end up sharing a connection again
+    // after reconnecting too, rather than each always paying for a private
+    // one. (Best-effort: if two sessions' reconnect attempts race, the
+    // second may not see the first's still-in-flight dial and end up with
+    // its own connection anyway — the same inherent limitation as two
+    // concurrent first-time connects to a host, not something reconnect
+    // makes worse.)
+    const { client, jumpClient } = await acquireClient(stillTracked.hostId);
+
+    let channel: ClientChannel;
+    try {
+      channel = await openShell(client, stillTracked.cols, stillTracked.rows);
+    } catch (err) {
+      releaseClient(stillTracked.hostId);
+      throw err;
+    }
+
     // The user may have disconnected while this attempt was in flight —
     // don't resurrect a session nobody wants anymore.
     if (!sessions.has(sessionId)) {
       channel.end();
-      client.end();
-      jumpClient?.end();
+      releaseClient(stillTracked.hostId);
       return;
     }
     stillTracked.client = client;
@@ -184,12 +199,7 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
 
   let channel: ClientChannel;
   try {
-    channel = await new Promise<ClientChannel>((resolve, reject) => {
-      client.shell({ term: "xterm-256color", cols, rows }, (err, stream) => {
-        if (err) reject(err);
-        else resolve(stream);
-      });
-    });
+    channel = await openShell(client, cols, rows);
   } catch (err) {
     releaseClient(hostId);
     throw err;
@@ -221,18 +231,7 @@ export function disconnect(sessionId: string): void {
   // which must see this session already gone rather than try to resurrect it.
   sessions.delete(sessionId);
   session.channel.end();
-  // A session's client is either the shared connectionPool entry for its
-  // host (the common case — release our reference, torn down only once
-  // every other sharer has too) or, after a reconnect, a private
-  // connection that was never registered with the pool (reconnects always
-  // dial fresh rather than reuse — see connectionPool.ts) and so must be
-  // ended directly instead.
-  if (isPooledClient(session.hostId, session.client)) {
-    releaseClient(session.hostId);
-  } else {
-    session.client.end();
-    session.jumpClient?.end();
-  }
+  releasePossiblyPooledClient(session.hostId, session.client, session.jumpClient);
   session.logStream?.end();
 }
 

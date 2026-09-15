@@ -156,12 +156,16 @@ src/
 
 ## Known limitations
 
-- Connection multiplexing only applies at connect time. If a shared
-  connection drops, every session/SFTP-browse/tunnel that was using it
-  reconnects independently rather than being re-multiplexed with each
-  other — each just gets its own connection back. A later new session to
-  that host can still multiplex with whichever one happened to reconnect
-  first.
+- When a shared connection drops, every session/SFTP-browse/tunnel that
+  was using it reconnects independently and through the same shared pool
+  — so a session that reconnects quickly can end up sharing its new
+  connection with others reconnecting to the same host afterward (or with
+  a brand new tab opened to that host during the outage), but two
+  sessions that both drop and start reconnecting at essentially the same
+  instant will usually each dial their own fresh connection rather than
+  perfectly re-grouping onto one, since neither's dial is done yet when
+  the other starts (the same inherent race as two simultaneous first-time
+  connects to a host that was never pooled before).
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.
