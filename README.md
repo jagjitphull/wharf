@@ -36,6 +36,12 @@ A personal SSH/SFTP terminal client, Termius-style.
   same tab; a deliberate disconnect never triggers this
 - SSH jump hosts — connect through another saved host as a bastion, for
   terminal sessions, SFTP, and tunnels alike
+- Connection multiplexing — a second terminal tab, an SFTP browse, or a
+  tunnel against a host you're already connected to reuses that one
+  connection instead of opening a fresh one, same practical benefit as
+  OpenSSH's ControlMaster (fewer logins on the server, instant extra
+  sessions), implemented natively since this app talks SSH directly
+  rather than shelling out to the system `ssh`
 - Port forwarding — local, remote & dynamic (SOCKS5) SSH tunnels, managed
   from a Tunnels panel
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
@@ -142,6 +148,12 @@ src/
 
 ## Known limitations
 
+- Connection multiplexing only applies at connect time. If a shared
+  connection drops, every session/SFTP-browse/tunnel that was using it
+  reconnects independently rather than being re-multiplexed with each
+  other — each just gets its own connection back. A later new session to
+  that host can still multiplex with whichever one happened to reconnect
+  first.
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.

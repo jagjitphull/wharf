@@ -1,11 +1,13 @@
-import { createWriteStream, readFileSync, type WriteStream } from "node:fs";
+import { createWriteStream, type WriteStream } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { Client, type ClientChannel, type ConnectConfig, type HostVerifier } from "ssh2";
+import { Client, type ClientChannel } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type HostRecord } from "../../shared/types";
-import { readSecret } from "./secretStore";
 import { getHosts } from "./store";
-import { verifyHostKeyInteractive } from "./knownHosts";
+import { connectHostClient } from "./sshConnect";
+import { acquireClient, isPooledClient, releaseClient } from "./connectionPool";
+
+export { buildConnectConfig, connectHostClient } from "./sshConnect";
 
 interface Session {
   id: string;
@@ -30,83 +32,6 @@ const sessions = new Map<string, Session>();
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send(channel, payload);
-  }
-}
-
-/** Exported for reuse by the SFTP manager, which opens its own direct connections rather than piggybacking on shell sessions. */
-export function buildConnectConfig(host: HostRecord): ConnectConfig {
-  const base: ConnectConfig = {
-    host: host.hostname,
-    port: host.port,
-    username: host.username,
-    readyTimeout: 20_000,
-    keepaliveInterval: 15_000,
-    // Verify against ~/.ssh/known_hosts (TOFU) instead of ssh2's default of
-    // silently accepting any server key.
-    hostVerifier: ((keyBlob: Buffer, verify: (valid: boolean) => void) => {
-      void verifyHostKeyInteractive(host.hostname, host.port, keyBlob).then(verify);
-    }) satisfies HostVerifier,
-  };
-
-  switch (host.authMethod) {
-    case "password":
-      return { ...base, password: readSecret(host.secretId) ?? "" };
-    case "privateKey": {
-      if (!host.privateKeyPath) {
-        throw new Error(`Host "${host.name}" is set to use a private key but no key file is configured.`);
-      }
-      const privateKey = readFileSync(host.privateKeyPath);
-      const passphrase = readSecret(host.secretId) ?? undefined;
-      return { ...base, privateKey, passphrase };
-    }
-    case "agent":
-      return { ...base, agent: process.env.SSH_AUTH_SOCK };
-    default:
-      throw new Error(`Unsupported auth method: ${host.authMethod satisfies never}`);
-  }
-}
-
-function connectClient(config: ConnectConfig): Promise<Client> {
-  return new Promise((resolve, reject) => {
-    const client = new Client();
-    client.on("ready", () => resolve(client));
-    client.on("error", reject);
-    client.connect(config);
-  });
-}
-
-interface EstablishedClient {
-  client: Client;
-  jumpClient?: Client;
-}
-
-/** Opens an authenticated `Client` for `host`, chaining through its jump
- * host first if one is configured. Shared by shell sessions, reconnect
- * attempts, and the SFTP manager, so every caller that needs a live
- * connection to a host goes through the same chain-building logic. */
-export async function connectHostClient(host: HostRecord): Promise<EstablishedClient> {
-  let jumpClient: Client | undefined;
-  let sock: ConnectConfig["sock"];
-
-  if (host.jumpHostId) {
-    const jumpHost = getHosts().find((h) => h.id === host.jumpHostId);
-    if (!jumpHost) throw new Error(`Jump host ${host.jumpHostId} not found`);
-
-    jumpClient = await connectClient(buildConnectConfig(jumpHost));
-    sock = await new Promise((resolve, reject) => {
-      jumpClient!.forwardOut("127.0.0.1", 0, host.hostname, host.port, (err, stream) => {
-        if (err) reject(err);
-        else resolve(stream as unknown as ConnectConfig["sock"]);
-      });
-    });
-  }
-
-  try {
-    const client = await connectClient({ ...buildConnectConfig(host), sock });
-    return { client, jumpClient };
-  } catch (err) {
-    jumpClient?.end();
-    throw err;
   }
 }
 
@@ -245,12 +170,31 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
  * Opens an interactive shell session against the given saved host and
  * starts streaming its output to all renderer windows over
  * `IPC.ssh.onData`. Resolves once the shell is ready to accept input.
+ *
+ * Reuses an already-open connection to this host if one exists (via
+ * connectionPool — real SSH multiplexing: a second/third tab to a host
+ * you're already connected to just opens a new channel, no fresh
+ * handshake) rather than always dialing a brand new one.
  */
 export async function connect(hostId: string, cols: number, rows: number): Promise<string> {
   const host = getHosts().find((h) => h.id === hostId);
   if (!host) throw new Error(`Host ${hostId} not found`);
 
-  const { client, channel, jumpClient } = await establishConnection(host, cols, rows);
+  const { client, jumpClient } = await acquireClient(hostId);
+
+  let channel: ClientChannel;
+  try {
+    channel = await new Promise<ClientChannel>((resolve, reject) => {
+      client.shell({ term: "xterm-256color", cols, rows }, (err, stream) => {
+        if (err) reject(err);
+        else resolve(stream);
+      });
+    });
+  } catch (err) {
+    releaseClient(hostId);
+    throw err;
+  }
+
   const sessionId = randomUUID();
   wireChannel(sessionId, channel, client);
   sessions.set(sessionId, { id: sessionId, hostId, client, channel, jumpClient, cols, rows, reconnecting: false });
@@ -272,13 +216,23 @@ export function resize(sessionId: string, cols: number, rows: number): void {
 export function disconnect(sessionId: string): void {
   const session = sessions.get(sessionId);
   if (!session) return;
-  // Delete first: the .end() calls below asynchronously trigger the same
-  // "close"/"error" events reconnect-on-drop listens for, which must see
-  // this session already gone rather than try to resurrect it.
+  // Delete first: the .end()/releaseClient() calls below can asynchronously
+  // trigger the same "close"/"error" events reconnect-on-drop listens for,
+  // which must see this session already gone rather than try to resurrect it.
   sessions.delete(sessionId);
   session.channel.end();
-  session.client.end();
-  session.jumpClient?.end();
+  // A session's client is either the shared connectionPool entry for its
+  // host (the common case — release our reference, torn down only once
+  // every other sharer has too) or, after a reconnect, a private
+  // connection that was never registered with the pool (reconnects always
+  // dial fresh rather than reuse — see connectionPool.ts) and so must be
+  // ended directly instead.
+  if (isPooledClient(session.hostId, session.client)) {
+    releaseClient(session.hostId);
+  } else {
+    session.client.end();
+    session.jumpClient?.end();
+  }
   session.logStream?.end();
 }
 

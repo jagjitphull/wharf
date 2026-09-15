@@ -3,13 +3,12 @@ import { randomUUID } from "node:crypto";
 import { Client } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type TunnelInput, type TunnelRecord, type TunnelStatus } from "../../shared/types";
-import { getHosts, getTunnels, setTunnels } from "./store";
-import { connectHostClient } from "./sshManager";
+import { getTunnels, setTunnels } from "./store";
+import { acquireClient, releaseClient } from "./connectionPool";
 
 interface RunningTunnel {
+  hostId: string;
   client: Client;
-  /** Kept alive alongside `client` for the tunnel's lifetime when its host connects through a jump host. */
-  jumpClient?: Client;
   server?: net.Server;
 }
 
@@ -131,20 +130,19 @@ export async function start(tunnelId: string): Promise<void> {
   const tunnel = getTunnels().find((t) => t.id === tunnelId);
   if (!tunnel) throw new Error(`Tunnel ${tunnelId} not found`);
 
-  const host = getHosts().find((h) => h.id === tunnel.hostId);
-  if (!host) throw new Error(`Host ${tunnel.hostId} not found`);
-
   broadcastState(tunnelId, "starting");
-  // Filled in once connectHostClient() resolves, so the catch below (which
-  // also covers connectHostClient() itself throwing — e.g. an unreachable
-  // jump host) has something safe to .end() without risking a second,
+  // Set once acquireClient() resolves, so the catch below (which also
+  // covers acquireClient() itself throwing — e.g. an unreachable jump
+  // host, or the host no longer existing) knows whether it actually holds
+  // a pool reference that needs releasing, without risking a second,
   // unrelated crash that would mask the real error.
-  const connected: { client?: Client; jumpClient?: Client } = {};
+  let acquired = false;
 
   try {
-    const { client, jumpClient } = await connectHostClient(host);
-    connected.client = client;
-    connected.jumpClient = jumpClient;
+    // Real SSH multiplexing, same as shell sessions and SFTP: reuses an
+    // already-open connection to this host rather than dialing a fresh one.
+    const { client } = await acquireClient(tunnel.hostId);
+    acquired = true;
 
     if (tunnel.type === "local") {
       const server = net.createServer((socket) => {
@@ -162,14 +160,14 @@ export async function start(tunnelId: string): Promise<void> {
         server.on("error", reject);
         server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
       });
-      running.set(tunnelId, { client, jumpClient, server });
+      running.set(tunnelId, { hostId: tunnel.hostId, client, server });
     } else if (tunnel.type === "dynamic") {
       const server = net.createServer((socket) => pipeSocksConnection(socket, client));
       await new Promise<void>((resolve, reject) => {
         server.on("error", reject);
         server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
       });
-      running.set(tunnelId, { client, jumpClient, server });
+      running.set(tunnelId, { hostId: tunnel.hostId, client, server });
     } else {
       // remote: ask the SSH server to listen on srcHost:srcPort and forward
       // incoming connections back to us, which we relay to dstHost:dstPort.
@@ -184,19 +182,21 @@ export async function start(tunnelId: string): Promise<void> {
         socket.on("error", () => stream.end());
         stream.on("error", () => socket.destroy());
       });
-      running.set(tunnelId, { client, jumpClient });
+      running.set(tunnelId, { hostId: tunnel.hostId, client });
     }
 
     broadcastState(tunnelId, "running");
 
+    // Fires once the connection is actually torn down — which, since it's
+    // shared, only happens once every session/SFTP-browse/other tunnel
+    // using it has also let go. Until then this tunnel just keeps running
+    // on the still-live shared connection, same as everyone else on it.
     client.on("close", () => {
-      jumpClient?.end();
       running.delete(tunnelId);
       broadcastState(tunnelId, "stopped");
     });
   } catch (err) {
-    connected.client?.end();
-    connected.jumpClient?.end();
+    if (acquired) releaseClient(tunnel.hostId);
     const message = err instanceof Error ? err.message : String(err);
     broadcastState(tunnelId, "error", message);
     throw err;
@@ -207,9 +207,11 @@ export function stop(tunnelId: string): void {
   const entry = running.get(tunnelId);
   if (!entry) return;
   entry.server?.close();
-  entry.client.end();
-  entry.jumpClient?.end();
   running.delete(tunnelId);
+  // Releases our reference; the underlying connection itself is only
+  // actually closed once every other sharer (a terminal session, an SFTP
+  // browse, another tunnel to the same host) has released theirs too.
+  releaseClient(entry.hostId);
   broadcastState(tunnelId, "stopped");
 }
 

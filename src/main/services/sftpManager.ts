@@ -1,22 +1,17 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { Client, type SFTPWrapper } from "ssh2";
+import type { SFTPWrapper } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type SftpEntry, type SftpEntryType } from "../../shared/types";
-import { getHosts } from "./store";
-import { connectHostClient } from "./sshManager";
+import { acquireClient, releaseClient } from "./connectionPool";
 
-interface Pooled {
-  client: Client;
-  /** Kept alive alongside `client` for the pooled connection's lifetime when the host connects through a jump host. */
-  jumpClient?: Client;
-  sftp: SFTPWrapper;
-}
-
-// Lazily-opened, cached SFTP connection per host so repeated browsing
-// doesn't re-authenticate on every directory listing. Chains through the
-// host's jump host (if any) via the same logic shell sessions use.
-const pool = new Map<string, Pooled>();
+// Lazily-opened, cached SFTP subsystem channel per host so repeated
+// browsing doesn't reopen it on every directory listing. The underlying
+// connection itself comes from connectionPool — shared with any shell
+// session (or tunnel) already open to the same host, real multiplexing —
+// so this holds exactly one pool reference per host for as long as it has
+// a cached channel, released via closeSftpForHost/closeAllSftp.
+const sftpCache = new Map<string, SFTPWrapper>();
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -25,13 +20,10 @@ function broadcast(channel: string, payload: unknown): void {
 }
 
 async function getSftp(hostId: string): Promise<SFTPWrapper> {
-  const existing = pool.get(hostId);
-  if (existing) return existing.sftp;
+  const cached = sftpCache.get(hostId);
+  if (cached) return cached;
 
-  const host = getHosts().find((h) => h.id === hostId);
-  if (!host) throw new Error(`Host ${hostId} not found`);
-
-  const { client, jumpClient } = await connectHostClient(host);
+  const { client } = await acquireClient(hostId);
 
   let sftp: SFTPWrapper;
   try {
@@ -39,29 +31,28 @@ async function getSftp(hostId: string): Promise<SFTPWrapper> {
       client.sftp((err, s) => (err ? reject(err) : resolve(s)));
     });
   } catch (err) {
-    client.end();
-    jumpClient?.end();
+    releaseClient(hostId);
     throw err;
   }
 
-  client.on("close", () => {
-    jumpClient?.end();
-    pool.delete(hostId);
-  });
-  pool.set(hostId, { client, jumpClient, sftp });
+  // The connection dropping (whether we're the only one using it or not)
+  // just means our cached channel is dead — forget it so the next call
+  // re-acquires. We don't release here: if this fired, the pool entry
+  // already tore itself down on its own "close" handler; there's nothing
+  // left for us to release a reference to.
+  client.on("close", () => sftpCache.delete(hostId));
+  sftpCache.set(hostId, sftp);
   return sftp;
 }
 
 export function closeSftpForHost(hostId: string): void {
-  const entry = pool.get(hostId);
-  if (!entry) return;
-  entry.client.end();
-  entry.jumpClient?.end();
-  pool.delete(hostId);
+  if (!sftpCache.has(hostId)) return;
+  sftpCache.delete(hostId);
+  releaseClient(hostId);
 }
 
 export function closeAllSftp(): void {
-  for (const hostId of [...pool.keys()]) closeSftpForHost(hostId);
+  for (const hostId of [...sftpCache.keys()]) closeSftpForHost(hostId);
 }
 
 // ssh2's plain `readdir` returns raw Attributes (a mode bitmask), not the
