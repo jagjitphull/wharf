@@ -268,6 +268,23 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         // input the user clearly meant for the shell.
         setAiPopup(null);
       }
+      // Let App.tsx's window-level listener handle its own global shortcuts
+      // instead of xterm swallowing the keystroke itself and sending it to
+      // the shell as a raw control character (several of these are real VT
+      // control codes — e.g. Ctrl+3..8 are ESC/FS/GS/RS/US/DEL, Ctrl+K is VT
+      // — that xterm stops the event for right there, so without this they
+      // never reach the window; 1, 2, and 9 have no such VT mapping and
+      // already worked without this).
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        ((event.key >= "1" && event.key <= "9") ||
+          event.key === "Tab" ||
+          event.key === "/" ||
+          event.key.toLowerCase() === "k" ||
+          event.key.toLowerCase() === "b")
+      ) {
+        return false;
+      }
       return true;
     });
 

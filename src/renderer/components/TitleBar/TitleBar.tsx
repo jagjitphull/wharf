@@ -6,7 +6,11 @@ import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
 
-export function TitleBar() {
+interface Props {
+  onOpenShortcuts(): void;
+}
+
+export function TitleBar({ onOpenShortcuts }: Props) {
   const [maximized, setMaximized] = useState(false);
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const setMode = useThemeStore((s) => s.setMode);
@@ -77,6 +81,26 @@ export function TitleBar() {
               />
             </svg>
           )}
+        </button>
+        <button
+          className="title-bar-icon-btn"
+          title={`Keyboard shortcuts (${isMac ? "Cmd" : "Ctrl"}+/)`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenShortcuts();
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+            <path
+              d="M6 6.2a2 2 0 0 1 3.7-1 1.8 1.8 0 0 1-.9 2.6c-.6.3-.8.6-.8 1.2v.3"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <circle cx="8" cy="11.3" r="0.7" fill="currentColor" />
+          </svg>
         </button>
       </div>
 

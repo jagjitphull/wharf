@@ -88,6 +88,32 @@ A personal SSH/SFTP terminal client, Termius-style.
   only the current line, recent command history, the host name, and your
   OS — never full command output
 
+## Keyboard shortcuts
+
+The full list is also available in-app: click the **?** icon in the title bar, or press `Ctrl/Cmd+/` (works even while a terminal has focus).
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl/Cmd+K` | Quick Connect — jump to a host from anywhere |
+| `Ctrl/Cmd+B` | Show/hide the sidebar |
+| `Ctrl/Cmd+1` … `Ctrl/Cmd+9` | Switch to tab 1 through 9 |
+| `Ctrl/Cmd+Tab` | Next tab |
+| `Ctrl/Cmd+Shift+Tab` | Previous tab |
+| `Ctrl/Cmd+/` | Show the keyboard shortcuts reference |
+| `Ctrl/Cmd+F` | Find in the terminal |
+| `Esc` | Close find, or dismiss the AI suggestions popup |
+| `Ctrl/Cmd+Space` | Ask the AI for autocomplete suggestions |
+| `Tab` / `Enter` | Accept the top AI suggestion |
+| `1` … `9` | Accept AI suggestion N (while the popup is open) |
+| `Ctrl/Cmd+=` / `Ctrl/Cmd+-` | Increase / decrease terminal font size |
+| `Ctrl/Cmd+0` | Reset terminal font size |
+| Right-click (terminal) | Copy/paste/select all/clear, split pane, insert snippet, theme, logging |
+| `Ctrl/Cmd+S` (file editor) | Save the file |
+| `Esc` (file editor) | Close (asks first if there are unsaved changes) |
+| `↑` / `↓` (pickers) | Move the selection in Quick Connect, snippets, etc. |
+
+All of these work the same whether focus is on the sidebar or inside a terminal — a handful of these key combinations (e.g. `Ctrl+3` through `Ctrl+8`, `Ctrl+K`) are also real terminal control characters that `xterm.js` would otherwise send straight to the shell, so Wharf explicitly intercepts them before that happens.
+
 ## Getting started
 
 ```bash

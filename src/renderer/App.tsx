@@ -7,6 +7,7 @@ import { Tunnels } from "./components/Tunnels/Tunnels";
 import { CommandHistory } from "./components/CommandHistory/CommandHistory";
 import { Settings } from "./components/Settings/Settings";
 import { QuickConnect } from "./components/QuickConnect/QuickConnect";
+import { KeyboardShortcuts } from "./components/KeyboardShortcuts/KeyboardShortcuts";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useAppStore } from "./state/store";
 import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
@@ -17,6 +18,7 @@ export default function App() {
   const { activeView, hosts, groups, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const [quickConnectOpen, setQuickConnectOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     void loadAll();
@@ -36,6 +38,12 @@ export default function App() {
       if (e.key.toLowerCase() === "b") {
         e.preventDefault();
         useUiPrefsStore.getState().toggleSidebar();
+        return;
+      }
+
+      if (e.key === "/") {
+        e.preventDefault();
+        setShortcutsOpen(true);
         return;
       }
 
@@ -98,7 +106,7 @@ export default function App() {
 
   return (
     <div className="app-root">
-      <TitleBar />
+      <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} />
       <div className="app-shell">
         {!sidebarCollapsed && <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />}
         <main className="app-main">
@@ -122,6 +130,8 @@ export default function App() {
           onConnect={handleQuickConnect}
         />
       )}
+
+      {shortcutsOpen && <KeyboardShortcuts onClose={() => setShortcutsOpen(false)} />}
     </div>
   );
 }
