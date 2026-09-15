@@ -88,6 +88,11 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
         <button className="host-name" onDoubleClick={() => connect(host)} onClick={() => setContextHostId(host.id)}>
           <span className="dot" style={{ background: host.color ?? "var(--accent)" }} />
           <span className="host-title">{host.name}</span>
+          {host.mosh && (
+            <span className="host-mosh-badge" title="Connects via Mosh">
+              Mosh
+            </span>
+          )}
           <span className="host-sub">
             {host.username}@{host.hostname}:{host.port}
           </span>

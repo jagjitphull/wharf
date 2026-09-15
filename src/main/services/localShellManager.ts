@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { BrowserWindow } from "electron";
 import type { IPty } from "node-pty";
 import { IPC } from "../../shared/types";
+import { loadPty } from "./ptyLoader";
 
 interface LocalSession {
   id: string;
@@ -16,27 +17,6 @@ const sessions = new Map<string, LocalSession>();
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send(channel, payload);
-  }
-}
-
-/**
- * node-pty ships a native addon that must be compiled against Electron's own
- * Node ABI (a plain `npm install` only builds it for the system Node used to
- * run npm) — see the `rebuild-native` script / postinstall. Requiring it
- * lazily, only when a local shell is actually opened, means a missing or
- * ABI-mismatched build surfaces as one clear, catchable error right here
- * instead of crashing the whole main process at startup.
- */
-function loadPty(): typeof import("node-pty") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require("node-pty");
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Local shell isn't available: node-pty's native module failed to load (${detail}). ` +
-        `Run "npm run rebuild-native" (or "npx electron-rebuild -f -w node-pty") and restart Wharf.`,
-    );
   }
 }
 

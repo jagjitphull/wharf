@@ -4,6 +4,7 @@ import { IPC, type HostInput, type HostRecord } from "../../shared/types";
 import { getHosts, getTunnels, setHosts, setTunnels } from "../services/store";
 import { deleteSecret, saveSecret, updateSecret } from "../services/secretStore";
 import { disconnectSessionsForHost } from "../services/sshManager";
+import { disconnectSessionsForHost as disconnectMoshSessionsForHost } from "../services/moshManager";
 import { closeSftpForHost } from "../services/sftpManager";
 
 export function registerHostsIpc(): void {
@@ -28,6 +29,7 @@ export function registerHostsIpc(): void {
       color: input.color,
       tags: input.tags,
       jumpHostId: input.jumpHostId ?? null,
+      mosh: input.mosh ?? false,
       createdAt: now,
       updatedAt: now,
     };
@@ -60,6 +62,7 @@ export function registerHostsIpc(): void {
       color: input.color,
       tags: input.tags,
       jumpHostId: input.jumpHostId ?? null,
+      mosh: input.mosh ?? false,
       updatedAt: Date.now(),
     };
     const next = [...hosts];
@@ -75,6 +78,7 @@ export function registerHostsIpc(): void {
     // Cascade: drop any tunnels defined against this host.
     setTunnels(getTunnels().filter((t) => t.hostId !== id));
     disconnectSessionsForHost(id);
+    disconnectMoshSessionsForHost(id);
     closeSftpForHost(id);
   });
 }

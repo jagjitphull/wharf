@@ -25,6 +25,8 @@ export interface HostRecord {
   tags?: string[];
   /** Connect through another saved host as an SSH jump/bastion host. */
   jumpHostId?: string | null;
+  /** Connect via Mosh (mobile shell) instead of a plain SSH session — see moshManager.ts. */
+  mosh?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -42,6 +44,7 @@ export interface HostInput {
   color?: string;
   tags?: string[];
   jumpHostId?: string | null;
+  mosh?: boolean;
 }
 
 export interface GroupRecord {

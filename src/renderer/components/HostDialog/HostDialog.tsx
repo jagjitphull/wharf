@@ -40,6 +40,7 @@ const emptyForm = (defaultGroupId: string | null): HostInput => ({
   secret: "",
   privateKeyPath: "",
   jumpHostId: null,
+  mosh: false,
 });
 
 export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSaved }: Props) {
@@ -55,6 +56,7 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
           secret: "",
           privateKeyPath: host.privateKeyPath ?? "",
           jumpHostId: host.jumpHostId ?? null,
+          mosh: host.mosh ?? false,
           color: host.color,
           tags: host.tags,
         }
@@ -213,6 +215,23 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="host-mosh-row">
+          <input
+            type="checkbox"
+            checked={form.mosh ?? false}
+            onChange={(e) => setForm({ ...form, mosh: e.target.checked })}
+          />
+          <span>
+            Connect via Mosh
+            <small>
+              Requires <code>mosh</code> installed on this machine and <code>mosh-server</code> on the remote host.
+              Auth still goes through SSH — a saved password/passphrase is auto-filled the same as a regular
+              connection, but host-key confirmation (for a never-before-seen host) shows up live in the terminal
+              instead of Wharf's own dialog.
+            </small>
+          </span>
         </label>
 
         {error && <div className="dialog-error">{error}</div>}

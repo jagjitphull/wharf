@@ -34,6 +34,12 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Reconnect on drop — an SSH session that dies unexpectedly (network blip,
   etc.) auto-retries with backoff instead of just going dead, reusing the
   same tab; a deliberate disconnect never triggers this
+- Mosh support — an opt-in per host ("Connect via Mosh" in the host editor)
+  that survives network changes/drops with no visible reconnect at all
+  (roaming IP, sleep/wake, switching wifi to cellular) and keeps typing
+  responsive over high-latency links via local echo — the real `mosh`
+  client, not a reimplementation, so it needs `mosh` installed locally and
+  `mosh-server` on the remote
 - SSH jump hosts — connect through another saved host as a bastion, for
   terminal sessions, SFTP, and tunnels alike
 - Connection multiplexing — a second terminal tab, an SFTP browse, or a
@@ -229,9 +235,18 @@ src/
   only as good as the model's read of your current line and recent
   commands — always review a suggestion before accepting it, the same as
   you would tab-completion.
-- No Mosh support — sessions are plain SSH only, so a connection drop over
-  a flaky network relies on the reconnect-on-drop retry above rather than
-  Mosh's roaming/local-echo model. Planned for a future version.
+- Mosh support spawns the real `mosh` CLI as a pty (not a reimplementation
+  of its UDP-based protocol) — so it requires `mosh` installed on this
+  machine and `mosh-server` installed on the remote host; Wharf can't
+  install either for you. Auth still goes through Mosh's own SSH bootstrap:
+  an SSH agent or an unencrypted private key is fully transparent, a saved
+  password or key passphrase is auto-filled the first time such a prompt
+  appears (falls back to typing it yourself if that's ever missed), and
+  host-key verification for a never-before-seen host is the real `ssh`
+  binary's own interactive prompt shown live in the terminal — not Wharf's
+  own TOFU dialog, and not (yet) `-J`-chained through Wharf's own jump-host
+  known_hosts handling. Jump hosts and non-default ports ARE passed through
+  to the underlying ssh command, same as a direct connection would use.
 
 ## Security notes
 

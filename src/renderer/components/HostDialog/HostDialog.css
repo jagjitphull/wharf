@@ -36,3 +36,35 @@
   border-style: solid;
   border-color: var(--text);
 }
+
+.host-mosh-row {
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.host-mosh-row input[type="checkbox"] {
+  margin-top: 2px;
+  flex: none;
+}
+
+.host-mosh-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.host-mosh-row small {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.host-mosh-row code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  background: var(--bg-input);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
