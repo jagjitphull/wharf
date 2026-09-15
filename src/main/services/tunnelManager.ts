@@ -4,10 +4,12 @@ import { Client } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type TunnelInput, type TunnelRecord, type TunnelStatus } from "../../shared/types";
 import { getHosts, getTunnels, setTunnels } from "./store";
-import { buildConnectConfig } from "./sshManager";
+import { connectHostClient } from "./sshManager";
 
 interface RunningTunnel {
   client: Client;
+  /** Kept alive alongside `client` for the tunnel's lifetime when its host connects through a jump host. */
+  jumpClient?: Client;
   server?: net.Server;
 }
 
@@ -133,14 +135,16 @@ export async function start(tunnelId: string): Promise<void> {
   if (!host) throw new Error(`Host ${tunnel.hostId} not found`);
 
   broadcastState(tunnelId, "starting");
-  const client = new Client();
+  // Filled in once connectHostClient() resolves, so the catch below (which
+  // also covers connectHostClient() itself throwing — e.g. an unreachable
+  // jump host) has something safe to .end() without risking a second,
+  // unrelated crash that would mask the real error.
+  const connected: { client?: Client; jumpClient?: Client } = {};
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      client.on("ready", () => resolve());
-      client.on("error", reject);
-      client.connect(buildConnectConfig(host));
-    });
+    const { client, jumpClient } = await connectHostClient(host);
+    connected.client = client;
+    connected.jumpClient = jumpClient;
 
     if (tunnel.type === "local") {
       const server = net.createServer((socket) => {
@@ -158,14 +162,14 @@ export async function start(tunnelId: string): Promise<void> {
         server.on("error", reject);
         server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
       });
-      running.set(tunnelId, { client, server });
+      running.set(tunnelId, { client, jumpClient, server });
     } else if (tunnel.type === "dynamic") {
       const server = net.createServer((socket) => pipeSocksConnection(socket, client));
       await new Promise<void>((resolve, reject) => {
         server.on("error", reject);
         server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
       });
-      running.set(tunnelId, { client, server });
+      running.set(tunnelId, { client, jumpClient, server });
     } else {
       // remote: ask the SSH server to listen on srcHost:srcPort and forward
       // incoming connections back to us, which we relay to dstHost:dstPort.
@@ -180,21 +184,23 @@ export async function start(tunnelId: string): Promise<void> {
         socket.on("error", () => stream.end());
         stream.on("error", () => socket.destroy());
       });
-      running.set(tunnelId, { client });
+      running.set(tunnelId, { client, jumpClient });
     }
 
     broadcastState(tunnelId, "running");
+
+    client.on("close", () => {
+      jumpClient?.end();
+      running.delete(tunnelId);
+      broadcastState(tunnelId, "stopped");
+    });
   } catch (err) {
-    client.end();
+    connected.client?.end();
+    connected.jumpClient?.end();
     const message = err instanceof Error ? err.message : String(err);
     broadcastState(tunnelId, "error", message);
     throw err;
   }
-
-  client.on("close", () => {
-    running.delete(tunnelId);
-    broadcastState(tunnelId, "stopped");
-  });
 }
 
 export function stop(tunnelId: string): void {
@@ -202,6 +208,7 @@ export function stop(tunnelId: string): void {
   if (!entry) return;
   entry.server?.close();
   entry.client.end();
+  entry.jumpClient?.end();
   running.delete(tunnelId);
   broadcastState(tunnelId, "stopped");
 }

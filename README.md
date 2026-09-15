@@ -27,7 +27,7 @@ A personal SSH/SFTP terminal client, Termius-style.
   etc.) auto-retries with backoff instead of just going dead, reusing the
   same tab; a deliberate disconnect never triggers this
 - SSH jump hosts — connect through another saved host as a bastion, for
-  both terminal sessions and SFTP
+  terminal sessions, SFTP, and tunnels alike
 - Port forwarding — local, remote & dynamic (SOCKS5) SSH tunnels, managed
   from a Tunnels panel
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
