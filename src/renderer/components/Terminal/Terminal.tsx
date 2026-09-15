@@ -19,6 +19,7 @@ import {
   scanAfterWrite,
   type CompiledRule,
 } from "./keywordHighlight";
+import { createCommandCaptureState, feedCommandCapture } from "./commandCapture";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -97,6 +98,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const keywordRules = useKeywordHighlightStore((s) => s.rules);
   const highlightStateRef = useRef(createHighlightState());
   const compiledRulesRef = useRef<CompiledRule[]>([]);
+  const commandCaptureRef = useRef(createCommandCaptureState());
   const terminalThemeId = themeOverrideId ?? globalTerminalThemeId;
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -187,6 +189,19 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
 
     const dataDisposable = term.onData((data) => {
       wharf.ssh.write(sessionId, data);
+      for (const command of feedCommandCapture(commandCaptureRef.current, data)) {
+        // hostId/hostName are read fresh here rather than threaded through
+        // this closure's deps — they're set once when the pane connects and
+        // never change for its lifetime, so a stale read is never actually
+        // stale in practice.
+        const meta = useAppStore.getState().paneMeta[sessionId];
+        void wharf.commandHistory.add({
+          sessionId,
+          hostId: meta?.hostId ?? null,
+          hostName: meta?.title ?? "Unknown",
+          command,
+        });
+      }
     });
 
     const resizeObserver = new ResizeObserver(() => {

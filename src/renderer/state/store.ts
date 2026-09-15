@@ -42,7 +42,7 @@ export interface TerminalTab {
   activePaneId: string;
 }
 
-export type ActiveView = "hosts" | "sftp" | "tunnels" | "settings";
+export type ActiveView = "hosts" | "sftp" | "tunnels" | "history" | "settings";
 
 /** All leaf sessionIds under a pane node, in left-to-right/top-to-bottom order. */
 export function flattenPanes(node: PaneNode): string[] {

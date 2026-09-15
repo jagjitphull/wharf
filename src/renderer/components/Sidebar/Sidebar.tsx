@@ -163,6 +163,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
       <nav className="sidebar-nav">
         {navItem("hosts", "Hosts")}
         {navItem("tunnels", "Tunnels")}
+        {navItem("history", "History")}
         {navItem("settings", "Settings")}
       </nav>
 

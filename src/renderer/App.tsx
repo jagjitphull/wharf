@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { TerminalPanel } from "./components/Terminal/TerminalPanel";
 import { SftpBrowser } from "./components/SftpBrowser/SftpBrowser";
 import { Tunnels } from "./components/Tunnels/Tunnels";
+import { CommandHistory } from "./components/CommandHistory/CommandHistory";
 import { Settings } from "./components/Settings/Settings";
 import { QuickConnect } from "./components/QuickConnect/QuickConnect";
 import { StatusBar } from "./components/StatusBar/StatusBar";
@@ -107,6 +108,7 @@ export default function App() {
           <TerminalPanel hidden={activeView !== "hosts"} />
           {activeView === "sftp" && <SftpBrowser />}
           {activeView === "tunnels" && <Tunnels />}
+          {activeView === "history" && <CommandHistory />}
           {activeView === "settings" && <Settings />}
         </main>
       </div>

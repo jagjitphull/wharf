@@ -17,6 +17,8 @@ import type {
   SftpTransferProgress,
   SnippetInput,
   SnippetRecord,
+  CommandHistoryEntry,
+  CommandHistoryInput,
   SshConfigCandidate,
   SshConfigImportResult,
   TerminalDataEvent,
@@ -126,5 +128,11 @@ export interface WharfApi {
     create(input: SnippetInput): Promise<SnippetRecord>;
     update(id: string, input: SnippetInput): Promise<SnippetRecord>;
     remove(id: string): Promise<void>;
+  };
+  commandHistory: {
+    /** Records one typed command. Best-effort — see CommandHistoryEntry's doc comment. */
+    add(input: CommandHistoryInput): Promise<void>;
+    list(): Promise<CommandHistoryEntry[]>;
+    clear(): Promise<void>;
   };
 }

@@ -95,6 +95,11 @@ const api: WharfApi = {
     update: (id, input) => ipcRenderer.invoke(IPC.snippets.update, id, input),
     remove: (id) => ipcRenderer.invoke(IPC.snippets.remove, id),
   },
+  commandHistory: {
+    add: (input) => ipcRenderer.invoke(IPC.commandHistory.add, input),
+    list: () => ipcRenderer.invoke(IPC.commandHistory.list),
+    clear: () => ipcRenderer.invoke(IPC.commandHistory.clear),
+  },
 };
 
 contextBridge.exposeInMainWorld("wharf", api);

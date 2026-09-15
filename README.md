@@ -60,6 +60,11 @@ A personal SSH/SFTP terminal client, Termius-style.
   pty) as its own tab, no SSH or saved host involved; it's a first-class tab
   alongside SSH sessions (duplicate, logging, keyword highlighting, themes,
   all work the same)
+- Command history / audit panel — a searchable log of commands typed into
+  any terminal session, filterable by command or host (best-effort —
+  reconstructed from keystrokes, so shell history recall and tab
+  completion aren't captured exactly as run), with one-click copy and a
+  Clear History button
 
 ## Getting started
 

@@ -83,6 +83,28 @@ export interface SnippetInput {
 }
 
 // ---------------------------------------------------------------------------
+// Command history / audit log
+// ---------------------------------------------------------------------------
+
+/** One command typed into a terminal session, for the history/audit panel.
+ * Reconstructed client-side from raw keystrokes sent over the pty (see
+ * Terminal.tsx) by buffering until Enter — best-effort, not a perfect
+ * transcript: shell line-editing like arrow-key history recall, tab
+ * completion, or a pasted multi-line block won't reproduce exactly what
+ * the shell itself saw. Good enough for "what did I run, and where". */
+export interface CommandHistoryEntry {
+  id: string;
+  sessionId: string;
+  /** null for a local shell session — it isn't connected to any saved host. */
+  hostId: string | null;
+  hostName: string;
+  command: string;
+  timestamp: number;
+}
+
+export type CommandHistoryInput = Omit<CommandHistoryEntry, "id" | "timestamp">;
+
+// ---------------------------------------------------------------------------
 // SSH sessions / terminal
 // ---------------------------------------------------------------------------
 
@@ -295,5 +317,10 @@ export const IPC = {
     create: "snippets:create",
     update: "snippets:update",
     remove: "snippets:remove",
+  },
+  commandHistory: {
+    add: "command-history:add",
+    list: "command-history:list",
+    clear: "command-history:clear",
   },
 } as const;

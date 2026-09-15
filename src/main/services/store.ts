@@ -1,5 +1,5 @@
 import Store from "electron-store";
-import type { GroupRecord, HostRecord, SnippetRecord, TunnelRecord } from "../../shared/types";
+import type { CommandHistoryEntry, GroupRecord, HostRecord, SnippetRecord, TunnelRecord } from "../../shared/types";
 
 export interface WindowBounds {
   x: number;
@@ -13,6 +13,7 @@ interface Schema {
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
   snippets: SnippetRecord[];
+  commandHistory: CommandHistoryEntry[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
   windowBounds: WindowBounds | null;
@@ -23,6 +24,7 @@ const defaults: Schema = {
   groups: [],
   tunnels: [],
   snippets: [],
+  commandHistory: [],
   secrets: {},
   windowBounds: null,
 };
@@ -68,6 +70,24 @@ export function getSnippets(): SnippetRecord[] {
 
 export function setSnippets(snippets: SnippetRecord[]): void {
   store.set("snippets", snippets);
+}
+
+// Caps the persisted log so a long-lived install doesn't grow this file
+// unboundedly — oldest entries are dropped first (FIFO) once past the cap.
+const COMMAND_HISTORY_MAX = 2000;
+
+export function getCommandHistory(): CommandHistoryEntry[] {
+  return store.get("commandHistory");
+}
+
+export function addCommandHistoryEntry(entry: CommandHistoryEntry): void {
+  const next = [...store.get("commandHistory"), entry];
+  if (next.length > COMMAND_HISTORY_MAX) next.splice(0, next.length - COMMAND_HISTORY_MAX);
+  store.set("commandHistory", next);
+}
+
+export function clearCommandHistory(): void {
+  store.set("commandHistory", []);
 }
 
 export function getWindowBounds(): WindowBounds | null {
