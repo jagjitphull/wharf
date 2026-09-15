@@ -13,6 +13,7 @@ import { registerBackupIpc } from "./ipc/backup";
 import { registerSnippetsIpc } from "./ipc/snippets";
 import { registerSshConfigIpc } from "./ipc/sshConfig";
 import { registerCommandHistoryIpc } from "./ipc/commandHistory";
+import { registerAiIpc } from "./ipc/ai";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { getWindowBounds, setWindowBounds } from "./services/store";
@@ -138,6 +139,7 @@ app.whenReady().then(() => {
   registerSnippetsIpc();
   registerSshConfigIpc();
   registerCommandHistoryIpc();
+  registerAiIpc();
 
   installAppMenu();
   createWindow(true);

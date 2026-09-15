@@ -16,6 +16,8 @@ interface Schema {
   commandHistory: CommandHistoryEntry[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
+  /** Id of the AI autocomplete API key in `secrets`, same encrypted-at-rest storage as host passwords. Null if not configured. */
+  aiApiKeySecretId: string | null;
   windowBounds: WindowBounds | null;
 }
 
@@ -26,6 +28,7 @@ const defaults: Schema = {
   snippets: [],
   commandHistory: [],
   secrets: {},
+  aiApiKeySecretId: null,
   windowBounds: null,
 };
 
@@ -88,6 +91,14 @@ export function addCommandHistoryEntry(entry: CommandHistoryEntry): void {
 
 export function clearCommandHistory(): void {
   store.set("commandHistory", []);
+}
+
+export function getAiApiKeySecretId(): string | null {
+  return store.get("aiApiKeySecretId");
+}
+
+export function setAiApiKeySecretId(secretId: string | null): void {
+  store.set("aiApiKeySecretId", secretId);
 }
 
 export function getWindowBounds(): WindowBounds | null {

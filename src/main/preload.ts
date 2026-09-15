@@ -100,6 +100,12 @@ const api: WharfApi = {
     list: () => ipcRenderer.invoke(IPC.commandHistory.list),
     clear: () => ipcRenderer.invoke(IPC.commandHistory.clear),
   },
+  ai: {
+    suggest: (request) => ipcRenderer.invoke(IPC.ai.suggest, request),
+    hasApiKey: () => ipcRenderer.invoke(IPC.ai.hasApiKey),
+    setApiKey: (key) => ipcRenderer.invoke(IPC.ai.setApiKey, key),
+    clearApiKey: () => ipcRenderer.invoke(IPC.ai.clearApiKey),
+  },
 };
 
 contextBridge.exposeInMainWorld("wharf", api);

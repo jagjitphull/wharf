@@ -105,6 +105,22 @@ export interface CommandHistoryEntry {
 export type CommandHistoryInput = Omit<CommandHistoryEntry, "id" | "timestamp">;
 
 // ---------------------------------------------------------------------------
+// AI autocomplete
+// ---------------------------------------------------------------------------
+
+/** Sent to Claude for one autocomplete request — the current unsent line
+ * plus enough context (recent commands, host, platform) for the suggestion
+ * to be grounded in what the user's actually doing, not a generic guess. */
+export interface AiSuggestRequest {
+  currentLine: string;
+  /** Most-recent-last, capped client-side before sending. */
+  recentCommands: string[];
+  hostName: string;
+  /** "darwin" | "win32" | "linux" | ... — from window.wharf.window.platform. */
+  platform: string;
+}
+
+// ---------------------------------------------------------------------------
 // SSH sessions / terminal
 // ---------------------------------------------------------------------------
 
@@ -322,5 +338,11 @@ export const IPC = {
     add: "command-history:add",
     list: "command-history:list",
     clear: "command-history:clear",
+  },
+  ai: {
+    suggest: "ai:suggest",
+    hasApiKey: "ai:has-api-key",
+    setApiKey: "ai:set-api-key",
+    clearApiKey: "ai:clear-api-key",
   },
 } as const;

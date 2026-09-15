@@ -23,6 +23,7 @@
     "postinstall": "npm run rebuild-native || echo \"warning: couldn't rebuild node-pty for Electron (needs network access to electronjs.org) — Local Shell tabs won't work until you run: npm run rebuild-native\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/xterm": "^5.5.0",

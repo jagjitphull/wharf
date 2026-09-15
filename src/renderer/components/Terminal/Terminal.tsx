@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
-import { wharf } from "../../api/wharf";
+import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
+import { useAiPrefsStore } from "../../state/aiPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
@@ -34,6 +35,17 @@ interface Props {
   /** Id of the tab this pane lives in — needed for the Split Right/Down
    * context-menu actions, which add a new pane into this tab's layout. */
   tabId: string;
+}
+
+interface AiPopupState {
+  status: "loading" | "ready" | "error";
+  suggestions: string[];
+  error?: string;
+  /** The current line as of when this request was fired — used both to
+   * compute the keystroke delta on accept and to detect staleness (the
+   * user kept typing while waiting on the API, so the suggestions no
+   * longer apply to what's actually on the line). */
+  requestLine: string;
 }
 
 const TERM_CSS_VARS = [
@@ -100,17 +112,83 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const compiledRulesRef = useRef<CompiledRule[]>([]);
   const commandCaptureRef = useRef(createCommandCaptureState());
   const terminalThemeId = themeOverrideId ?? globalTerminalThemeId;
+  const aiEnabled = useAiPrefsStore((s) => s.enabled);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
+  const [aiPopup, setAiPopup] = useState<AiPopupState | null>(null);
   const searchOpenRef = useRef(false);
+  // Mirrors aiPopup/aiEnabled for the custom key handler below, which is
+  // registered once at mount (see the searchOpenRef comment on the same
+  // pattern) and would otherwise see a stale closure.
+  const aiPopupRef = useRef<AiPopupState | null>(null);
+  const aiEnabledRef = useRef(aiEnabled);
 
   useEffect(() => {
     searchOpenRef.current = searchOpen;
     if (searchOpen) requestAnimationFrame(() => searchInputRef.current?.focus());
     else termRef.current?.focus();
   }, [searchOpen]);
+
+  useEffect(() => {
+    aiPopupRef.current = aiPopup;
+  }, [aiPopup]);
+
+  useEffect(() => {
+    aiEnabledRef.current = aiEnabled;
+  }, [aiEnabled]);
+
+  /** Fires an AI autocomplete request for whatever's currently typed
+   * (unsent) on this pane's line, sourced from the same buffer the command-
+   * history capture already maintains — no separate tracking needed. */
+  async function requestAiSuggestions() {
+    const requestLine = commandCaptureRef.current.buffer;
+    if (!requestLine) return; // nothing to complete
+    setAiPopup({ status: "loading", suggestions: [], requestLine });
+    try {
+      const hasKey = await wharf.ai.hasApiKey();
+      if (!hasKey) {
+        setAiPopup({ status: "error", suggestions: [], requestLine, error: "No API key configured — add one in Settings." });
+        return;
+      }
+      const history = await wharf.commandHistory.list();
+      const recentCommands = history
+        .filter((h) => h.sessionId === sessionId)
+        .slice(-10)
+        .map((h) => h.command);
+      const meta = useAppStore.getState().paneMeta[sessionId];
+      const suggestions = await wharf.ai.suggest({
+        currentLine: requestLine,
+        recentCommands,
+        hostName: meta?.title ?? "unknown",
+        platform: wharf.window.platform,
+      });
+      // The user may have kept typing while this was in flight — stale
+      // suggestions for a line that no longer exists would be actively
+      // misleading, so just drop them rather than show them anyway.
+      if (commandCaptureRef.current.buffer !== requestLine) {
+        setAiPopup(null);
+        return;
+      }
+      setAiPopup({ status: "ready", suggestions, requestLine });
+    } catch (err) {
+      setAiPopup({ status: "error", suggestions: [], requestLine, error: ipcErrorMessage(err) });
+    }
+  }
+
+  /** Types the remainder of `suggestion` (past what's already on the line)
+   * into the terminal via paste — not a direct wharf.ssh.write, so it goes
+   * through the same onData path a real paste would, keeping the command-
+   * history capture buffer in sync automatically. Never sends Enter itself:
+   * the user reviews/edits before running it. */
+  function acceptAiSuggestion(suggestion: string) {
+    const popup = aiPopupRef.current;
+    setAiPopup(null);
+    if (!popup || commandCaptureRef.current.buffer !== popup.requestLine) return;
+    const delta = suggestion.slice(popup.requestLine.length);
+    if (delta) termRef.current?.paste(delta);
+  }
 
   // Mounts the xterm instance exactly once per session (this component is
   // kept alive-but-hidden by the parent while its tab is in the background,
@@ -160,6 +238,34 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       if (event.key === "Escape" && searchOpenRef.current) {
         setSearchOpen(false);
         return false;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.code === "Space") {
+        if (aiEnabledRef.current) void requestAiSuggestions();
+        return false;
+      }
+      const popup = aiPopupRef.current;
+      if (popup) {
+        if (event.key === "Escape") {
+          setAiPopup(null);
+          return false;
+        }
+        if (popup.status === "ready" && popup.suggestions.length > 0) {
+          if (event.key === "Tab" || event.key === "Enter") {
+            acceptAiSuggestion(popup.suggestions[0]);
+            return false;
+          }
+          if (event.key >= "1" && event.key <= "9") {
+            const idx = Number(event.key) - 1;
+            if (idx < popup.suggestions.length) {
+              acceptAiSuggestion(popup.suggestions[idx]);
+              return false;
+            }
+          }
+        }
+        // Any other keystroke while the popup is open (still loading, an
+        // error, or just typing past it) dismisses it rather than eating
+        // input the user clearly meant for the shell.
+        setAiPopup(null);
       }
       return true;
     });
@@ -328,6 +434,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       { separator: true },
       { label: "Find…", onClick: () => setSearchOpen(true) },
       { label: "Insert Snippet…", onClick: () => setSnippetPickerOpen(true) },
+      { label: "AI Suggestions (Ctrl/Cmd+Space)", onClick: () => void requestAiSuggestions() },
       { label: "Select All", onClick: () => term.selectAll() },
       {
         label: "Clear",
@@ -409,6 +516,31 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
             setSnippetPickerOpen(false);
           }}
         />
+      )}
+      {visible && aiPopup && (
+        <div className="ai-suggest-popup">
+          <div className="ai-suggest-header">
+            <span>AI suggestions</span>
+            <button title="Close (Esc)" onClick={() => setAiPopup(null)}>
+              ×
+            </button>
+          </div>
+          {aiPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}
+          {aiPopup.status === "error" && <div className="ai-suggest-status ai-suggest-error">{aiPopup.error}</div>}
+          {aiPopup.status === "ready" && aiPopup.suggestions.length === 0 && (
+            <div className="ai-suggest-status">No suggestions.</div>
+          )}
+          {aiPopup.status === "ready" &&
+            aiPopup.suggestions.map((s, i) => (
+              <button key={i} className="ai-suggest-row" onClick={() => acceptAiSuggestion(s)}>
+                <span className="ai-suggest-index">{i + 1}</span>
+                <span className="ai-suggest-text">{s}</span>
+              </button>
+            ))}
+          {aiPopup.status === "ready" && aiPopup.suggestions.length > 0 && (
+            <div className="ai-suggest-hint">Tab/Enter · 1-{aiPopup.suggestions.length} · Esc</div>
+          )}
+        </div>
       )}
     </>
   );

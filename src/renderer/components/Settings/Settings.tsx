@@ -5,6 +5,7 @@ import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
+import { AiAutocompleteSettings } from "./AiAutocompleteSettings";
 import "../../styles/dialog.css";
 import "./Settings.css";
 
@@ -161,6 +162,9 @@ export function Settings() {
 
       <h2>Keyword Highlighting</h2>
       <KeywordHighlightSettings />
+
+      <h2>AI Autocomplete</h2>
+      <AiAutocompleteSettings />
 
       <h2>Backup</h2>
       <p className="hint">

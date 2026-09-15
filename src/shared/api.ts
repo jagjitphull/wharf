@@ -19,6 +19,7 @@ import type {
   SnippetRecord,
   CommandHistoryEntry,
   CommandHistoryInput,
+  AiSuggestRequest,
   SshConfigCandidate,
   SshConfigImportResult,
   TerminalDataEvent,
@@ -134,5 +135,12 @@ export interface WharfApi {
     add(input: CommandHistoryInput): Promise<void>;
     list(): Promise<CommandHistoryEntry[]>;
     clear(): Promise<void>;
+  };
+  ai: {
+    /** Asks Claude for up to 3 likely completions of the current line. Throws if no API key is configured. */
+    suggest(request: AiSuggestRequest): Promise<string[]>;
+    hasApiKey(): Promise<boolean>;
+    setApiKey(key: string): Promise<void>;
+    clearApiKey(): Promise<void>;
   };
 }

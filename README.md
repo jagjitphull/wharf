@@ -71,6 +71,14 @@ A personal SSH/SFTP terminal client, Termius-style.
   reconstructed from keystrokes, so shell history recall and tab
   completion aren't captured exactly as run), with one-click copy and a
   Clear History button
+- AI-powered autocomplete — press `Ctrl/Cmd+Space` in any terminal to ask
+  Claude for up to 3 completions of the command you're typing, grounded in
+  your recent commands from that session; accept one with a click,
+  `Tab`/`Enter`, or `1`-`3`, or dismiss with `Esc`. Off by default until you
+  add a Claude API key in Settings → AI Autocomplete (stored encrypted at
+  rest the same way host passwords are); nothing is sent until you trigger
+  a suggestion, and each request includes only the current line, recent
+  command history, the host name, and your OS — never full command output
 
 ## Getting started
 
@@ -170,6 +178,15 @@ src/
   the app, and everything else keeps working. Re-run
   `npm run rebuild-native` after fixing whatever blocked it, or after
   upgrading Electron.
+- AI autocomplete requires your own Claude API key and outbound network
+  access to `api.anthropic.com`; it costs a small amount of API usage per
+  suggestion you trigger (nothing runs automatically). Suggestions are only
+  as good as the model's read of your current line and recent commands —
+  always review a suggestion before accepting it, the same as you would
+  tab-completion.
+- No Mosh support — sessions are plain SSH only, so a connection drop over
+  a flaky network relies on the reconnect-on-drop retry above rather than
+  Mosh's roaming/local-echo model. Planned for a future version.
 
 ## Security notes
 
