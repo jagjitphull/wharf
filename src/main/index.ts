@@ -91,7 +91,21 @@ function createWindow(primary: boolean): BrowserWindow {
 
   win.on("maximize", () => win.webContents.send(IPC.window.onMaximizedChange, true));
   win.on("unmaximize", () => win.webContents.send(IPC.window.onMaximizedChange, false));
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    win.show();
+    // show() alone doesn't reliably grant real OS input focus on every
+    // platform/window manager (a well-known Electron gap, especially on
+    // Linux) — without this, the window can appear active but not actually
+    // be receiving keyboard input until the user clicks it once themselves.
+    win.focus();
+  });
+  // The native window regaining OS focus (alt-tab back, clicking the
+  // taskbar/dock icon, switching from another app) doesn't always mean
+  // Chromium's own DOM focus follows it — with contextIsolation + sandbox
+  // both on, an explicit webContents.focus() keeps keyboard events actually
+  // routing into the page's currently-focused element (the terminal) rather
+  // than requiring an extra click inside the window itself.
+  win.on("focus", () => win.webContents.focus());
 
   if (isDev) {
     void win.loadURL("http://localhost:5173");
