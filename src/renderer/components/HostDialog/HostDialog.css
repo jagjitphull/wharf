@@ -1,0 +1,70 @@
+.host-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.host-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.host-color-swatch.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg-panel);
+}
+
+.host-color-swatch.none {
+  background: var(--bg-input);
+  border: 1px dashed var(--border);
+  position: relative;
+}
+
+.host-color-swatch.none::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-top: 1px solid var(--text-dim);
+  transform: rotate(45deg);
+}
+
+.host-color-swatch.none.active {
+  border-style: solid;
+  border-color: var(--text);
+}
+
+.host-mosh-row {
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.host-mosh-row input[type="checkbox"] {
+  margin-top: 2px;
+  flex: none;
+}
+
+.host-mosh-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.host-mosh-row small {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.host-mosh-row code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  background: var(--bg-input);
+  padding: 1px 4px;
+  border-radius: 3px;
+}

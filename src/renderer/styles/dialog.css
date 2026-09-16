@@ -1,0 +1,81 @@
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.dialog h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.dialog-row {
+  display: flex;
+  gap: 10px;
+}
+
+.dialog-row .grow {
+  flex: 1;
+}
+
+.dialog-row .narrow {
+  width: 90px;
+}
+
+.dialog input,
+.dialog select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dialog input:focus,
+.dialog select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.dialog-error {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}

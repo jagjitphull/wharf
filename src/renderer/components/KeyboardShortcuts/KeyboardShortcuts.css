@@ -1,0 +1,55 @@
+.shortcuts-dialog {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+}
+
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shortcuts-header h2 {
+  margin: 0;
+}
+
+.shortcuts-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.shortcuts-group h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.shortcut-row kbd {
+  flex: none;
+  min-width: 118px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--text);
+}
+
+.shortcut-row span {
+  color: var(--text-dim);
+}

@@ -1,0 +1,142 @@
+.blocks-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 40%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  z-index: 15;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+.blocks-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.blocks-panel-header button {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.blocks-panel-header button:hover {
+  color: var(--text);
+}
+
+.blocks-panel-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.blocks-panel-empty {
+  padding: 14px 10px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.blocks-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 11.5px;
+}
+
+.blocks-panel-row:hover {
+  background: var(--bg-hover);
+}
+
+.blocks-panel-status {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.blocks-panel-status.ok {
+  background: var(--accent, #35c76e);
+  background: #35c76e;
+}
+
+.blocks-panel-status.failed {
+  background: #e0575f;
+}
+
+.blocks-panel-status.running {
+  background: #dbb642;
+  animation: blocks-panel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes blocks-panel-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.blocks-panel-command {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  color: var(--text);
+}
+
+.blocks-panel-bookmark {
+  flex: none;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.blocks-panel-time {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.blocks-panel-more {
+  flex: none;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  opacity: 0;
+}
+
+.blocks-panel-row:hover .blocks-panel-more {
+  opacity: 1;
+}
+
+.blocks-panel-more:hover {
+  color: var(--text);
+}
+
+.blocks-panel-explaining {
+  flex: none;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+}
