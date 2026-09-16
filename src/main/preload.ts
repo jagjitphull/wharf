@@ -109,6 +109,12 @@ const api: WharfApi = {
     clearApiKey: (provider) => ipcRenderer.invoke(IPC.ai.clearApiKey, provider),
     getProviderConfig: (provider) => ipcRenderer.invoke(IPC.ai.getProviderConfig, provider),
     setProviderConfig: (provider, config) => ipcRenderer.invoke(IPC.ai.setProviderConfig, provider, config),
+    explainFailure: (request) => ipcRenderer.invoke(IPC.ai.explainFailure, request),
+    generateCommand: (request) => ipcRenderer.invoke(IPC.ai.generateCommand, request),
+  },
+  commandBlocks: {
+    getEnabled: () => ipcRenderer.invoke(IPC.commandBlocks.getEnabled),
+    setEnabled: (enabled) => ipcRenderer.invoke(IPC.commandBlocks.setEnabled, enabled),
   },
 };
 

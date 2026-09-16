@@ -139,6 +139,33 @@ export interface AiProviderConfig {
   baseUrl?: string;
 }
 
+/** Sent when the user asks the AI to explain why a command failed (and
+ * suggest a fix) — from a Command Block whose real exit code (via shell
+ * integration) was non-zero. */
+export interface AiExplainFailureRequest {
+  command: string;
+  /** The block's captured output — capped client-side before sending, same spirit as recentCommands. */
+  output: string;
+  exitCode: number;
+  hostName: string;
+  platform: string;
+}
+
+export interface AiExplainFailureResult {
+  explanation: string;
+  /** A corrected command to offer as one-click "Insert fix", if the AI has one. */
+  suggestedFix?: string;
+}
+
+/** Sent when the user describes what they want in plain English and asks
+ * the AI to turn it into one real shell command. */
+export interface AiGenerateCommandRequest {
+  description: string;
+  recentCommands: string[];
+  hostName: string;
+  platform: string;
+}
+
 // ---------------------------------------------------------------------------
 // SSH sessions / terminal
 // ---------------------------------------------------------------------------
@@ -367,5 +394,11 @@ export const IPC = {
     clearApiKey: "ai:clear-api-key",
     getProviderConfig: "ai:get-provider-config",
     setProviderConfig: "ai:set-provider-config",
+    explainFailure: "ai:explain-failure",
+    generateCommand: "ai:generate-command",
+  },
+  commandBlocks: {
+    getEnabled: "command-blocks:get-enabled",
+    setEnabled: "command-blocks:set-enabled",
   },
 } as const;

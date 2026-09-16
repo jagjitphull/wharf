@@ -1,4 +1,11 @@
-import type { AiProvider, AiProviderConfig, AiSuggestRequest } from "../../shared/types";
+import type {
+  AiExplainFailureRequest,
+  AiExplainFailureResult,
+  AiGenerateCommandRequest,
+  AiProvider,
+  AiProviderConfig,
+  AiSuggestRequest,
+} from "../../shared/types";
 import { deleteSecret, readSecret, saveSecret, updateSecret } from "./secretStore";
 import {
   getAiApiKeySecretId,
@@ -79,4 +86,18 @@ export async function suggest(request: AiSuggestRequest): Promise<string[]> {
   const apiKey = isCloudProvider(provider) ? readSecret(getAiApiKeySecretId(provider)) : null;
   const config = getAiProviderConfig(provider);
   return ADAPTERS[provider].suggest(apiKey, config, request);
+}
+
+export async function explainFailure(request: AiExplainFailureRequest): Promise<AiExplainFailureResult> {
+  const provider = getAiProvider();
+  const apiKey = isCloudProvider(provider) ? readSecret(getAiApiKeySecretId(provider)) : null;
+  const config = getAiProviderConfig(provider);
+  return ADAPTERS[provider].explainFailure(apiKey, config, request);
+}
+
+export async function generateCommand(request: AiGenerateCommandRequest): Promise<string> {
+  const provider = getAiProvider();
+  const apiKey = isCloudProvider(provider) ? readSecret(getAiApiKeySecretId(provider)) : null;
+  const config = getAiProviderConfig(provider);
+  return ADAPTERS[provider].generateCommand(apiKey, config, request);
 }

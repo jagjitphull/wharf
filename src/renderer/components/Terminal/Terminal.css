@@ -146,3 +146,21 @@
   color: var(--text-dim);
   border-top: 1px solid var(--border);
 }
+
+.ai-nl-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.ai-explain-text {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  border-bottom: 1px solid var(--border);
+}

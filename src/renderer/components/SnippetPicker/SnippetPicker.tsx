@@ -3,6 +3,7 @@ import type { SnippetRecord } from "@shared/types";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { IconPencil, IconPlus, IconTrash } from "../Icons/Icons";
+import { extractPlaceholders, fillPlaceholders } from "./workflowVars";
 import "./SnippetPicker.css";
 
 interface Props {
@@ -17,19 +18,29 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Warp-style "Workflows": a snippet whose command contains {{placeholder}}
+  // tokens gets a quick fill-in form here instead of inserting immediately —
+  // see workflowVars.ts. A plain snippet skips straight to onInsert, same as always.
+  const [filling, setFilling] = useState<SnippetRecord | null>(null);
+  const [fillValues, setFillValues] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const firstFillInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!editing) inputRef.current?.focus();
-  }, [editing]);
+    if (!editing && !filling) inputRef.current?.focus();
+    if (filling) firstFillInputRef.current?.focus();
+  }, [editing, filling]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !editing) onClose();
+      if (e.key === "Escape" && !editing) {
+        if (filling) setFilling(null);
+        else onClose();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editing, onClose]);
+  }, [editing, filling, onClose]);
 
   const visible = snippets.filter(
     (s) =>
@@ -71,10 +82,51 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
     await refreshSnippets();
   }
 
+  function handleRowClick(s: SnippetRecord) {
+    const placeholders = extractPlaceholders(s.command);
+    if (placeholders.length === 0) {
+      onInsert(s.command);
+      return;
+    }
+    setFilling(s);
+    setFillValues(Object.fromEntries(placeholders.map((p) => [p, ""])));
+  }
+
+  function handleFillSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!filling) return;
+    onInsert(fillPlaceholders(filling.command, fillValues));
+    setFilling(null);
+  }
+
   return (
     <div className="snippet-picker-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="snippet-picker">
-        {editing ? (
+        {filling ? (
+          <form className="snippet-form" onSubmit={handleFillSubmit}>
+            <h3>{filling.name}</h3>
+            <p className="hint snippet-fill-preview">{filling.command}</p>
+            {extractPlaceholders(filling.command).map((placeholder, i) => (
+              <label key={placeholder}>
+                {placeholder}
+                <input
+                  ref={i === 0 ? firstFillInputRef : undefined}
+                  required
+                  value={fillValues[placeholder] ?? ""}
+                  onChange={(e) => setFillValues({ ...fillValues, [placeholder]: e.target.value })}
+                />
+              </label>
+            ))}
+            <div className="snippet-form-actions">
+              <button type="button" className="btn ghost small" onClick={() => setFilling(null)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn primary small">
+                Insert
+              </button>
+            </div>
+          </form>
+        ) : editing ? (
           <form className="snippet-form" onSubmit={handleSave}>
             <h3>{editing === "new" ? "New snippet" : "Edit snippet"}</h3>
             <label>
@@ -91,6 +143,10 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
                 rows={3}
               />
             </label>
+            <p className="hint">
+              Add <code>{"{{name}}"}</code> placeholders to turn this into a Workflow — you'll be prompted to fill
+              them in each time you insert it, e.g. <code>docker logs -f {"{{container}}"}</code>.
+            </p>
             {error && <div className="snippet-error">{error}</div>}
             <div className="snippet-form-actions">
               <button type="button" className="btn ghost small" onClick={() => setEditing(null)}>
@@ -115,32 +171,42 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
               </button>
             </div>
             <div className="snippet-list">
-              {visible.map((s) => (
-                <div key={s.id} className="snippet-row" onClick={() => onInsert(s.command)}>
-                  <div className="snippet-row-text">
-                    <div className="snippet-name">{s.name}</div>
-                    <div className="snippet-command">{s.command}</div>
+              {visible.map((s) => {
+                const placeholders = extractPlaceholders(s.command);
+                return (
+                  <div key={s.id} className="snippet-row" onClick={() => handleRowClick(s)}>
+                    <div className="snippet-row-text">
+                      <div className="snippet-name">
+                        {s.name}
+                        {placeholders.length > 0 && (
+                          <span className="snippet-workflow-badge" title={`Fill in: ${placeholders.join(", ")}`}>
+                            Workflow
+                          </span>
+                        )}
+                      </div>
+                      <div className="snippet-command">{s.command}</div>
+                    </div>
+                    <div className="snippet-row-actions">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEdit(s);
+                        }}
+                      >
+                        <IconPencil />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(s);
+                        }}
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
                   </div>
-                  <div className="snippet-row-actions">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEdit(s);
-                      }}
-                    >
-                      <IconPencil />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(s);
-                      }}
-                    >
-                      <IconTrash />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {visible.length === 0 && (
                 <div className="snippet-empty">{snippets.length === 0 ? "No snippets yet." : "No matches."}</div>
               )}

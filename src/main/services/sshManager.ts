@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { Client, type ClientChannel } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC } from "../../shared/types";
-import { getHosts } from "./store";
+import { getCommandBlocksEnabled, getHosts } from "./store";
 import { acquireClient, isPooledClient, releaseClient } from "./connectionPool";
+import { buildRemoteBootstrapCommand } from "./shellIntegration";
 
 export { buildConnectConfig, connectHostClient } from "./sshConnect";
 
@@ -176,6 +177,12 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
     stillTracked.reconnecting = false;
     wireChannel(sessionId, channel, client);
     broadcast(IPC.ssh.onReconnected, { sessionId });
+
+    if (getCommandBlocksEnabled()) {
+      setTimeout(() => {
+        if (sessions.has(sessionId)) channel.write(buildRemoteBootstrapCommand() + "\r");
+      }, 1000);
+    }
   } catch (err) {
     void attemptReconnect(sessionId, attemptIndex + 1, err instanceof Error ? err : new Error(String(err)));
   }
@@ -208,6 +215,21 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
   const sessionId = randomUUID();
   wireChannel(sessionId, channel, client);
   sessions.set(sessionId, { id: sessionId, hostId, client, channel, jumpClient, cols, rows, reconnecting: false });
+
+  if (getCommandBlocksEnabled()) {
+    // Sent as one real line of input, same as the user typing it — there's
+    // no clean signal from here that the remote shell's first prompt has
+    // actually appeared (MOTD etc. may still be flushing), so this is a
+    // fixed best-effort delay long enough for that to typically have
+    // happened. A bash/zsh remote shell picks it up; anything else no-ops
+    // harmlessly. Each channel gets its own fresh interactive shell on the
+    // remote (even ones sharing a pooled connection), so every session
+    // needs this, not just the first to a host.
+    setTimeout(() => {
+      if (sessions.has(sessionId)) channel.write(buildRemoteBootstrapCommand() + "\r");
+    }, 1000);
+  }
+
   return sessionId;
 }
 

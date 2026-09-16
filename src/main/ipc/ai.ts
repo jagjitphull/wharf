@@ -1,5 +1,13 @@
 import { ipcMain } from "electron";
-import { IPC, type AiProvider, type AiProviderConfig, type AiSuggestRequest } from "../../shared/types";
+import {
+  IPC,
+  type AiExplainFailureRequest,
+  type AiExplainFailureResult,
+  type AiGenerateCommandRequest,
+  type AiProvider,
+  type AiProviderConfig,
+  type AiSuggestRequest,
+} from "../../shared/types";
 import * as aiSuggest from "../services/aiSuggest";
 
 export function registerAiIpc(): void {
@@ -33,5 +41,13 @@ export function registerAiIpc(): void {
 
   ipcMain.handle(IPC.ai.setProviderConfig, (_event, provider: AiProvider, config: AiProviderConfig): void => {
     aiSuggest.setProviderConfig(provider, config);
+  });
+
+  ipcMain.handle(IPC.ai.explainFailure, async (_event, request: AiExplainFailureRequest): Promise<AiExplainFailureResult> => {
+    return aiSuggest.explainFailure(request);
+  });
+
+  ipcMain.handle(IPC.ai.generateCommand, async (_event, request: AiGenerateCommandRequest): Promise<string> => {
+    return aiSuggest.generateCommand(request);
   });
 }

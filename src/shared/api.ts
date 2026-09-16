@@ -22,6 +22,9 @@ import type {
   AiSuggestRequest,
   AiProvider,
   AiProviderConfig,
+  AiExplainFailureRequest,
+  AiExplainFailureResult,
+  AiGenerateCommandRequest,
   SshConfigCandidate,
   SshConfigImportResult,
   TerminalDataEvent,
@@ -149,5 +152,13 @@ export interface WharfApi {
     clearApiKey(provider: AiProvider): Promise<void>;
     getProviderConfig(provider: AiProvider): Promise<AiProviderConfig>;
     setProviderConfig(provider: AiProvider, config: AiProviderConfig): Promise<void>;
+    /** Asks the active provider why a command failed, and for a corrected command if it has one. */
+    explainFailure(request: AiExplainFailureRequest): Promise<AiExplainFailureResult>;
+    /** Asks the active provider to turn a plain-English description into one real shell command. */
+    generateCommand(request: AiGenerateCommandRequest): Promise<string>;
+  };
+  commandBlocks: {
+    getEnabled(): Promise<boolean>;
+    setEnabled(enabled: boolean): Promise<void>;
   };
 }

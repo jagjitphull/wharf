@@ -30,6 +30,8 @@ interface Schema {
   aiApiKeySecretIds: Partial<Record<Exclude<AiProvider, "ollama">, string>>;
   /** Per-provider settings beyond the key: an optional model override for the cloud providers, and Ollama's base URL + model. */
   aiProviderConfig: Partial<Record<AiProvider, AiProviderConfig>>;
+  /** Whether new sessions get OSC-133 shell integration injected (bash/zsh only) — powers Command Blocks and real exit codes. Off disables it for every new session; existing ones are unaffected until reconnected. */
+  commandBlocksEnabled: boolean;
   windowBounds: WindowBounds | null;
 }
 
@@ -43,6 +45,7 @@ const defaults: Schema = {
   aiProvider: "claude",
   aiApiKeySecretIds: {},
   aiProviderConfig: {},
+  commandBlocksEnabled: true,
   windowBounds: null,
 };
 
@@ -148,6 +151,14 @@ export function getAiProviderConfig(provider: AiProvider): AiProviderConfig {
 
 export function setAiProviderConfig(provider: AiProvider, config: AiProviderConfig): void {
   store.set("aiProviderConfig", { ...store.get("aiProviderConfig"), [provider]: config });
+}
+
+export function getCommandBlocksEnabled(): boolean {
+  return store.get("commandBlocksEnabled");
+}
+
+export function setCommandBlocksEnabled(enabled: boolean): void {
+  store.set("commandBlocksEnabled", enabled);
 }
 
 export function getWindowBounds(): WindowBounds | null {

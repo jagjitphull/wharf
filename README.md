@@ -93,6 +93,28 @@ A personal SSH/SFTP terminal client, Termius-style.
   Nothing is sent until you trigger a suggestion, and each request includes
   only the current line, recent command history, the host name, and your
   OS — never full command output
+- Command Blocks — each command you run gets grouped with its own output as
+  a distinct block in a right-side panel (right-click a terminal → Show
+  Command Blocks), color-coded by real exit code (green/red), with a
+  timestamp and a per-block menu: copy the command, copy just its output,
+  re-run it, bookmark it, or (on a failed command) "Explain & Fix…". Driven
+  by a small, standard shell-integration script (OSC 133, the same protocol
+  iTerm2/VS Code/Warp use) sent to bash/zsh sessions on connect — see Known
+  limitations below for what that means for other shells and for SSH/Mosh.
+  Toggle it off in Settings → Command Blocks if you'd rather not have it
+  sent to new sessions
+- AI: natural language → command — `Ctrl/Cmd+Shift+Space` in any terminal
+  opens a small prompt; describe what you want in plain English and the
+  configured AI provider inserts the actual shell command (pasted, never
+  auto-submitted, so you can review it first)
+- AI: explain & fix failed commands — from a red (non-zero exit) Command
+  Block's menu, "Explain & Fix…" sends the command, its output, and exit
+  code to the AI and shows a plain-English explanation plus, when it has a
+  confident one, a corrected command you can insert with a click
+- Workflows — a Snippet whose command contains `{{placeholder}}` tokens
+  (e.g. `docker logs -f {{container}}`) becomes a small fill-in form on
+  insert instead of pasting immediately; fill in the values once per use,
+  same Insert Snippet flow as any other snippet
 
 ## Keyboard shortcuts
 
@@ -109,6 +131,7 @@ The full list is also available in-app: click the **?** icon in the title bar, o
 | `Ctrl/Cmd+F` | Find in the terminal |
 | `Esc` | Close find, or dismiss the AI suggestions popup |
 | `Ctrl/Cmd+Space` | Ask the AI for autocomplete suggestions |
+| `Ctrl/Cmd+Shift+Space` | Ask the AI to generate a command from a plain-English description |
 | `Tab` / `Enter` | Accept the top AI suggestion |
 | `1` … `9` | Accept AI suggestion N (while the popup is open) |
 | `Ctrl/Cmd+=` / `Ctrl/Cmd+-` | Increase / decrease terminal font size |
@@ -247,6 +270,24 @@ src/
   own TOFU dialog, and not (yet) `-J`-chained through Wharf's own jump-host
   known_hosts handling. Jump hosts and non-default ports ARE passed through
   to the underlying ssh command, same as a direct connection would use.
+- Command Blocks (and the AI's "Explain & Fix…") need the session's shell
+  to support the OSC 133 shell-integration hooks Wharf sends — currently
+  bash and zsh only; any other shell (fish, a restricted shell, etc.) just
+  never emits the block-boundary sequences, so the panel stays empty and
+  nothing else about the session is affected. For a local shell tab the
+  integration script loads invisibly (via `--rcfile`/`ZDOTDIR`); for SSH and
+  Mosh sessions — where Wharf doesn't control how the remote shell starts —
+  it's delivered as one base64 line of real typed input shortly after
+  connect, so it's visible once in the terminal/scrollback by design (hiding
+  it risked eating real output like a MOTD). A block's output is read live
+  from the terminal's own scrollback between its start/end markers — once
+  either marker scrolls out of the retained scrollback, the block still
+  shows its command and exit code, just without recoverable output text.
+- Re-running a block, or inserting an AI-generated/explained-fix command,
+  pastes it into the terminal rather than typing it keystroke-by-keystroke
+  — a re-run auto-submits (it's a command you already ran once), but a
+  generated or suggested-fix command is only ever pasted for you to review,
+  never auto-submitted.
 
 ## Security notes
 

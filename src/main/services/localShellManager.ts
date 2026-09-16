@@ -5,6 +5,8 @@ import { BrowserWindow } from "electron";
 import type { IPty } from "node-pty";
 import { IPC } from "../../shared/types";
 import { loadPty } from "./ptyLoader";
+import { prepareLocalShellIntegration } from "./shellIntegration";
+import { getCommandBlocksEnabled } from "./store";
 
 interface LocalSession {
   id: string;
@@ -32,13 +34,15 @@ function defaultShell(): string {
 export function connect(cols: number, rows: number): string {
   const pty = loadPty();
   const sessionId = randomUUID();
+  const shell = defaultShell();
+  const integration = getCommandBlocksEnabled() ? prepareLocalShellIntegration(shell) : null;
 
-  const proc = pty.spawn(defaultShell(), [], {
+  const proc = pty.spawn(shell, integration?.args ?? [], {
     name: "xterm-256color",
     cols,
     rows,
     cwd: homedir(),
-    env: process.env as Record<string, string>,
+    env: { ...process.env, ...integration?.env } as Record<string, string>,
   });
 
   proc.onData((chunk: string) => {

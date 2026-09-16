@@ -4,9 +4,10 @@ import { homedir } from "node:os";
 import { BrowserWindow } from "electron";
 import type { IPty } from "node-pty";
 import { IPC, type HostRecord } from "../../shared/types";
-import { getHosts } from "./store";
+import { getCommandBlocksEnabled, getHosts } from "./store";
 import { readSecret } from "./secretStore";
 import { loadPty } from "./ptyLoader";
+import { buildRemoteBootstrapCommand } from "./shellIntegration";
 
 interface MoshSession {
   id: string;
@@ -141,6 +142,18 @@ export function connect(hostId: string, cols: number, rows: number): string {
   });
 
   sessions.set(sessionId, { id: sessionId, hostId, proc, authHandled: !secret, earlyOutput: "" });
+
+  if (getCommandBlocksEnabled()) {
+    // Sent as one real line of input, same as the user typing it — there's
+    // no clean signal from here that the mosh session is fully up (auth
+    // done, MOTD flushed, real shell prompt showing), so this is a fixed
+    // best-effort delay long enough for that to typically have happened.
+    // A bash/zsh remote shell picks it up; anything else no-ops harmlessly.
+    setTimeout(() => {
+      if (sessions.has(sessionId)) proc.write(buildRemoteBootstrapCommand() + "\r");
+    }, 1000);
+  }
+
   return sessionId;
 }
 
