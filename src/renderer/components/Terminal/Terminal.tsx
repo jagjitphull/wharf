@@ -247,6 +247,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   function acceptAiSuggestion(suggestion: string) {
     const popup = aiPopupRef.current;
     setAiPopup(null);
+    // Clicking a suggestion row moves DOM focus to that (now-unmounting)
+    // button rather than the terminal — without this, further typing goes
+    // nowhere until the user clicks the terminal again.
+    termRef.current?.focus();
     if (!popup || commandCaptureRef.current.buffer !== popup.requestLine) return;
     const delta = suggestion.slice(popup.requestLine.length);
     if (delta) termRef.current?.paste(delta);
@@ -303,6 +307,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   function acceptGhostSuggestion() {
     const ghost = ghostSuggestionRef.current;
     disposeGhostSuggestion();
+    termRef.current?.focus();
     if (!ghost) return;
     const delta = ghost.fullCommand.slice(ghost.typedLength);
     if (delta) termRef.current?.paste(delta);
@@ -311,19 +316,26 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   /** Scrolls the terminal so a block's command line is visible — a block
    * whose start marker has scrolled out of the retained scrollback just
    * can't be jumped to any more, same limit normal scrolling already has. */
+  // Every Blocks-panel row action below is triggered by clicking a button
+  // inside that panel, not the terminal — each ends with an explicit
+  // termRef.current?.focus() so keyboard input actually goes back to the
+  // terminal afterward, rather than being left on the (now-closed) panel
+  // button with nothing to receive it until the user clicks the terminal.
   function jumpToBlock(block: CommandBlock) {
-    if (block.startMarker.isDisposed) return;
-    termRef.current?.scrollToLine(block.startMarker.line);
+    if (!block.startMarker.isDisposed) termRef.current?.scrollToLine(block.startMarker.line);
+    termRef.current?.focus();
   }
 
   function copyBlockCommand(block: CommandBlock) {
     void wharf.clipboard.writeText(block.command);
+    termRef.current?.focus();
   }
 
   function copyBlockOutput(block: CommandBlock) {
     const term = termRef.current;
     if (!term) return;
     void wharf.clipboard.writeText(readBlockOutput(term, block));
+    term.focus();
   }
 
   /** Re-running is a deliberate, explicit action on a command the user
@@ -340,10 +352,12 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     commandCaptureRef.current.buffer = "";
     notePendingCommand(commandBlocksRef.current, block.command);
     wharf.ssh.write(sessionId, "\r");
+    termRef.current?.focus();
   }
 
   function toggleBlockBookmark(block: CommandBlock) {
     setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, bookmarked: !b.bookmarked } : b)));
+    termRef.current?.focus();
   }
 
   /** Sends a failed block's command/output/exit code to the AI and shows
@@ -374,6 +388,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   function insertExplainFix() {
     const popup = explainPopup;
     setExplainPopup(null);
+    termRef.current?.focus();
     if (popup?.suggestedFix) termRef.current?.paste(popup.suggestedFix);
   }
 
@@ -382,6 +397,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
    * auto-submitted, so the user reviews it before running it. */
   async function generateFromDescription(description: string) {
     setNlPopup({ status: "loading", description });
+    // The popup's own <input> (which had focus, being autoFocus) only
+    // renders in the "input" status — moving to "loading" unmounts it, and
+    // a removed focused element reverts focus to document.body rather than
+    // the terminal, so it has to be reclaimed explicitly here.
+    termRef.current?.focus();
     try {
       const history = await wharf.commandHistory.list();
       const recentCommands = history
@@ -765,7 +785,20 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         style={{ display: visible ? "block" : "none" }}
         onContextMenu={handleContextMenu}
       />
-      {visible && <ContextMenu menu={menu} onClose={closeMenu} />}
+      {visible && (
+        <ContextMenu
+          menu={menu}
+          onClose={() => {
+            closeMenu();
+            // Covers every menu item that doesn't open its own focus-taking
+            // UI (Paste, Select All, Clear, theme swatches, …) — an item
+            // that does (Find…, Insert Snippet…, Generate Command…) focuses
+            // its own input via an effect/autoFocus that runs after this,
+            // so it still wins out correctly.
+            termRef.current?.focus();
+          }}
+        />
+      )}
       {visible && searchOpen && (
         <div className="terminal-search-bar">
           <input
@@ -800,10 +833,14 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       )}
       {visible && snippetPickerOpen && (
         <SnippetPicker
-          onClose={() => setSnippetPickerOpen(false)}
-          onInsert={(command) => {
-            termRef.current?.paste(command);
+          onClose={() => {
             setSnippetPickerOpen(false);
+            termRef.current?.focus();
+          }}
+          onInsert={(command) => {
+            setSnippetPickerOpen(false);
+            termRef.current?.focus();
+            termRef.current?.paste(command);
           }}
         />
       )}
