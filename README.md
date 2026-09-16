@@ -115,6 +115,12 @@ A personal SSH/SFTP terminal client, Termius-style.
   (e.g. `docker logs -f {{container}}`) becomes a small fill-in form on
   insert instead of pasting immediately; fill in the values once per use,
   same Insert Snippet flow as any other snippet
+- Inline Suggestions — fish/zsh-autosuggestions-style ghost text: as you
+  type, the rest of the most recent matching command from that host's
+  history is shown dimmed right after the cursor; press `→` or `End` to
+  accept it into the line, or keep typing to ignore it. Pure local history
+  matching, no AI involved and nothing sent anywhere — instant and free.
+  Toggle it off in Settings → Inline Suggestions
 
 ## Keyboard shortcuts
 
@@ -134,6 +140,7 @@ The full list is also available in-app: click the **?** icon in the title bar, o
 | `Ctrl/Cmd+Shift+Space` | Ask the AI to generate a command from a plain-English description |
 | `Tab` / `Enter` | Accept the top AI suggestion |
 | `1` … `9` | Accept AI suggestion N (while the popup is open) |
+| `→` / `End` | Accept the dimmed inline suggestion showing after the cursor, if any |
 | `Ctrl/Cmd+=` / `Ctrl/Cmd+-` | Increase / decrease terminal font size |
 | `Ctrl/Cmd+0` | Reset terminal font size |
 | Right-click (terminal) | Copy/paste/select all/clear, split pane, insert snippet, theme, logging |
@@ -288,6 +295,15 @@ src/
   — a re-run auto-submits (it's a command you already ran once), but a
   generated or suggested-fix command is only ever pasted for you to review,
   never auto-submitted.
+- Inline Suggestions match against this host's own command history only
+  (never across unrelated hosts, same scoping the AI features' "recent
+  commands" context already uses) and only while the cursor is genuinely at
+  the end of the current line — same best-effort limits as command-history
+  capture generally (arrow-key history recall, Tab completion): moving the
+  cursor with an arrow key clears the suggestion rather than risk it landing
+  in the wrong spot. For a remote session, the suggestion updates in the
+  same lockstep as your own typed characters already do (both wait on the
+  shell's echo), so it can lag slightly on a high-latency connection.
 
 ## Security notes
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
+import { Terminal as XTerm, type IDecoration, type IMarker, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
@@ -9,6 +9,7 @@ import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { useAiPrefsStore } from "../../state/aiPrefsStore";
+import { useGhostSuggestionPrefsStore } from "../../state/ghostSuggestionPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
@@ -22,6 +23,7 @@ import {
 } from "./keywordHighlight";
 import { createCommandCaptureState, feedCommandCapture } from "./commandCapture";
 import { createCommandBlocksState, handleOsc133, notePendingCommand, readBlockOutput, type CommandBlock } from "./commandBlocks";
+import { createGhostHistoryCache, findGhostSuggestion, pushToGhostHistoryCache, type GhostHistoryCache } from "./ghostSuggestion";
 import { BlocksPanel } from "./BlocksPanel";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
@@ -62,6 +64,15 @@ interface NlPopupState {
   status: "input" | "loading" | "error";
   description: string;
   error?: string;
+}
+
+/** The currently-rendered ghost suggestion, if any — tracks enough to erase
+ * it (marker/decoration) and to compute the delta to insert on accept. */
+interface GhostSuggestionState {
+  marker: IMarker;
+  decoration: IDecoration;
+  fullCommand: string;
+  typedLength: number;
 }
 
 const TERM_CSS_VARS = [
@@ -130,6 +141,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const commandBlocksRef = useRef(createCommandBlocksState());
   const terminalThemeId = themeOverrideId ?? globalTerminalThemeId;
   const aiEnabled = useAiPrefsStore((s) => s.enabled);
+  const ghostEnabled = useGhostSuggestionPrefsStore((s) => s.enabled);
+  const ghostEnabledRef = useRef(ghostEnabled);
+  const historyCacheRef = useRef<GhostHistoryCache>([]);
+  const ghostSuggestionRef = useRef<GhostSuggestionState | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -161,6 +176,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   useEffect(() => {
     aiEnabledRef.current = aiEnabled;
   }, [aiEnabled]);
+
+  useEffect(() => {
+    ghostEnabledRef.current = ghostEnabled;
+    if (!ghostEnabled) disposeGhostSuggestion();
+  }, [ghostEnabled]);
 
   useEffect(() => {
     nlPopupRef.current = nlPopup;
@@ -229,6 +249,62 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     setAiPopup(null);
     if (!popup || commandCaptureRef.current.buffer !== popup.requestLine) return;
     const delta = suggestion.slice(popup.requestLine.length);
+    if (delta) termRef.current?.paste(delta);
+  }
+
+  /** Erases the currently-rendered ghost suggestion, if any — always safe to
+   * call even when nothing is showing. */
+  function disposeGhostSuggestion() {
+    const ghost = ghostSuggestionRef.current;
+    if (!ghost) return;
+    ghost.decoration.dispose();
+    ghost.marker.dispose();
+    ghostSuggestionRef.current = null;
+  }
+
+  /** Re-evaluates the fish/zsh-autosuggestions-style ghost text against the
+   * current typed buffer and (re)renders it via an xterm decoration anchored
+   * to the cursor's current row/column — xterm handles the pixel positioning
+   * and scroll-following itself, and since a decoration is a DOM overlay
+   * rather than real buffer content, it can never race with or corrupt the
+   * shell's own echoed output. Called after every real write to the
+   * terminal (see the wharf.ssh.onData handler below) rather than on the
+   * user's own keystroke, since for a remote pty the cursor doesn't actually
+   * move until the shell's echo of that keystroke comes back — recomputing
+   * only once real content has landed keeps the suggestion's position always
+   * trustworthy, at the cost of it updating in the same lockstep as the
+   * user's own typed characters already do over a laggy connection. */
+  function recomputeGhostSuggestion() {
+    const term = termRef.current;
+    disposeGhostSuggestion();
+    if (!term) return;
+    if (!ghostEnabledRef.current || aiPopupRef.current || nlPopupRef.current || searchOpenRef.current) return;
+    const buffer = commandCaptureRef.current.buffer;
+    const match = buffer ? findGhostSuggestion(buffer, historyCacheRef.current) : null;
+    if (!match) return;
+    const remainder = match.slice(buffer.length);
+    const marker = term.registerMarker(0);
+    if (!marker) return;
+    const decoration = term.registerDecoration({ marker, x: term.buffer.active.cursorX, width: remainder.length, anchor: "left" });
+    if (!decoration) {
+      marker.dispose();
+      return;
+    }
+    decoration.onRender((el) => {
+      el.textContent = remainder;
+      el.classList.add("ghost-suggestion-text");
+    });
+    ghostSuggestionRef.current = { marker, decoration, fullCommand: match, typedLength: buffer.length };
+  }
+
+  /** Right Arrow / End while a ghost suggestion is showing types its
+   * remainder into the line the same way an accepted AI suggestion is —
+   * pasted, never auto-submitted. */
+  function acceptGhostSuggestion() {
+    const ghost = ghostSuggestionRef.current;
+    disposeGhostSuggestion();
+    if (!ghost) return;
+    const delta = ghost.fullCommand.slice(ghost.typedLength);
     if (delta) termRef.current?.paste(delta);
   }
 
@@ -379,6 +455,19 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         if (aiEnabledRef.current) setNlPopup({ status: "input", description: "" });
         return false;
       }
+      // Bare Right Arrow / End (no modifiers — leaves Cmd/Ctrl+Right's OS-
+      // level word/line-navigation alone) accepts a showing ghost
+      // suggestion, same convention fish/zsh-autosuggestions/PSReadLine use.
+      if (
+        (event.key === "ArrowRight" || event.key === "End") &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        ghostSuggestionRef.current
+      ) {
+        acceptGhostSuggestion();
+        return false;
+      }
       if ((event.metaKey || event.ctrlKey) && event.code === "Space") {
         if (aiEnabledRef.current) void requestAiSuggestions();
         return false;
@@ -450,7 +539,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
 
     const offData = wharf.ssh.onData((event) => {
       if (event.sessionId === sessionId) {
-        term.write(event.chunk, () => scanAfterWrite(term, compiledRulesRef.current, highlightStateRef.current));
+        term.write(event.chunk, () => {
+          scanAfterWrite(term, compiledRulesRef.current, highlightStateRef.current);
+          recomputeGhostSuggestion();
+        });
       }
     });
     const offClosed = wharf.ssh.onClosed((event) => {
@@ -488,7 +580,20 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         // Paired up with the next OSC 133;C (if this shell has integration)
         // to give the resulting block its command text — see commandBlocks.ts.
         notePendingCommand(commandBlocksRef.current, command);
+        // Makes a just-run command suggestible immediately, without waiting
+        // on a re-fetch of the full history list.
+        pushToGhostHistoryCache(historyCacheRef.current, command);
       }
+    });
+
+    // Seeds the ghost-suggestion history cache from this host's (or, for a
+    // local shell, this session's) past commands — scoped the same way the
+    // AI features' "recent commands" context already is, so a suggestion
+    // never surfaces something typed against an unrelated host.
+    void wharf.commandHistory.list().then((entries) => {
+      const meta = useAppStore.getState().paneMeta[sessionId];
+      const scoped = entries.filter((e) => e.hostId === (meta?.hostId ?? null)).map((e) => e.command);
+      historyCacheRef.current = createGhostHistoryCache(scoped);
     });
 
     const resizeObserver = new ResizeObserver(() => {
@@ -507,6 +612,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       oscDisposable.dispose();
       resizeObserver.disconnect();
       disposeAllDecorations(highlightStateRef.current);
+      disposeGhostSuggestion();
       term.dispose();
       termRef.current = null;
       searchAddonRef.current = null;

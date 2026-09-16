@@ -9,6 +9,19 @@
   height: 100%;
 }
 
+/* Fish/zsh-autosuggestions-style ghost text, rendered via an xterm
+   decoration anchored to the cursor — xterm positions/sizes the element
+   itself (it's laid out in the real cell grid), this just styles it. */
+.ghost-suggestion-text {
+  display: block;
+  color: var(--text-dim);
+  opacity: 0.6;
+  white-space: pre;
+  pointer-events: none;
+  font-family: inherit;
+  font-size: inherit;
+}
+
 .terminal-search-bar {
   position: absolute;
   top: 10px;

@@ -6,6 +6,7 @@ import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
 import { CommandBlocksSettings } from "./CommandBlocksSettings";
+import { GhostSuggestionSettings } from "./GhostSuggestionSettings";
 import { AiAutocompleteSettings } from "./AiAutocompleteSettings";
 import "../../styles/dialog.css";
 import "./Settings.css";
@@ -166,6 +167,9 @@ export function Settings() {
 
       <h2>Command Blocks</h2>
       <CommandBlocksSettings />
+
+      <h2>Inline Suggestions</h2>
+      <GhostSuggestionSettings />
 
       <h2>AI Autocomplete</h2>
       <AiAutocompleteSettings />
