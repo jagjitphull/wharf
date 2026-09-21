@@ -6,6 +6,7 @@ import { IconChevronUp, IconFile, IconFolder, IconPencil, IconPlus, IconRefresh,
 import { formatSize } from "./formatSize";
 import { readTransferData, setTransferData, TRANSFER_MIME } from "./dragTransfer";
 import { isLocalRoot, localBaseName, localJoin, localParent } from "../../utils/localPath";
+import { PromptDialog } from "../PromptDialog/PromptDialog";
 import "./SftpBrowser.css";
 
 interface Props {
@@ -21,6 +22,8 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [renamingEntry, setRenamingEntry] = useState<SftpEntry | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   useEffect(() => {
@@ -88,9 +91,8 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
     }
   }
 
-  async function handleNewFolder() {
-    const name = prompt("New folder name:");
-    if (!name) return;
+  async function handleNewFolderSubmit(name: string) {
+    setNewFolderOpen(false);
     try {
       await wharf.localFs.mkdir(localJoin(path, name));
       await refresh();
@@ -99,9 +101,10 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
     }
   }
 
-  async function handleRename(entry: SftpEntry) {
-    const name = prompt("Rename to:", entry.name);
-    if (!name || name === entry.name) return;
+  async function handleRenameSubmit(name: string) {
+    const entry = renamingEntry;
+    setRenamingEntry(null);
+    if (!entry || name === entry.name) return;
     try {
       await wharf.localFs.rename(entry.path, localJoin(localParent(entry.path), name));
       await refresh();
@@ -141,7 +144,7 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
         <button className="btn ghost small icon-btn" onClick={refresh} title="Refresh">
           <IconRefresh />
         </button>
-        <button className="btn ghost small" onClick={handleNewFolder}>
+        <button className="btn ghost small" onClick={() => setNewFolderOpen(true)}>
           <IconPlus size={12} /> Folder
         </button>
       </div>
@@ -163,7 +166,7 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
                   entry.type === "directory"
                     ? { label: "Open", onClick: () => openEntry(entry) }
                     : { label: "Send to remote pane", onClick: () => onTransferToRemote(entry.path) },
-                  { label: "Rename…", onClick: () => handleRename(entry) },
+                  { label: "Rename…", onClick: () => setRenamingEntry(entry) },
                   { separator: true },
                   { label: "Delete", danger: true, onClick: () => handleDelete(entry) },
                 ])
@@ -180,7 +183,7 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
                     <IconUpload />
                   </button>
                 )}
-                <button onClick={() => handleRename(entry)}>
+                <button onClick={() => setRenamingEntry(entry)}>
                   <IconPencil />
                 </button>
                 <button onClick={() => handleDelete(entry)}>
@@ -192,6 +195,26 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
         {!loading && entries.length === 0 && <div className="sftp-loading">Empty directory.</div>}
       </div>
       <ContextMenu menu={menu} onClose={closeMenu} />
+      {newFolderOpen && (
+        <PromptDialog
+          title="New folder"
+          label="Folder name"
+          placeholder="untitled"
+          confirmLabel="Create"
+          onCancel={() => setNewFolderOpen(false)}
+          onSubmit={handleNewFolderSubmit}
+        />
+      )}
+      {renamingEntry && (
+        <PromptDialog
+          title="Rename"
+          label="New name"
+          defaultValue={renamingEntry.name}
+          confirmLabel="Rename"
+          onCancel={() => setRenamingEntry(null)}
+          onSubmit={handleRenameSubmit}
+        />
+      )}
     </div>
   );
 }
