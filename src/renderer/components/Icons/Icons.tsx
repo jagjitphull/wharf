@@ -181,3 +181,13 @@ export function IconDuplicate({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+export function IconBroadcast({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M5.3 5.3a3.8 3.8 0 0 0 0 5.4M10.7 5.3a3.8 3.8 0 0 1 0 5.4" />
+      <path d="M2.8 2.8a7.4 7.4 0 0 0 0 10.4M13.2 2.8a7.4 7.4 0 0 1 0 10.4" />
+    </svg>
+  );
+}

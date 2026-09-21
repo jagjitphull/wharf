@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm, type IDecoration, type IMarker } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
+import { WebLinksAddon } from "@xterm/addon-web-links";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset, resolveXtermTheme } from "../../state/terminalThemes";
-import { useAppStore } from "../../state/store";
+import { flattenPanes, useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { useAiPrefsStore } from "../../state/aiPrefsStore";
 import { useGhostSuggestionPrefsStore } from "../../state/ghostSuggestionPrefsStore";
+import { LONG_COMMAND_THRESHOLD_MS, useNotificationPrefsStore } from "../../state/notificationPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import { IconChevronDown, IconChevronUp, IconClose } from "../Icons/Icons";
@@ -91,6 +93,8 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const setPaneLogPath = useAppStore((s) => s.setPaneLogPath);
   const splitPane = useAppStore((s) => s.splitPane);
   const closeTerminal = useAppStore((s) => s.closeTerminal);
+  const broadcastInput = useAppStore((s) => s.tabs.find((t) => t.tabId === tabId)?.broadcastInput ?? false);
+  const toggleBroadcastInput = useAppStore((s) => s.toggleBroadcastInput);
   const keywordEnabled = useKeywordHighlightStore((s) => s.enabled);
   const keywordRules = useKeywordHighlightStore((s) => s.rules);
   const highlightStateRef = useRef(createHighlightState());
@@ -101,6 +105,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const aiEnabled = useAiPrefsStore((s) => s.enabled);
   const ghostEnabled = useGhostSuggestionPrefsStore((s) => s.enabled);
   const ghostEnabledRef = useRef(ghostEnabled);
+  const notifyOnLongCommand = useNotificationPrefsStore((s) => s.notifyOnLongCommand);
+  const notifyOnLongCommandRef = useRef(notifyOnLongCommand);
+  const visibleRef = useRef(visible);
   const historyCacheRef = useRef<GhostHistoryCache>([]);
   const ghostSuggestionRef = useRef<GhostSuggestionState | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
@@ -141,6 +148,14 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   }, [ghostEnabled]);
 
   useEffect(() => {
+    notifyOnLongCommandRef.current = notifyOnLongCommand;
+  }, [notifyOnLongCommand]);
+
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
+
+  useEffect(() => {
     nlPopupRef.current = nlPopup;
   }, [nlPopup]);
 
@@ -157,6 +172,31 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [explainPopup]);
+
+  /** A desktop notification when a long-running command finishes on a pane
+   * you're not currently looking at — checked against notifyOnLongCommandRef
+   * (not the prop directly, since this is called from a listener registered
+   * once at mount) and skipped entirely for a pane/tab that's already
+   * visible and focused, so it never fires for something you're watching
+   * complete in real time. */
+  function notifyCommandFinished(block: CommandBlock) {
+    if (!notifyOnLongCommandRef.current) return;
+    if (Date.now() - block.timestamp < LONG_COMMAND_THRESHOLD_MS) return;
+    if (visibleRef.current && !document.hidden && document.hasFocus()) return;
+    if (typeof Notification === "undefined" || Notification.permission === "denied") return;
+
+    const meta = useAppStore.getState().paneMeta[sessionId];
+    const ok = block.exitCode === 0 || block.exitCode === null;
+    const notification = new Notification(ok ? "Command finished" : `Command failed (exit ${block.exitCode})`, {
+      body: `${meta?.title ?? "Terminal"} — ${block.command}`,
+    });
+    notification.onclick = () => {
+      window.focus();
+      const { setActiveTab, setActiveView } = useAppStore.getState();
+      setActiveTab(tabId);
+      setActiveView("hosts");
+    };
+  }
 
   /** Fires an AI autocomplete request for whatever's currently typed
    * (unsent) on this pane's line, sourced from the same buffer the command-
@@ -410,6 +450,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     const search = new SearchAddon();
     term.loadAddon(search);
     searchAddonRef.current = search;
+    // Default matcher (http/https only) — the main-process handler behind
+    // this also refuses anything else, so this is belt-and-suspenders, not
+    // the only guard against handing arbitrary terminal output to the OS.
+    term.loadAddon(new WebLinksAddon((_event, uri) => void wharf.shell.openExternal(uri)));
     term.open(el);
     fitRef.current = fit;
     fit.fit();
@@ -512,6 +556,12 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     const oscDisposable = term.parser.registerOscHandler(133, (payload) => {
       const updated = handleOsc133(term, commandBlocksRef.current, payload);
       if (updated) setBlocks(updated);
+      // "D" always closes whatever block "C" most recently opened (only one
+      // can be open at a time), so it's always the last entry once handled.
+      if (updated && payload.startsWith("D")) {
+        const closed = updated[updated.length - 1];
+        if (closed) notifyCommandFinished(closed);
+      }
       return true;
     });
 
@@ -543,6 +593,17 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
 
     const dataDisposable = term.onData((data) => {
       wharf.ssh.write(sessionId, data);
+      // Broadcast Input (tab context menu / right-click a pane) — mirrors
+      // whatever's typed here to every other pane in this same tab. Read
+      // fresh via getState() rather than a prop/ref, since which tab this
+      // pane belongs to and that tab's broadcast flag can both change
+      // without this pane remounting.
+      const tab = useAppStore.getState().tabs.find((t) => t.tabId === tabId);
+      if (tab?.broadcastInput) {
+        for (const otherSessionId of flattenPanes(tab.layout)) {
+          if (otherSessionId !== sessionId) wharf.ssh.write(otherSessionId, data);
+        }
+      }
       for (const command of feedCommandCapture(commandCaptureRef.current, data)) {
         // hostId/hostName are read fresh here rather than threaded through
         // this closure's deps — they're set once when the pane connects and
@@ -714,6 +775,10 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       { separator: true },
       { label: "Split Right", onClick: () => splitPane(tabId, sessionId, "row") },
       { label: "Split Down", onClick: () => splitPane(tabId, sessionId, "column") },
+      {
+        label: broadcastInput ? "Stop Broadcasting Input" : "Broadcast Input to All Panes",
+        onClick: () => toggleBroadcastInput(tabId),
+      },
       { label: "Close Pane", onClick: () => closeTerminal(sessionId) },
       { separator: true },
       { label: logPath ? "Stop Logging" : "Start Logging…", onClick: toggleLogging },

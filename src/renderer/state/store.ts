@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GroupRecord, HostInput, HostRecord, SnippetRecord, TunnelRecord } from "@shared/types";
+import type { GroupRecord, HostInput, HostRecord, SnippetRecord, TunnelRecord, WorkspaceNode, WorkspaceRecord, WorkspaceTab } from "@shared/types";
 import { wharf } from "../api/wharf";
 
 /**
@@ -40,9 +40,14 @@ export interface TerminalTab {
   layout: PaneNode;
   /** Which pane in this tab currently has keyboard focus / is highlighted. */
   activePaneId: string;
+  /** While true, keystrokes typed into any pane of this tab are sent to
+   * every pane in it (tmux/iTerm2 "broadcast input") — for running the
+   * same command across several hosts split side by side. Off by default;
+   * per-tab, not global, since it's easy to forget is on. */
+  broadcastInput?: boolean;
 }
 
-export type ActiveView = "hosts" | "sftp" | "tunnels" | "history" | "settings";
+export type ActiveView = "hosts" | "sftp" | "tunnels" | "history" | "settings" | "workspaces";
 
 /** All leaf sessionIds under a pane node, in left-to-right/top-to-bottom order. */
 export function flattenPanes(node: PaneNode): string[] {
@@ -80,6 +85,7 @@ interface AppState {
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
   snippets: SnippetRecord[];
+  workspaces: WorkspaceRecord[];
 
   tabs: TerminalTab[];
   activeTabId: string | null;
@@ -95,6 +101,15 @@ interface AppState {
   refreshGroups(): Promise<void>;
   refreshTunnels(): Promise<void>;
   refreshSnippets(): Promise<void>;
+  refreshWorkspaces(): Promise<void>;
+  /** Saves the currently open tabs (and each one's split layout) as a named
+   * workspace — each pane is stored as a reference to its host (or null for
+   * a local shell), not its live session, so it can be reopened fresh. */
+  saveCurrentAsWorkspace(name: string): Promise<void>;
+  /** Reconnects every pane of every tab in a saved workspace and opens them
+   * as new tabs alongside whatever's already open (existing tabs/sessions
+   * are left alone). */
+  openWorkspace(workspaceId: string): Promise<void>;
   /** Reassigns a saved host to a different group (or null to ungroup it) —
    * used by the sidebar's drag-and-drop. Sends the host's existing fields
    * back unchanged aside from groupId; wharf.hosts.update keeps its saved
@@ -118,6 +133,7 @@ interface AppState {
   setActivePane(tabId: string, sessionId: string): void;
   setPaneThemeId(sessionId: string, themeId: string | undefined): void;
   setPaneLogPath(sessionId: string, logPath: string | undefined): void;
+  toggleBroadcastInput(tabId: string): void;
 
   setActiveView(view: ActiveView): void;
   setContextHostId(hostId: string | null): void;
@@ -140,11 +156,43 @@ async function connectSession(
   return { sessionId, meta: { hostId: null, title, connectedAt: Date.now(), themeId } };
 }
 
+/** Recursively (re)connects every leaf of a saved workspace tab, in order —
+ * sequential rather than parallel so several hosts don't all auth at once,
+ * which matters less for correctness than for not hammering several
+ * connections open simultaneously. A leaf whose host was since deleted
+ * falls back to a local shell rather than aborting the whole open, so one
+ * stale reference doesn't cost you the rest of the layout. */
+async function connectWorkspaceNode(
+  node: WorkspaceNode,
+  hosts: HostRecord[],
+  localShellOrdinal: { count: number },
+  metasOut: Record<string, PaneMeta>,
+): Promise<PaneNode> {
+  if (node.type === "leaf") {
+    const host = node.hostId ? (hosts.find((h) => h.id === node.hostId) ?? null) : null;
+    const ordinal = host ? 0 : localShellOrdinal.count++;
+    const { sessionId, meta } = await connectSession(host, undefined, ordinal);
+    metasOut[sessionId] = meta;
+    return { type: "leaf", sessionId };
+  }
+  const children: PaneNode[] = [];
+  for (const child of node.children) {
+    children.push(await connectWorkspaceNode(child, hosts, localShellOrdinal, metasOut));
+  }
+  return { type: "split", direction: node.direction, children };
+}
+
+function paneNodeToWorkspaceNode(node: PaneNode, paneMeta: Record<string, PaneMeta>): WorkspaceNode {
+  if (node.type === "leaf") return { type: "leaf", hostId: paneMeta[node.sessionId]?.hostId ?? null };
+  return { type: "split", direction: node.direction, children: node.children.map((c) => paneNodeToWorkspaceNode(c, paneMeta)) };
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   hosts: [],
   groups: [],
   tunnels: [],
   snippets: [],
+  workspaces: [],
 
   tabs: [],
   activeTabId: null,
@@ -154,7 +202,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   contextHostId: null,
 
   async loadAll() {
-    await Promise.all([get().refreshHosts(), get().refreshGroups(), get().refreshTunnels(), get().refreshSnippets()]);
+    await Promise.all([
+      get().refreshHosts(),
+      get().refreshGroups(),
+      get().refreshTunnels(),
+      get().refreshSnippets(),
+      get().refreshWorkspaces(),
+    ]);
   },
 
   async refreshHosts() {
@@ -171,6 +225,36 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async refreshSnippets() {
     set({ snippets: await wharf.snippets.list() });
+  },
+
+  async refreshWorkspaces() {
+    set({ workspaces: await wharf.workspaces.list() });
+  },
+
+  async saveCurrentAsWorkspace(name) {
+    const { tabs, paneMeta } = get();
+    const workspaceTabs: WorkspaceTab[] = tabs.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta) }));
+    await wharf.workspaces.create({ name, tabs: workspaceTabs });
+    await get().refreshWorkspaces();
+  },
+
+  async openWorkspace(workspaceId) {
+    const workspace = get().workspaces.find((w) => w.id === workspaceId);
+    if (!workspace) return;
+    const hosts = get().hosts;
+    const localShellOrdinal = { count: 0 };
+    for (const workspaceTab of workspace.tabs) {
+      const metas: Record<string, PaneMeta> = {};
+      const layout = await connectWorkspaceNode(workspaceTab.layout, hosts, localShellOrdinal, metas);
+      const activePaneId = flattenPanes(layout)[0];
+      const tab: TerminalTab = { tabId: crypto.randomUUID(), layout, activePaneId };
+      set((s) => ({
+        tabs: [...s.tabs, tab],
+        activeTabId: tab.tabId,
+        paneMeta: { ...s.paneMeta, ...metas },
+      }));
+    }
+    set({ activeView: "hosts" });
   },
 
   async moveHostToGroup(hostId, groupId) {
@@ -303,6 +387,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActivePane(tabId, sessionId) {
     set((s) => ({
       tabs: s.tabs.map((t) => (t.tabId === tabId ? { ...t, activePaneId: sessionId } : t)),
+    }));
+  },
+
+  toggleBroadcastInput(tabId) {
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.tabId === tabId ? { ...t, broadcastInput: !t.broadcastInput } : t)),
     }));
   },
 

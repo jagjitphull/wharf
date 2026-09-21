@@ -17,6 +17,9 @@ import type {
   SftpTransferProgress,
   SnippetInput,
   SnippetRecord,
+  WorkspaceInput,
+  WorkspaceRecord,
+  HostStatsUpdateEvent,
   CommandHistoryEntry,
   CommandHistoryInput,
   AiSuggestRequest,
@@ -125,6 +128,9 @@ export interface WharfApi {
     writeText(text: string): void;
     readText(): Promise<string>;
   };
+  shell: {
+    openExternal(url: string): Promise<void>;
+  };
   backup: {
     /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */
     export(): Promise<string | null>;
@@ -136,6 +142,16 @@ export interface WharfApi {
     create(input: SnippetInput): Promise<SnippetRecord>;
     update(id: string, input: SnippetInput): Promise<SnippetRecord>;
     remove(id: string): Promise<void>;
+  };
+  workspaces: {
+    list(): Promise<WorkspaceRecord[]>;
+    create(input: WorkspaceInput): Promise<WorkspaceRecord>;
+    remove(id: string): Promise<void>;
+  };
+  hostStats: {
+    start(sessionId: string): void;
+    stop(sessionId: string): void;
+    onUpdate(cb: (event: HostStatsUpdateEvent) => void): () => void;
   };
   commandHistory: {
     /** Records one typed command. Best-effort — see CommandHistoryEntry's doc comment. */

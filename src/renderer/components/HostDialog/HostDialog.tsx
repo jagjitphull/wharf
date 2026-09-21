@@ -65,6 +65,29 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
   const [secretPlaceholder] = useState(host?.secretId ? "•••••••• (unchanged)" : "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [tagDraft, setTagDraft] = useState("");
+
+  function addTag(raw: string) {
+    const tag = raw.trim();
+    if (!tag) return;
+    const existing = form.tags ?? [];
+    if (existing.includes(tag)) return;
+    setForm({ ...form, tags: [...existing, tag] });
+  }
+
+  function removeTag(tag: string) {
+    setForm({ ...form, tags: (form.tags ?? []).filter((t) => t !== tag) });
+  }
+
+  function handleTagInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagDraft);
+      setTagDraft("");
+    } else if (e.key === "Backspace" && !tagDraft && (form.tags ?? []).length > 0) {
+      removeTag(form.tags![form.tags!.length - 1]);
+    }
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -137,6 +160,30 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
                 onClick={() => setForm({ ...form, color: c })}
               />
             ))}
+          </div>
+        </label>
+
+        <label>
+          Tags
+          <div className="host-tags-input">
+            {(form.tags ?? []).map((tag) => (
+              <span className="host-tag-chip" key={tag}>
+                {tag}
+                <button type="button" onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`}>
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              value={tagDraft}
+              onChange={(e) => setTagDraft(e.target.value)}
+              onKeyDown={handleTagInputKeyDown}
+              onBlur={() => {
+                addTag(tagDraft);
+                setTagDraft("");
+              }}
+              placeholder={(form.tags ?? []).length ? "" : "prod, db, us-east…"}
+            />
           </div>
         </label>
 

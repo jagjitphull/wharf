@@ -6,7 +6,7 @@ import { wharf } from "../../api/wharf";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
-import { IconClose, IconDuplicate, IconTerminal } from "../Icons/Icons";
+import { IconBroadcast, IconClose, IconDuplicate, IconTerminal } from "../Icons/Icons";
 import { EmptyState } from "../EmptyState/EmptyState";
 import "./TerminalPanel.css";
 
@@ -136,6 +136,7 @@ export function TerminalPanel({ hidden }: Props) {
               closeError={activeMeta?.closeError}
               logPath={activeMeta?.logPath}
               themeId={activeMeta?.themeId}
+              broadcasting={!!tab.broadcastInput}
               isActive={tab.tabId === activeTabId}
               draggingId={draggingId}
               dropTargetId={dropTargetId}
@@ -168,7 +169,7 @@ export function TerminalPanel({ hidden }: Props) {
         {tabs.map((tab) => (
           <div
             key={tab.tabId}
-            className="tab-pane-container"
+            className={`tab-pane-container ${tab.broadcastInput ? "broadcasting" : ""}`}
             style={{ display: !hidden && tab.tabId === activeTabId ? "flex" : "none" }}
           >
             <PaneTree
@@ -193,6 +194,7 @@ interface TabButtonProps {
   closeError?: string;
   logPath?: string;
   themeId?: string;
+  broadcasting: boolean;
   isActive: boolean;
   draggingId: string | null;
   dropTargetId: string | null;
@@ -252,6 +254,11 @@ function TabButton(p: TabButtonProps) {
     >
       {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
       {p.logPath && <span className="tab-logging-dot" title={`Logging to ${p.logPath}`} />}
+      {p.broadcasting && (
+        <span className="tab-broadcast-badge" title="Broadcasting input to every pane in this tab">
+          <IconBroadcast size={11} />
+        </span>
+      )}
       {p.themeId && (
         <span
           className="tab-theme-dot"

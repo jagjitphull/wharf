@@ -37,6 +37,61 @@
   border-color: var(--text);
 }
 
+.host-tags-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.host-tags-input input {
+  flex: 1;
+  min-width: 80px;
+  background: transparent !important;
+  border: none !important;
+  padding: 2px !important;
+  font-size: 13px;
+}
+
+.host-tags-input input:focus {
+  outline: none;
+}
+
+.host-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-active);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 2px 4px 2px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.host-tag-chip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.host-tag-chip button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
 .host-mosh-row {
   flex-direction: row !important;
   align-items: flex-start;

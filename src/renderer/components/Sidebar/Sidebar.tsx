@@ -14,7 +14,7 @@ interface Props {
 }
 
 function hostMatchesFilter(host: HostRecord, filter: string): boolean {
-  const haystack = `${host.name} ${host.username} ${host.hostname}`.toLowerCase();
+  const haystack = `${host.name} ${host.username} ${host.hostname} ${(host.tags ?? []).join(" ")}`.toLowerCase();
   return haystack.includes(filter);
 }
 
@@ -132,6 +132,23 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
           <span className="host-sub">
             {host.username}@{host.hostname}:{host.port}
           </span>
+          {host.tags && host.tags.length > 0 && (
+            <span className="host-tags">
+              {host.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="host-tag-badge"
+                  title={`Filter by "${tag}"`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilter(tag);
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </span>
+          )}
         </button>
         <div className="host-actions">
           <button title="Connect" onClick={() => connect(host)}>
@@ -215,6 +232,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
       <nav className="sidebar-nav">
         {navItem("hosts", "Hosts")}
         {navItem("tunnels", "Tunnels")}
+        {navItem("workspaces", "Workspaces")}
         {navItem("history", "History")}
         {navItem("settings", "Settings")}
       </nav>

@@ -131,6 +131,29 @@ A personal SSH/SFTP terminal client, Termius-style.
   accept it into the line, or keep typing to ignore it. Pure local history
   matching, no AI involved and nothing sent anywhere — instant and free.
   Toggle it off in Settings → Inline Suggestions
+- Clickable links — URLs printed to a terminal (`ls` output, logs, `git`
+  remotes, anything) are clickable, opening in your default browser
+- Desktop notifications — get notified when a command that ran at least
+  10s finishes on a pane you're not currently looking at; click the
+  notification to jump straight back to that tab. Needs Command Blocks
+  (above) to know when a command finishes; toggle it off in Settings →
+  Notifications
+- Tags — label hosts with free-form tags in the host editor, shown as small
+  pills under each host in the sidebar; click one (or just type it into the
+  filter box) to filter to every host sharing it
+- Broadcast Input — right-click a pane → "Broadcast Input to All Panes" to
+  mirror every keystroke typed into it to every other pane in that same tab
+  (a gold outline + a small icon on the tab show it's on) — handy for
+  running the same command across several hosts split side by side
+- Workspaces — save the tabs (and their splits) you currently have open as
+  a named layout from the Workspaces panel; each pane remembers which host
+  it connects to, not a live session, so opening a saved workspace later
+  reconnects everything fresh with one click
+- Host stats — the status bar shows live load average, memory, and disk
+  usage for whichever SSH pane currently has focus, polled every 5s over a
+  lightweight `exec` on its existing connection (never the interactive
+  shell itself); Linux remotes only, and any field a remote doesn't support
+  is just left out rather than shown as an error
 
 ## Keyboard shortcuts
 

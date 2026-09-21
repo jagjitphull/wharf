@@ -175,6 +175,7 @@
 .host-name {
   flex: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   background: transparent;
@@ -220,6 +221,32 @@
   background: var(--accent-bg);
   border-radius: 4px;
   padding: 1px 4px;
+}
+
+/* flex-basis:100% forces this onto its own wrapped line within
+   .host-name's flex-wrap row, indented roughly under the title (past the
+   status dot) rather than starting flush with the row's left edge. */
+.host-tags {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 16px;
+}
+
+.host-tag-badge {
+  flex: none;
+  font-size: 9.5px;
+  color: var(--text-dim);
+  background: var(--bg-active);
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+
+.host-tag-badge:hover {
+  color: var(--text);
+  background: var(--bg-hover);
 }
 
 .sidebar-footer {

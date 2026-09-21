@@ -5,6 +5,7 @@ import { TerminalPanel } from "./components/Terminal/TerminalPanel";
 import { SftpBrowser } from "./components/SftpBrowser/SftpBrowser";
 import { Tunnels } from "./components/Tunnels/Tunnels";
 import { CommandHistory } from "./components/CommandHistory/CommandHistory";
+import { Workspaces } from "./components/Workspaces/Workspaces";
 import { Settings } from "./components/Settings/Settings";
 import { QuickConnect } from "./components/QuickConnect/QuickConnect";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts/KeyboardShortcuts";
@@ -117,6 +118,7 @@ export default function App() {
           {activeView === "sftp" && <SftpBrowser />}
           {activeView === "tunnels" && <Tunnels />}
           {activeView === "history" && <CommandHistory />}
+          {activeView === "workspaces" && <Workspaces />}
           {activeView === "settings" && <Settings />}
         </main>
       </div>

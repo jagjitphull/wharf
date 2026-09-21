@@ -58,6 +58,11 @@
   white-space: nowrap;
 }
 
+.status-stats {
+  font-family: monospace;
+  color: var(--text-dim);
+}
+
 .status-spacer {
   flex: 1;
 }

@@ -9,14 +9,18 @@ import { registerLocalFsIpc } from "./ipc/localFs";
 import { registerTunnelsIpc } from "./ipc/tunnels";
 import { registerWindowIpc } from "./ipc/window";
 import { registerClipboardIpc } from "./ipc/clipboard";
+import { registerShellIpc } from "./ipc/shell";
 import { registerBackupIpc } from "./ipc/backup";
 import { registerSnippetsIpc } from "./ipc/snippets";
+import { registerWorkspacesIpc } from "./ipc/workspaces";
+import { registerHostStatsIpc } from "./ipc/hostStats";
 import { registerSshConfigIpc } from "./ipc/sshConfig";
 import { registerCommandHistoryIpc } from "./ipc/commandHistory";
 import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
+import { stopAll as stopAllHostStats } from "./services/hostStats";
 import { getWindowBounds, setWindowBounds } from "./services/store";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -163,8 +167,11 @@ app.whenReady().then(() => {
   registerTunnelsIpc();
   registerWindowIpc(() => createWindow(false));
   registerClipboardIpc();
+  registerShellIpc();
   registerBackupIpc();
   registerSnippetsIpc();
+  registerWorkspacesIpc();
+  registerHostStatsIpc();
   registerSshConfigIpc();
   registerCommandHistoryIpc();
   registerAiIpc();
@@ -190,4 +197,5 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   stopAllTunnels();
   closeAllSftp();
+  stopAllHostStats();
 });

@@ -7,6 +7,7 @@ import type {
   HostRecord,
   SnippetRecord,
   TunnelRecord,
+  WorkspaceRecord,
 } from "../../shared/types";
 
 export interface WindowBounds {
@@ -21,6 +22,7 @@ interface Schema {
   groups: GroupRecord[];
   tunnels: TunnelRecord[];
   snippets: SnippetRecord[];
+  workspaces: WorkspaceRecord[];
   commandHistory: CommandHistoryEntry[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
@@ -40,6 +42,7 @@ const defaults: Schema = {
   groups: [],
   tunnels: [],
   snippets: [],
+  workspaces: [],
   commandHistory: [],
   secrets: {},
   aiProvider: "claude",
@@ -106,6 +109,14 @@ export function getSnippets(): SnippetRecord[] {
 
 export function setSnippets(snippets: SnippetRecord[]): void {
   store.set("snippets", snippets);
+}
+
+export function getWorkspaces(): WorkspaceRecord[] {
+  return store.get("workspaces");
+}
+
+export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
+  store.set("workspaces", workspaces);
 }
 
 // Caps the persisted log so a long-lived install doesn't grow this file

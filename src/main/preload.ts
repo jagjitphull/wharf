@@ -87,6 +87,9 @@ const api: WharfApi = {
     writeText: (text) => ipcRenderer.send(IPC.clipboard.writeText, text),
     readText: () => ipcRenderer.invoke(IPC.clipboard.readText),
   },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke(IPC.shell.openExternal, url),
+  },
   backup: {
     export: () => ipcRenderer.invoke(IPC.backup.export),
     import: () => ipcRenderer.invoke(IPC.backup.import),
@@ -96,6 +99,16 @@ const api: WharfApi = {
     create: (input) => ipcRenderer.invoke(IPC.snippets.create, input),
     update: (id, input) => ipcRenderer.invoke(IPC.snippets.update, id, input),
     remove: (id) => ipcRenderer.invoke(IPC.snippets.remove, id),
+  },
+  workspaces: {
+    list: () => ipcRenderer.invoke(IPC.workspaces.list),
+    create: (input) => ipcRenderer.invoke(IPC.workspaces.create, input),
+    remove: (id) => ipcRenderer.invoke(IPC.workspaces.remove, id),
+  },
+  hostStats: {
+    start: (sessionId) => ipcRenderer.send(IPC.hostStats.start, sessionId),
+    stop: (sessionId) => ipcRenderer.send(IPC.hostStats.stop, sessionId),
+    onUpdate: (cb) => on(IPC.hostStats.onUpdate, cb as (...args: unknown[]) => void),
   },
   commandHistory: {
     add: (input) => ipcRenderer.invoke(IPC.commandHistory.add, input),

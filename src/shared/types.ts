@@ -86,6 +86,52 @@ export interface SnippetInput {
 }
 
 // ---------------------------------------------------------------------------
+// Workspaces — a saved set of tabs (each possibly split into panes), each
+// pane referencing a saved host (or null for a local shell) rather than a
+// live session id, so it can be reopened fresh any time.
+// ---------------------------------------------------------------------------
+
+export type WorkspaceNode =
+  | { type: "leaf"; hostId: string | null }
+  | { type: "split"; direction: "row" | "column"; children: WorkspaceNode[] };
+
+export interface WorkspaceTab {
+  layout: WorkspaceNode;
+}
+
+export interface WorkspaceRecord {
+  id: string;
+  name: string;
+  tabs: WorkspaceTab[];
+  createdAt: number;
+}
+
+export interface WorkspaceInput {
+  name: string;
+  tabs: WorkspaceTab[];
+}
+
+// ---------------------------------------------------------------------------
+// Host stats — periodic, lightweight CPU/memory/disk readout for the
+// currently-focused SSH pane, polled via `exec` on its already-open
+// connection (never the interactive shell channel itself).
+// ---------------------------------------------------------------------------
+
+export interface HostStatsSnapshot {
+  loadAvg: [number, number, number] | null;
+  memTotalMb: number | null;
+  memUsedMb: number | null;
+  diskUsePercent: number | null;
+}
+
+export interface HostStatsUpdateEvent {
+  sessionId: string;
+  stats: HostStatsSnapshot | null;
+  /** Set when the poll itself failed (e.g. session just closed) — stats is null in that case. */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Command history / audit log
 // ---------------------------------------------------------------------------
 
@@ -371,6 +417,9 @@ export const IPC = {
     writeText: "clipboard:write-text",
     readText: "clipboard:read-text",
   },
+  shell: {
+    openExternal: "shell:open-external",
+  },
   backup: {
     export: "backup:export",
     import: "backup:import",
@@ -380,6 +429,16 @@ export const IPC = {
     create: "snippets:create",
     update: "snippets:update",
     remove: "snippets:remove",
+  },
+  workspaces: {
+    list: "workspaces:list",
+    create: "workspaces:create",
+    remove: "workspaces:remove",
+  },
+  hostStats: {
+    start: "host-stats:start",
+    stop: "host-stats:stop",
+    onUpdate: "host-stats:on-update",
   },
   commandHistory: {
     add: "command-history:add",
