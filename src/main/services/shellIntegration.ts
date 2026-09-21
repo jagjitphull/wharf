@@ -133,3 +133,68 @@ export function buildRemoteBootstrapCommand(): string {
     `elif [ -n "$ZSH_VERSION" ]; then eval "$(echo ${zshB64} | base64 -d)"; fi`
   );
 }
+
+const PROMPT_START_MARKER = "\x1b]133;A\x07";
+
+/**
+ * Hides the visible terminal-echo of buildRemoteBootstrapCommand() itself
+ * (the remote pty echoes whatever we send it as input, same as anything the
+ * user types) without touching remote-side echo settings, which would risk
+ * leaving a session's *real* input permanently un-echoed on a shell our
+ * hooks don't recognize.
+ *
+ * Filters by content, not time: everything received after start() is held
+ * back until the shell's own first post-hook prompt-start marker (";A")
+ * shows up in the stream — at that point the bootstrap line's raw-text
+ * echo (and the one no-op ;C/;D cycle it can trigger — already ignored by
+ * commandBlocks.ts's "skip the startup pair" case) is behind us, and
+ * everything from the marker onward, including the shell's real fresh
+ * prompt, passes through untouched.
+ *
+ * A remote shell our hooks don't support (fish, dash, PowerShell, …) never
+ * emits that marker — timeoutMs is the safety net: whatever was held back
+ * gets flushed as-is (bootstrap echo included) instead of silently lost, so
+ * an unsupported shell just sees the old un-suppressed behavior, delayed
+ * slightly, rather than going silent for good.
+ */
+export class BootstrapEchoSuppressor {
+  private active = false;
+  private buffer = "";
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  start(onTimeout: (pending: string) => void, timeoutMs = 3000): void {
+    this.reset();
+    this.active = true;
+    this.timer = setTimeout(() => {
+      const pending = this.buffer;
+      this.reset();
+      if (pending) onTimeout(pending);
+    }, timeoutMs);
+  }
+
+  private reset(): void {
+    this.active = false;
+    this.buffer = "";
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  /** Feed a newly-received chunk of remote output; returns the portion (if
+   * any) that should actually reach the terminal display right now. */
+  feed(chunk: string): string {
+    if (!this.active) return chunk;
+    this.buffer += chunk;
+    const idx = this.buffer.indexOf(PROMPT_START_MARKER);
+    if (idx === -1) return "";
+    const rest = this.buffer.slice(idx);
+    this.reset();
+    // The bytes just discarded would normally have ended in whatever moved
+    // the cursor to a fresh line before the shell's own prompt redraw (the
+    // echoed Enter that submitted the bootstrap line) — losing that means
+    // the fresh prompt below would otherwise get drawn right where the
+    // cursor already sat, butted up against whatever was on screen before.
+    return "\r\n" + rest;
+  }
+}

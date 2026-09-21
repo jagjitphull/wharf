@@ -7,7 +7,7 @@ import { IPC, type HostRecord } from "../../shared/types";
 import { getCommandBlocksEnabled, getHosts } from "./store";
 import { readSecret } from "./secretStore";
 import { loadPty } from "./ptyLoader";
-import { buildRemoteBootstrapCommand } from "./shellIntegration";
+import { BootstrapEchoSuppressor, buildRemoteBootstrapCommand } from "./shellIntegration";
 
 interface MoshSession {
   id: string;
@@ -24,6 +24,10 @@ interface MoshSession {
    * the "binary not found" case and give a clear message instead of a bare
    * exit code. */
   earlyOutput: string;
+  /** Hides the visible echo of the Command Blocks bootstrap line right
+   * after it's sent — see BootstrapEchoSuppressor. A no-op the rest of the
+   * time. */
+  echoFilter: BootstrapEchoSuppressor;
 }
 
 const sessions = new Map<string, MoshSession>();
@@ -106,9 +110,13 @@ export function connect(hostId: string, cols: number, rows: number): string {
   });
 
   proc.onData((chunk: string) => {
-    broadcast(IPC.ssh.onData, { sessionId, chunk });
     const session = sessions.get(sessionId);
+    const visible = session ? session.echoFilter.feed(chunk) : chunk;
+    if (visible) broadcast(IPC.ssh.onData, { sessionId, chunk: visible });
     if (session) {
+      // Unfiltered — logging and the password/passphrase auto-fill match
+      // below both need the real, complete stream, not the display-only
+      // filtered view.
       session.logStream?.write(chunk);
       if (!session.authHandled) {
         session.earlyOutput += chunk;
@@ -141,7 +149,14 @@ export function connect(hostId: string, cols: number, rows: number): string {
     sessions.delete(sessionId);
   });
 
-  sessions.set(sessionId, { id: sessionId, hostId, proc, authHandled: !secret, earlyOutput: "" });
+  sessions.set(sessionId, {
+    id: sessionId,
+    hostId,
+    proc,
+    authHandled: !secret,
+    earlyOutput: "",
+    echoFilter: new BootstrapEchoSuppressor(),
+  });
 
   if (getCommandBlocksEnabled()) {
     // Sent as one real line of input, same as the user typing it — there's
@@ -150,7 +165,10 @@ export function connect(hostId: string, cols: number, rows: number): string {
     // best-effort delay long enough for that to typically have happened.
     // A bash/zsh remote shell picks it up; anything else no-ops harmlessly.
     setTimeout(() => {
-      if (sessions.has(sessionId)) proc.write(buildRemoteBootstrapCommand() + "\r");
+      const session = sessions.get(sessionId);
+      if (!session) return;
+      session.echoFilter.start((pending) => broadcast(IPC.ssh.onData, { sessionId, chunk: pending }));
+      proc.write(buildRemoteBootstrapCommand() + "\r");
     }, 1000);
   }
 

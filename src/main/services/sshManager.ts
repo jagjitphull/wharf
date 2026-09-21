@@ -5,7 +5,7 @@ import { BrowserWindow } from "electron";
 import { IPC } from "../../shared/types";
 import { getCommandBlocksEnabled, getHosts } from "./store";
 import { acquireClient, isPooledClient, releaseClient } from "./connectionPool";
-import { buildRemoteBootstrapCommand } from "./shellIntegration";
+import { BootstrapEchoSuppressor, buildRemoteBootstrapCommand } from "./shellIntegration";
 
 export { buildConnectConfig, connectHostClient } from "./sshConnect";
 
@@ -25,6 +25,10 @@ interface Session {
    * duplicate chain when both the channel and the client report the same
    * underlying failure. */
   reconnecting: boolean;
+  /** Hides the visible echo of the Command Blocks bootstrap line right
+   * after it's sent (on connect and on every reconnect) — see
+   * BootstrapEchoSuppressor. A no-op the rest of the time. */
+  echoFilter: BootstrapEchoSuppressor;
 }
 
 const sessions = new Map<string, Session>();
@@ -83,10 +87,15 @@ function sleep(ms: number): Promise<void> {
  * reconnect-on-drop handling for an unexpected close. */
 function wireChannel(sessionId: string, channel: ClientChannel, client: Client): void {
   function emitData(data: Buffer) {
-    broadcast(IPC.ssh.onData, { sessionId, chunk: data.toString("utf8") });
+    const session = sessions.get(sessionId);
+    const text = data.toString("utf8");
+    const visible = session ? session.echoFilter.feed(text) : text;
+    if (visible) broadcast(IPC.ssh.onData, { sessionId, chunk: visible });
     // Raw bytes, ANSI codes included — same as what `script`/`asciinema`
-    // record, and what the user actually sees in the terminal.
-    sessions.get(sessionId)?.logStream?.write(data);
+    // record, and what the user actually sees in the terminal (echo
+    // suppression only holds display back briefly, it never affects what's
+    // logged).
+    session?.logStream?.write(data);
   }
   channel.on("data", emitData);
   channel.stderr.on("data", emitData);
@@ -180,7 +189,10 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
 
     if (getCommandBlocksEnabled()) {
       setTimeout(() => {
-        if (sessions.has(sessionId)) channel.write(buildRemoteBootstrapCommand() + "\r");
+        const s = sessions.get(sessionId);
+        if (!s) return;
+        s.echoFilter.start((pending) => broadcast(IPC.ssh.onData, { sessionId, chunk: pending }));
+        channel.write(buildRemoteBootstrapCommand() + "\r");
       }, 1000);
     }
   } catch (err) {
@@ -214,7 +226,17 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
 
   const sessionId = randomUUID();
   wireChannel(sessionId, channel, client);
-  sessions.set(sessionId, { id: sessionId, hostId, client, channel, jumpClient, cols, rows, reconnecting: false });
+  sessions.set(sessionId, {
+    id: sessionId,
+    hostId,
+    client,
+    channel,
+    jumpClient,
+    cols,
+    rows,
+    reconnecting: false,
+    echoFilter: new BootstrapEchoSuppressor(),
+  });
 
   if (getCommandBlocksEnabled()) {
     // Sent as one real line of input, same as the user typing it — there's
@@ -226,7 +248,10 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
     // remote (even ones sharing a pooled connection), so every session
     // needs this, not just the first to a host.
     setTimeout(() => {
-      if (sessions.has(sessionId)) channel.write(buildRemoteBootstrapCommand() + "\r");
+      const session = sessions.get(sessionId);
+      if (!session) return;
+      session.echoFilter.start((pending) => broadcast(IPC.ssh.onData, { sessionId, chunk: pending }));
+      channel.write(buildRemoteBootstrapCommand() + "\r");
     }, 1000);
   }
 
