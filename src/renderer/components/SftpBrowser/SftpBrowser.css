@@ -132,14 +132,6 @@
   border: 1px solid var(--border);
 }
 
-.sftp-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-dim);
-}
-
 .sftp-toolbar {
   display: flex;
   gap: 8px;

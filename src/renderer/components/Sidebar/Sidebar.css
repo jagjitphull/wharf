@@ -66,6 +66,12 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.nav-item:hover:not(.active) {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .nav-item.active {
@@ -145,7 +151,8 @@
   align-items: center;
   justify-content: space-between;
   border-radius: 6px;
-  padding: 2px 4px;
+  padding: 1px 4px;
+  transition: background-color 0.1s ease;
 }
 
 .host-row.active,
@@ -162,7 +169,7 @@
   border: none;
   color: var(--text);
   text-align: left;
-  padding: 6px 4px;
+  padding: 7px 6px;
   cursor: pointer;
   font-size: 13px;
   min-width: 0;

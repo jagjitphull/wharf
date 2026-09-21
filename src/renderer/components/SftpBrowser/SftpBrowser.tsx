@@ -3,6 +3,8 @@ import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { RemotePane } from "./RemotePane";
 import { LocalPane } from "./LocalPane";
+import { IconFolder } from "../Icons/Icons";
+import { EmptyState } from "../EmptyState/EmptyState";
 import "./SftpBrowser.css";
 
 export function SftpBrowser() {
@@ -62,9 +64,11 @@ export function SftpBrowser() {
 
   if (!host) {
     return (
-      <div className="sftp-empty">
-        <p>Select a host in the sidebar and click its Files icon to browse its files.</p>
-      </div>
+      <EmptyState
+        icon={<IconFolder size={40} />}
+        title="No host selected"
+        hint="Select a host in the sidebar and click its Files icon to browse its files."
+      />
     );
   }
 

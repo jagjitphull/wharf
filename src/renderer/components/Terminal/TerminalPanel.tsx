@@ -6,7 +6,8 @@ import { wharf } from "../../api/wharf";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
-import { IconClose, IconDuplicate } from "../Icons/Icons";
+import { IconClose, IconDuplicate, IconTerminal } from "../Icons/Icons";
+import { EmptyState } from "../EmptyState/EmptyState";
 import "./TerminalPanel.css";
 
 interface Props {
@@ -106,12 +107,16 @@ export function TerminalPanel({ hidden }: Props) {
 
   if (tabs.length === 0) {
     return (
-      <div className="terminal-empty" style={hidden ? { display: "none" } : undefined}>
-        <p>No open sessions.</p>
-        <p className="hint">Double-click a host in the sidebar (or hit ▶) to connect.</p>
-        <button className="btn ghost small" onClick={() => openLocalShell()}>
-          Open Local Shell
-        </button>
+      <div style={hidden ? { display: "none", height: "100%" } : { height: "100%" }}>
+        <EmptyState
+          icon={<IconTerminal size={40} />}
+          title="No open sessions"
+          hint="Double-click a host in the sidebar (or hit ▶) to connect."
+        >
+          <button className="btn ghost small" onClick={() => openLocalShell()}>
+            Open Local Shell
+          </button>
+        </EmptyState>
       </div>
     );
   }

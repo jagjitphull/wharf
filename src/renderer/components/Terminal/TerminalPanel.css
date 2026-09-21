@@ -164,16 +164,3 @@
   margin: 2px;
 }
 
-.terminal-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-dim);
-  gap: 4px;
-}
-
-.terminal-empty .hint {
-  font-size: 12px;
-}
