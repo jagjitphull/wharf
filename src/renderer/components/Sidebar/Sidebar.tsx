@@ -18,15 +18,48 @@ function hostMatchesFilter(host: HostRecord, filter: string): boolean {
   return haystack.includes(filter);
 }
 
+/** Sentinel for the "Ungrouped" drop zone (the sidebar footer while
+ * dragging a host) — distinct from `null`, which means "not hovering any
+ * drop target right now" for dropTargetGroupId. */
+const UNGROUPED = "__ungrouped__";
+
 export function Sidebar({ onOpenQuickConnect }: Props) {
-  const { hosts, groups, activeView, setActiveView, contextHostId, setContextHostId, openTerminal, openLocalShell, loadAll } =
-    useAppStore();
+  const {
+    hosts,
+    groups,
+    activeView,
+    setActiveView,
+    contextHostId,
+    setContextHostId,
+    openTerminal,
+    openLocalShell,
+    loadAll,
+    moveHostToGroup,
+  } = useAppStore();
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
   const [groupDialog, setGroupDialog] = useState<{ group: GroupRecord | null } | null>(null);
   const [sshConfigImportOpen, setSshConfigImportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [draggingHostId, setDraggingHostId] = useState<string | null>(null);
+  const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
+
+  function endHostDrag() {
+    setDraggingHostId(null);
+    setDropTargetGroupId(null);
+  }
+
+  async function dropHostOnGroup(groupId: string | null) {
+    const hostId = draggingHostId;
+    endHostDrag();
+    if (!hostId) return;
+    try {
+      await moveHostToGroup(hostId, groupId);
+    } catch (err) {
+      setError(ipcErrorMessage(err));
+    }
+  }
 
   const normalizedFilter = filter.trim().toLowerCase();
   const visibleHosts = useMemo(
@@ -74,7 +107,10 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     return (
       <div
         key={host.id}
-        className={`host-row ${contextHostId === host.id ? "active" : ""}`}
+        draggable
+        onDragStart={() => setDraggingHostId(host.id)}
+        onDragEnd={endHostDrag}
+        className={`host-row ${contextHostId === host.id ? "active" : ""} ${draggingHostId === host.id ? "dragging" : ""}`}
         onContextMenu={(e) =>
           openMenu(e, [
             { label: "Connect", onClick: () => connect(host) },
@@ -127,7 +163,18 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
       <div className="group-node" style={{ marginLeft: depth * 12 }} key={group?.id ?? "root"}>
         {group && (
           <div
-            className="group-row"
+            className={`group-row ${dropTargetGroupId === group.id ? "drop-target" : ""}`}
+            onDragOver={(e) => {
+              if (!draggingHostId) return;
+              e.preventDefault();
+              setDropTargetGroupId(group.id);
+            }}
+            onDragLeave={() => setDropTargetGroupId((cur) => (cur === group.id ? null : cur))}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void dropHostOnGroup(group.id);
+            }}
             onContextMenu={(e) =>
               openMenu(e, [
                 { label: "Add host here", onClick: () => setHostDialog({ host: null, groupId: group.id }) },
@@ -209,10 +256,26 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
         {normalizedFilter && visibleHosts.length === 0 && <p className="sidebar-empty">No hosts match "{filter}".</p>}
       </div>
 
-      <div className="sidebar-footer">
-        <span className="host-count">
-          {hosts.length} host{hosts.length === 1 ? "" : "s"}
-        </span>
+      <div
+        className={`sidebar-footer ${draggingHostId ? "drop-zone" : ""} ${dropTargetGroupId === UNGROUPED ? "drop-target" : ""}`}
+        onDragOver={(e) => {
+          if (!draggingHostId) return;
+          e.preventDefault();
+          setDropTargetGroupId(UNGROUPED);
+        }}
+        onDragLeave={() => setDropTargetGroupId((cur) => (cur === UNGROUPED ? null : cur))}
+        onDrop={(e) => {
+          e.preventDefault();
+          void dropHostOnGroup(null);
+        }}
+      >
+        {draggingHostId ? (
+          <span className="host-count">Drop here to ungroup</span>
+        ) : (
+          <span className="host-count">
+            {hosts.length} host{hosts.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
 
       {hostDialog && (

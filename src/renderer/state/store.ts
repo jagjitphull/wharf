@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GroupRecord, HostRecord, SnippetRecord, TunnelRecord } from "@shared/types";
+import type { GroupRecord, HostInput, HostRecord, SnippetRecord, TunnelRecord } from "@shared/types";
 import { wharf } from "../api/wharf";
 
 /**
@@ -95,6 +95,11 @@ interface AppState {
   refreshGroups(): Promise<void>;
   refreshTunnels(): Promise<void>;
   refreshSnippets(): Promise<void>;
+  /** Reassigns a saved host to a different group (or null to ungroup it) —
+   * used by the sidebar's drag-and-drop. Sends the host's existing fields
+   * back unchanged aside from groupId; wharf.hosts.update keeps its saved
+   * credential untouched when HostInput.secret is left out. */
+  moveHostToGroup(hostId: string, groupId: string | null): Promise<void>;
 
   openTerminal(host: HostRecord, themeId?: string): Promise<void>;
   openLocalShell(themeId?: string): Promise<void>;
@@ -166,6 +171,26 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async refreshSnippets() {
     set({ snippets: await wharf.snippets.list() });
+  },
+
+  async moveHostToGroup(hostId, groupId) {
+    const host = get().hosts.find((h) => h.id === hostId);
+    if (!host || host.groupId === groupId) return;
+    const input: HostInput = {
+      name: host.name,
+      hostname: host.hostname,
+      port: host.port,
+      username: host.username,
+      groupId,
+      authMethod: host.authMethod,
+      privateKeyPath: host.privateKeyPath,
+      color: host.color,
+      tags: host.tags,
+      jumpHostId: host.jumpHostId,
+      mosh: host.mosh,
+    };
+    await wharf.hosts.update(hostId, input);
+    await get().refreshHosts();
   },
 
   async openTerminal(host, themeId) {

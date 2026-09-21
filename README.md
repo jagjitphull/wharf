@@ -9,7 +9,9 @@ A personal SSH/SFTP terminal client, Termius-style.
 
 ## Features
 
-- Save hosts, organize them into (nested) groups
+- Save hosts, organize them into (nested) groups — drag a host onto a group
+  to move it there, or onto the host count at the bottom of the sidebar to
+  ungroup it
 - Connect via password, private key, or SSH agent auth
 - Multiple concurrent terminal sessions (tabbed) — duplicate a tab, drag to
   reorder, switch with `Ctrl/Cmd+1..9` or `Ctrl/Cmd+Tab`, and open multiple

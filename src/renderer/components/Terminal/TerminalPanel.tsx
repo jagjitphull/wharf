@@ -259,7 +259,7 @@ function TabButton(p: TabButtonProps) {
           style={{ background: getTerminalThemePreset(p.themeId).theme?.background ?? "var(--term-bg)" }}
         />
       )}
-      <span>{p.title}</span>
+      <span className="tab-title">{p.title}</span>
       {p.closed && <span className="tab-dot" />}
       <button
         className="tab-duplicate"
