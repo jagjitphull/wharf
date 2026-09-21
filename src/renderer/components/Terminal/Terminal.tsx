@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Terminal as XTerm, type IDecoration, type IMarker, type ITheme } from "@xterm/xterm";
+import { Terminal as XTerm, type IDecoration, type IMarker } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
-import { getTerminalThemePreset } from "../../state/terminalThemes";
+import { getTerminalThemePreset, resolveXtermTheme } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { useAiPrefsStore } from "../../state/aiPrefsStore";
@@ -74,49 +74,6 @@ interface GhostSuggestionState {
   decoration: IDecoration;
   fullCommand: string;
   typedLength: number;
-}
-
-const TERM_CSS_VARS = [
-  ["background", "--term-bg"],
-  ["foreground", "--term-fg"],
-  ["cursor", "--term-cursor"],
-  ["selectionBackground", "--term-selection"],
-  ["black", "--term-black"],
-  ["red", "--term-red"],
-  ["green", "--term-green"],
-  ["yellow", "--term-yellow"],
-  ["blue", "--term-blue"],
-  ["magenta", "--term-magenta"],
-  ["cyan", "--term-cyan"],
-  ["white", "--term-white"],
-  ["brightBlack", "--term-bright-black"],
-  ["brightRed", "--term-bright-red"],
-  ["brightGreen", "--term-bright-green"],
-  ["brightYellow", "--term-bright-yellow"],
-  ["brightBlue", "--term-bright-blue"],
-  ["brightMagenta", "--term-bright-magenta"],
-  ["brightCyan", "--term-bright-cyan"],
-  ["brightWhite", "--term-bright-white"],
-] as const;
-
-/** Builds an xterm.js theme from the current CSS custom properties, so the
- * terminal's colors are a single source of truth (global.css) rather than
- * duplicated as hex literals in JS. Used for the "Match App Theme" preset. */
-function readAppCssTheme(): ITheme {
-  const styles = getComputedStyle(document.documentElement);
-  const theme: Record<string, string> = {};
-  for (const [key, cssVar] of TERM_CSS_VARS) {
-    const value = styles.getPropertyValue(cssVar).trim();
-    if (value) theme[key] = value;
-  }
-  return theme;
-}
-
-/** Resolves the active xterm theme: a fixed preset palette, or (for the
- * "app" preset) the app's own light/dark + accent CSS custom properties. */
-function resolveXtermTheme(themeId: string): ITheme {
-  const preset = getTerminalThemePreset(themeId);
-  return preset.theme ?? readAppCssTheme();
 }
 
 export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tabId }: Props) {

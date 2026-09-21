@@ -269,10 +269,188 @@ export const TERMINAL_THEME_PRESETS: TerminalThemePreset[] = [
       brightWhite: "#f9f8f5",
     },
   },
+  {
+    id: "gruvbox-light",
+    name: "Gruvbox Light",
+    blurb: "Retro warm paper tone — daytime pair to Gruvbox Dark",
+    theme: {
+      background: "#fbf1c7",
+      foreground: "#3c3836",
+      cursor: "#3c3836",
+      selectionBackground: "rgba(60, 56, 54, 0.2)",
+      black: "#fbf1c7",
+      red: "#cc241d",
+      green: "#98971a",
+      yellow: "#d79921",
+      blue: "#458588",
+      magenta: "#b16286",
+      cyan: "#689d6a",
+      white: "#7c6f64",
+      brightBlack: "#928374",
+      brightRed: "#9d0006",
+      brightGreen: "#79740e",
+      brightYellow: "#b57614",
+      brightBlue: "#076678",
+      brightMagenta: "#8f3f71",
+      brightCyan: "#427b58",
+      brightWhite: "#3c3836",
+    },
+  },
+  {
+    id: "one-light",
+    name: "One Light",
+    blurb: "Clean, high-contrast daytime pair to One Dark",
+    theme: {
+      background: "#fafafa",
+      foreground: "#383a42",
+      cursor: "#383a42",
+      selectionBackground: "rgba(56, 58, 66, 0.15)",
+      black: "#383a42",
+      red: "#e45649",
+      green: "#50a14f",
+      yellow: "#c18401",
+      blue: "#4078f2",
+      magenta: "#a626a4",
+      cyan: "#0184bc",
+      white: "#fafafa",
+      brightBlack: "#a0a1a7",
+      brightRed: "#e45649",
+      brightGreen: "#50a14f",
+      brightYellow: "#c18401",
+      brightBlue: "#4078f2",
+      brightMagenta: "#a626a4",
+      brightCyan: "#0184bc",
+      brightWhite: "#ffffff",
+    },
+  },
+  {
+    id: "catppuccin-mocha",
+    name: "Catppuccin Mocha",
+    blurb: "Soft pastel dark — a popular, gentle-on-the-eyes palette",
+    theme: {
+      background: "#1e1e2e",
+      foreground: "#cdd6f4",
+      cursor: "#f5e0dc",
+      selectionBackground: "rgba(205, 214, 244, 0.2)",
+      black: "#45475a",
+      red: "#f38ba8",
+      green: "#a6e3a1",
+      yellow: "#f9e2af",
+      blue: "#89b4fa",
+      magenta: "#f5c2e7",
+      cyan: "#94e2d5",
+      white: "#bac2de",
+      brightBlack: "#585b70",
+      brightRed: "#f38ba8",
+      brightGreen: "#a6e3a1",
+      brightYellow: "#f9e2af",
+      brightBlue: "#89b4fa",
+      brightMagenta: "#f5c2e7",
+      brightCyan: "#94e2d5",
+      brightWhite: "#a6adc8",
+    },
+  },
+  {
+    id: "catppuccin-latte",
+    name: "Catppuccin Latte",
+    blurb: "Pastel light — the daytime Catppuccin flavor",
+    theme: {
+      background: "#eff1f5",
+      foreground: "#4c4f69",
+      cursor: "#dc8a78",
+      selectionBackground: "rgba(76, 79, 105, 0.15)",
+      black: "#5c5f77",
+      red: "#d20f39",
+      green: "#40a02b",
+      yellow: "#df8e1d",
+      blue: "#1e66f5",
+      magenta: "#ea76cb",
+      cyan: "#179299",
+      white: "#acb0be",
+      brightBlack: "#6c6f85",
+      brightRed: "#d20f39",
+      brightGreen: "#40a02b",
+      brightYellow: "#df8e1d",
+      brightBlue: "#1e66f5",
+      brightMagenta: "#ea76cb",
+      brightCyan: "#179299",
+      brightWhite: "#bcc0cc",
+    },
+  },
+  {
+    id: "rose-pine",
+    name: "Rosé Pine",
+    blurb: "Muted rose & pine — quiet, low-saturation dark theme",
+    theme: {
+      background: "#191724",
+      foreground: "#e0def4",
+      cursor: "#e0def4",
+      selectionBackground: "rgba(224, 222, 244, 0.2)",
+      black: "#26233a",
+      red: "#eb6f92",
+      green: "#31748f",
+      yellow: "#f6c177",
+      blue: "#9ccfd8",
+      magenta: "#c4a7e7",
+      cyan: "#ebbcba",
+      white: "#e0def4",
+      brightBlack: "#6e6a86",
+      brightRed: "#eb6f92",
+      brightGreen: "#31748f",
+      brightYellow: "#f6c177",
+      brightBlue: "#9ccfd8",
+      brightMagenta: "#c4a7e7",
+      brightCyan: "#ebbcba",
+      brightWhite: "#e0def4",
+    },
+  },
 ];
 
 export const DEFAULT_TERMINAL_THEME_ID = "app";
 
 export function getTerminalThemePreset(id: string): TerminalThemePreset {
   return TERMINAL_THEME_PRESETS.find((p) => p.id === id) ?? TERMINAL_THEME_PRESETS[0];
+}
+
+const TERM_CSS_VARS = [
+  ["background", "--term-bg"],
+  ["foreground", "--term-fg"],
+  ["cursor", "--term-cursor"],
+  ["selectionBackground", "--term-selection"],
+  ["black", "--term-black"],
+  ["red", "--term-red"],
+  ["green", "--term-green"],
+  ["yellow", "--term-yellow"],
+  ["blue", "--term-blue"],
+  ["magenta", "--term-magenta"],
+  ["cyan", "--term-cyan"],
+  ["white", "--term-white"],
+  ["brightBlack", "--term-bright-black"],
+  ["brightRed", "--term-bright-red"],
+  ["brightGreen", "--term-bright-green"],
+  ["brightYellow", "--term-bright-yellow"],
+  ["brightBlue", "--term-bright-blue"],
+  ["brightMagenta", "--term-bright-magenta"],
+  ["brightCyan", "--term-bright-cyan"],
+  ["brightWhite", "--term-bright-white"],
+] as const;
+
+/** Builds an xterm.js theme from the current CSS custom properties, so the
+ * terminal's colors are a single source of truth (global.css) rather than
+ * duplicated as hex literals in JS. Used for the "Match App Theme" preset. */
+export function readAppCssTheme(): ITheme {
+  const styles = getComputedStyle(document.documentElement);
+  const theme: Record<string, string> = {};
+  for (const [key, cssVar] of TERM_CSS_VARS) {
+    const value = styles.getPropertyValue(cssVar).trim();
+    if (value) theme[key] = value;
+  }
+  return theme;
+}
+
+/** Resolves the active xterm theme: a fixed preset palette, or (for the
+ * "app" preset) the app's own light/dark + accent CSS custom properties. */
+export function resolveXtermTheme(themeId: string): ITheme {
+  const preset = getTerminalThemePreset(themeId);
+  return preset.theme ?? readAppCssTheme();
 }

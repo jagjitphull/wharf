@@ -64,10 +64,13 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Custom title bar with working minimize/maximize/close on every platform;
   remembers window size and position between launches
 - Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)
-- Light/dark/system theme with an accent-color picker
-- Terminal font size/family controls, a sidebar collapse toggle, and 9
-  built-in terminal color themes (Solarized, Nord, Gruvbox, Dracula, and
-  more) — settable globally or per-tab, independent of the app's own theme
+- Light/dark/system theme with an accent-color picker, plus an interface
+  size control (Settings → Appearance) that scales the app's own chrome —
+  sidebar, tabs, every panel — independently of terminal font size
+- Terminal font size/family controls, a sidebar collapse toggle, and 14
+  built-in terminal color themes (Solarized, Nord, Gruvbox, Dracula,
+  Catppuccin, Rosé Pine, and more) — settable globally or per-tab,
+  independent of the app's own theme; Settings shows a live preview
 - Import hosts straight from `~/.ssh/config` (`Include` and `Host *`
   defaults supported), reviewable before importing
 - Per-session logging — record a terminal's raw output to a file, toggled

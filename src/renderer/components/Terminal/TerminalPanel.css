@@ -134,6 +134,10 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  /* Cancels .app-root's interface-size zoom back out (see the comment
+     there) — a session's real terminal content is sized only by Settings
+     → Terminal's own font size, never by the interface-size preference. */
+  zoom: calc(1 / var(--ui-zoom));
 }
 
 /* Each tab gets its own absolutely-positioned layer filling .terminal-stack

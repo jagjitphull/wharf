@@ -5,6 +5,9 @@
    --accent derives from it so every surface stays in sync. */
 :root {
   --accent-color: #5b8def;
+  /* Set synchronously by uiPrefsStore.ts before first paint (same pattern
+     as --accent-color) — this is only the pre-JS/no-JS fallback. */
+  --ui-zoom: 1;
 }
 
 [data-theme="dark"] {
@@ -148,8 +151,23 @@ h3 {
 .app-root {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* zoom scales this box's rendered footprint outward from its own
+     declared size, not just its content — a plain 100vh here would render
+     at ui-zoom × the real window height and get clipped at the bottom by
+     the overflow:hidden below. Pre-shrinking by the inverse first makes
+     the zoomed result land on exactly 100vh again. */
+  height: calc(100vh / var(--ui-zoom));
   overflow: hidden;
+  /* Interface size (Settings → Appearance) scales the whole app's own
+     chrome — title bar, sidebar, tab bar, Settings/SFTP/Tunnels — via this
+     single zoom. A session's actual terminal content must never move with
+     it (a "resize the interface" preference, not the terminal one right
+     next to it), so .terminal-stack below carries the exact inverse zoom
+     to cancel this back out for that one subtree. Dialogs and context
+     menus (position: fixed) are naturally unaffected either way — zoom,
+     unlike transform, doesn't establish a new containing block for them,
+     so Chromium renders and positions them against the real viewport. */
+  zoom: var(--ui-zoom);
 }
 
 .app-shell {
