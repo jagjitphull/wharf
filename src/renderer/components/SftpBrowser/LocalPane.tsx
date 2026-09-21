@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { SftpEntry, SftpTransferProgress } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import { IconFile, IconFolder, IconPencil, IconTrash, IconUpload } from "../Icons/Icons";
+import { IconChevronUp, IconFile, IconFolder, IconPencil, IconPlus, IconRefresh, IconTrash, IconUpload } from "../Icons/Icons";
 import { formatSize } from "./formatSize";
 import { readTransferData, setTransferData, TRANSFER_MIME } from "./dragTransfer";
 import { isLocalRoot, localBaseName, localJoin, localParent } from "../../utils/localPath";
@@ -130,7 +130,7 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
       <div className="sftp-pane-header">Local</div>
       <div className="sftp-toolbar">
         <button className="btn ghost small" onClick={goUp} disabled={isLocalRoot(path)}>
-          ↑ Up
+          <IconChevronUp size={12} /> Up
         </button>
         <input
           className="sftp-path"
@@ -138,11 +138,11 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
           onChange={(e) => onPathChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && refresh()}
         />
-        <button className="btn ghost small" onClick={refresh} title="Refresh">
-          ⟳
+        <button className="btn ghost small icon-btn" onClick={refresh} title="Refresh">
+          <IconRefresh />
         </button>
         <button className="btn ghost small" onClick={handleNewFolder}>
-          + Folder
+          <IconPlus size={12} /> Folder
         </button>
       </div>
 

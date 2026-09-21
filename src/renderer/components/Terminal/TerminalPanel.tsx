@@ -6,6 +6,7 @@ import { wharf } from "../../api/wharf";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
+import { IconClose, IconDuplicate } from "../Icons/Icons";
 import "./TerminalPanel.css";
 
 interface Props {
@@ -263,7 +264,7 @@ function TabButton(p: TabButtonProps) {
           p.onDuplicate();
         }}
       >
-        ⧉
+        <IconDuplicate size={12} />
       </button>
       <button
         className="tab-close"
@@ -273,7 +274,7 @@ function TabButton(p: TabButtonProps) {
           p.onClose();
         }}
       >
-        ×
+        <IconClose size={12} />
       </button>
     </div>
   );

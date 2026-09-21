@@ -2,7 +2,20 @@ import { useEffect, useState } from "react";
 import type { HostRecord, SftpEntry, SftpTransferProgress } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import { IconDownload, IconFile, IconFolder, IconPencil, IconSearch, IconTrash } from "../Icons/Icons";
+import {
+  IconArrowRight,
+  IconChevronDown,
+  IconChevronUp,
+  IconDownload,
+  IconFile,
+  IconFolder,
+  IconPencil,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+  IconTrash,
+  IconUpload,
+} from "../Icons/Icons";
 import { FileEditorDialog } from "../FileEditor/FileEditorDialog";
 import { formatSize } from "./formatSize";
 import { readTransferData, setTransferData, TRANSFER_MIME } from "./dragTransfer";
@@ -213,7 +226,7 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
       <div className="sftp-pane-header">Remote — {host.name}</div>
       <div className="sftp-toolbar">
         <button className="btn ghost small" onClick={goUp} disabled={path === "." || path === "/" || inSearchMode}>
-          ↑ Up
+          <IconChevronUp size={12} /> Up
         </button>
         <input
           className="sftp-path"
@@ -221,8 +234,8 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
           onChange={(e) => onPathChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && refresh()}
         />
-        <button className="btn ghost small" onClick={refresh} title="Refresh">
-          ⟳
+        <button className="btn ghost small icon-btn" onClick={refresh} title="Refresh">
+          <IconRefresh />
         </button>
         <button
           className={`btn ghost small icon-btn ${searchOpen ? "active" : ""}`}
@@ -232,10 +245,10 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
           <IconSearch />
         </button>
         <button className="btn ghost small" onClick={handleNewFolder}>
-          + Folder
+          <IconPlus size={12} /> Folder
         </button>
         <button className="btn primary small" onClick={handleUpload}>
-          ↑ Upload
+          <IconUpload size={12} /> Upload
         </button>
       </div>
 
@@ -268,8 +281,8 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
         <div className="sftp-transfers">
           {Object.values(transfers).map((t) => (
             <div key={t.transferId} className="transfer-row">
-              <span>
-                {t.direction === "upload" ? "↑" : "↓"} {t.fileName}
+              <span className="transfer-row-name">
+                {t.direction === "upload" ? <IconChevronUp size={11} /> : <IconChevronDown size={11} />} {t.fileName}
               </span>
               {t.error ? (
                 <span className="transfer-error">{t.error}</span>
@@ -325,7 +338,7 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
                       <IconDownload />
                     </button>
                     <button onClick={() => onTransferToOther(entry.path)} title={`Send to ${otherPaneLabel}`}>
-                      →
+                      <IconArrowRight />
                     </button>
                   </>
                 )}

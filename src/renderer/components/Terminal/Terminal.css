@@ -95,13 +95,15 @@
 }
 
 .ai-suggest-header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  padding: 2px 4px;
+  border-radius: 4px;
+  padding: 3px;
 }
 
 .ai-suggest-header button:hover {

@@ -20,6 +20,7 @@
   padding: 7px 10px;
   border-radius: 5px;
   cursor: pointer;
+  transition: background-color 0.1s ease;
 }
 
 .context-menu-item:hover:not(:disabled) {

@@ -185,10 +185,10 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
 
       <div className="sidebar-toolbar">
         <button className="btn ghost small" onClick={() => setHostDialog({ host: null, groupId: null })}>
-          + Host
+          <IconPlus size={12} /> Host
         </button>
         <button className="btn ghost small" onClick={() => setGroupDialog({ group: null })}>
-          + Group
+          <IconPlus size={12} /> Group
         </button>
         <button
           className="btn ghost small"

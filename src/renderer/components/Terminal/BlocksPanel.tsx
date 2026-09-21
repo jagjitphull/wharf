@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { CommandBlock } from "./commandBlocks";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { IconClose, IconMore, IconStar } from "../Icons/Icons";
 import "./BlocksPanel.css";
 
 function relativeTime(ts: number): string {
@@ -65,7 +66,7 @@ export function BlocksPanel({ blocks, onClose, onJumpTo, onCopyCommand, onCopyOu
       <div className="blocks-panel-header">
         <span>Command Blocks</span>
         <button title="Close" onClick={onClose}>
-          ×
+          <IconClose />
         </button>
       </div>
       <div className="blocks-panel-list" ref={listRef}>
@@ -81,10 +82,14 @@ export function BlocksPanel({ blocks, onClose, onJumpTo, onCopyCommand, onCopyOu
             <span className="blocks-panel-command" title={block.command}>
               {block.command}
             </span>
-            {block.bookmarked && <span className="blocks-panel-bookmark" title="Bookmarked">★</span>}
+            {block.bookmarked && (
+              <span className="blocks-panel-bookmark" title="Bookmarked">
+                <IconStar size={11} />
+              </span>
+            )}
             <span className="blocks-panel-time">{relativeTime(block.timestamp)}</span>
             <button className="blocks-panel-more" title="Actions" onClick={(e) => openRowMenu(e, block)}>
-              ⋯
+              <IconMore />
             </button>
           </div>
         ))}

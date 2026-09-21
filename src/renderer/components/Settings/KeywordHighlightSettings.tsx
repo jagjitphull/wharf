@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
+import { IconClose } from "../Icons/Icons";
 import "./KeywordHighlightSettings.css";
 
 const NEW_RULE_COLOR_PRESETS = [
@@ -100,7 +101,7 @@ export function KeywordHighlightSettings() {
               disabled={!enabled}
               onClick={() => removeRule(rule.id)}
             >
-              ×
+              <IconClose size={11} />
             </button>
           </div>
         ))}

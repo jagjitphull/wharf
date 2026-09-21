@@ -12,6 +12,7 @@ import { useAiPrefsStore } from "../../state/aiPrefsStore";
 import { useGhostSuggestionPrefsStore } from "../../state/ghostSuggestionPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
+import { IconChevronDown, IconChevronUp, IconClose } from "../Icons/Icons";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
 import {
   compileRules,
@@ -821,13 +822,13 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
             placeholder="Find in terminal…"
           />
           <button title="Previous match (Shift+Enter)" onClick={() => findPrevious(searchQuery)}>
-            ↑
+            <IconChevronUp />
           </button>
           <button title="Next match (Enter)" onClick={() => findNext(searchQuery)}>
-            ↓
+            <IconChevronDown />
           </button>
           <button title="Close (Esc)" onClick={() => setSearchOpen(false)}>
-            ×
+            <IconClose />
           </button>
         </div>
       )}
@@ -849,7 +850,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
           <div className="ai-suggest-header">
             <span>AI suggestions</span>
             <button title="Close (Esc)" onClick={() => setAiPopup(null)}>
-              ×
+              <IconClose />
             </button>
           </div>
           {aiPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}
@@ -874,7 +875,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
           <div className="ai-suggest-header">
             <span>Generate command</span>
             <button title="Close (Esc)" onClick={() => setNlPopup(null)}>
-              ×
+              <IconClose />
             </button>
           </div>
           {nlPopup.status === "input" && (
@@ -909,7 +910,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
           <div className="ai-suggest-header">
             <span>Explain failure</span>
             <button title="Close (Esc)" onClick={() => setExplainPopup(null)}>
-              ×
+              <IconClose />
             </button>
           </div>
           {explainPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}

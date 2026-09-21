@@ -86,17 +86,16 @@
 
 .tab-close,
 .tab-duplicate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
   opacity: 0.6;
-}
-
-.tab-close {
-  font-size: 14px;
+  border-radius: 4px;
+  padding: 2px;
 }
 
 .tab-close:hover,

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
+import { IconAnchor, IconDuplicate } from "../Icons/Icons";
 import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
@@ -42,7 +43,9 @@ export function TitleBar({ onOpenShortcuts }: Props) {
             {sidebarCollapsed && <rect x="8.5" y="5.5" width="4" height="5" fill="currentColor" opacity="0.5" />}
           </svg>
         </button>
-        <span className="title-bar-brand">⚓ Wharf</span>
+        <span className="title-bar-brand">
+          <IconAnchor size={13} /> Wharf
+        </span>
         <button
           className="title-bar-icon-btn"
           title="New Window"
@@ -51,7 +54,7 @@ export function TitleBar({ onOpenShortcuts }: Props) {
             wharf.window.newWindow();
           }}
         >
-          ⧉
+          <IconDuplicate size={12} />
         </button>
         <button
           className="title-bar-icon-btn"

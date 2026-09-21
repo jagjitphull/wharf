@@ -26,6 +26,9 @@
 }
 
 .blocks-panel-header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -103,8 +106,9 @@
 }
 
 .blocks-panel-bookmark {
+  display: flex;
+  align-items: center;
   flex: none;
-  font-size: 10px;
   color: var(--accent);
 }
 
@@ -115,13 +119,16 @@
 }
 
 .blocks-panel-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   background: transparent;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 13px;
-  padding: 2px 4px;
+  padding: 3px 5px;
+  border-radius: 4px;
   opacity: 0;
 }
 
@@ -131,6 +138,7 @@
 
 .blocks-panel-more:hover {
   color: var(--text);
+  background: var(--bg-hover);
 }
 
 .blocks-panel-explaining {

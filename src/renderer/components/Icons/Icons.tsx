@@ -113,3 +113,71 @@ export function IconTerminal({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+export function IconClose({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+    </svg>
+  );
+}
+
+export function IconRefresh({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M3 8a5 5 0 0 1 8.5-3.5L13 6M13 6V3M13 6h-3M13 8a5 5 0 0 1-8.5 3.5L3 10M3 10v3M3 10h3" />
+    </svg>
+  );
+}
+
+export function IconMore({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common} fill="currentColor" stroke="none">
+      <circle cx="3.2" cy="8" r="1.3" />
+      <circle cx="8" cy="8" r="1.3" />
+      <circle cx="12.8" cy="8" r="1.3" />
+    </svg>
+  );
+}
+
+export function IconStar({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common} fill="currentColor" stroke="none">
+      <path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z" />
+    </svg>
+  );
+}
+
+export function IconChevronUp({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M3.5 10l4.5-4.5 4.5 4.5" />
+    </svg>
+  );
+}
+
+export function IconChevronDown({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M3.5 6l4.5 4.5L12.5 6" />
+    </svg>
+  );
+}
+
+export function IconAnchor({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <circle cx="8" cy="2.8" r="1.5" />
+      <path d="M8 4.3v9.2M5 6.5h6M2.8 9a5.2 5.2 0 0 0 5.2 5.2A5.2 5.2 0 0 0 13.2 9" />
+    </svg>
+  );
+}
+
+export function IconDuplicate({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.2" />
+      <path d="M10.5 5.5V3.7a1.2 1.2 0 0 0-1.2-1.2H3.2A1.2 1.2 0 0 0 2 3.7v6.1a1.2 1.2 0 0 0 1.2 1.2h1.8" />
+    </svg>
+  );
+}

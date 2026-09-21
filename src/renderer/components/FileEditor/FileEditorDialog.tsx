@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { IconClose } from "../Icons/Icons";
 import "../../styles/dialog.css";
 import "./FileEditorDialog.css";
 
@@ -77,7 +78,7 @@ export function FileEditorDialog({ hostId, remotePath, onClose, onSaved }: Props
             <span className="file-editor-path">{remotePath}</span>
           </div>
           <button className="file-editor-close" onClick={requestClose} title="Close">
-            ×
+            <IconClose />
           </button>
         </div>
 
