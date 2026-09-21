@@ -37,13 +37,19 @@ export function ContextMenu({ menu, onClose }: Props) {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    // Capture phase + next tick so the same right-click that opened the
-    // menu doesn't immediately trigger the outside-click close handler.
-    const id = setTimeout(() => document.addEventListener("mousedown", onDocMouseDown));
+    // Capture phase (the `true` third arg) + next tick so the same
+    // right-click that opened the menu doesn't immediately trigger the
+    // outside-click close handler. Capture matters, not just timing: xterm.js
+    // handles its own mousedown internally and stops it from bubbling, so a
+    // bubble-phase listener here would never fire for a click inside the
+    // terminal — only clicking elsewhere (the sidebar, etc.) would close the
+    // menu. Capture-phase listeners run before a target's own handler can
+    // stop propagation, so this closes the menu on any click anywhere.
+    const id = setTimeout(() => document.addEventListener("mousedown", onDocMouseDown, true));
     document.addEventListener("keydown", onKey);
     return () => {
       clearTimeout(id);
-      document.removeEventListener("mousedown", onDocMouseDown);
+      document.removeEventListener("mousedown", onDocMouseDown, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [menu, onClose]);
