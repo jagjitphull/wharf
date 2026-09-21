@@ -11,7 +11,20 @@ import { wharf } from "../api/wharf";
  */
 export type PaneNode =
   | { type: "leaf"; sessionId: string }
-  | { type: "split"; direction: "row" | "column"; children: PaneNode[] };
+  | {
+      type: "split";
+      /** Stable id so a resize can target this exact split node without
+       * needing to describe its position in the tree (which shifts as
+       * sibling panes split/close around it). */
+      id: string;
+      direction: "row" | "column";
+      children: PaneNode[];
+      /** Relative sizes (flex-grow factors, not required to sum to 1) for
+       * each child, parallel to `children`. Undefined means split evenly —
+       * the common case, so a plain split doesn't need to carry an explicit
+       * [0.5, 0.5] just to render. */
+      sizes?: number[];
+    };
 
 /** Per-pane state, keyed by sessionId. Each pane is its own independent
  * SSH/local-shell session, so this is where everything that used to live
@@ -61,7 +74,7 @@ export function flattenPanes(node: PaneNode): string[] {
 function splitNode(node: PaneNode, targetSessionId: string, newSessionId: string, direction: "row" | "column"): PaneNode {
   if (node.type === "leaf") {
     if (node.sessionId !== targetSessionId) return node;
-    return { type: "split", direction, children: [node, { type: "leaf", sessionId: newSessionId }] };
+    return { type: "split", id: crypto.randomUUID(), direction, children: [node, { type: "leaf", sessionId: newSessionId }] };
   }
   return { ...node, children: node.children.map((c) => splitNode(c, targetSessionId, newSessionId, direction)) };
 }
@@ -74,10 +87,31 @@ function removeNode(node: PaneNode, targetSessionId: string): PaneNode | null {
   if (node.type === "leaf") {
     return node.sessionId === targetSessionId ? null : node;
   }
-  const children = node.children.map((c) => removeNode(c, targetSessionId)).filter((c): c is PaneNode => c !== null);
+  const survivingIndices: number[] = [];
+  const children: PaneNode[] = [];
+  node.children.forEach((c, i) => {
+    const removed = removeNode(c, targetSessionId);
+    if (removed !== null) {
+      survivingIndices.push(i);
+      children.push(removed);
+    }
+  });
   if (children.length === 0) return null;
   if (children.length === 1) return children[0];
-  return { ...node, children };
+  // Keep any custom sizes aligned to whichever children survived, so
+  // closing one pane out of a three-way split doesn't silently reset the
+  // other two back to an even split.
+  const sizes = node.sizes ? survivingIndices.map((i) => node.sizes![i]) : undefined;
+  return { ...node, children, sizes };
+}
+
+/** Walks the tree looking for the split node with `splitId` and replaces
+ * its sizes — used by a resize-divider drag. No-op if the split is no
+ * longer in the tree (e.g. a pane it contained was closed concurrently). */
+function setSplitSizes(node: PaneNode, splitId: string, sizes: number[]): PaneNode {
+  if (node.type === "leaf") return node;
+  if (node.id === splitId) return { ...node, sizes };
+  return { ...node, children: node.children.map((c) => setSplitSizes(c, splitId, sizes)) };
 }
 
 interface AppState {
@@ -130,6 +164,9 @@ interface AppState {
   /** Splits `sessionId`'s pane, opening a fresh session to the same host
    * alongside it (row = side by side, column = stacked). */
   splitPane(tabId: string, sessionId: string, direction: "row" | "column"): Promise<void>;
+  /** Sets the relative sizes of a split's children (a resize-divider drag) —
+   * see PaneNode.sizes. */
+  resizeSplit(tabId: string, splitId: string, sizes: number[]): void;
   setActivePane(tabId: string, sessionId: string): void;
   setPaneThemeId(sessionId: string, themeId: string | undefined): void;
   setPaneLogPath(sessionId: string, logPath: string | undefined): void;
@@ -179,7 +216,7 @@ async function connectWorkspaceNode(
   for (const child of node.children) {
     children.push(await connectWorkspaceNode(child, hosts, localShellOrdinal, metasOut));
   }
-  return { type: "split", direction: node.direction, children };
+  return { type: "split", id: crypto.randomUUID(), direction: node.direction, children };
 }
 
 function paneNodeToWorkspaceNode(node: PaneNode, paneMeta: Record<string, PaneMeta>): WorkspaceNode {
@@ -381,6 +418,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           : t,
       ),
       paneMeta: { ...s.paneMeta, [newSessionId]: newMeta },
+    }));
+  },
+
+  resizeSplit(tabId, splitId, sizes) {
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.tabId === tabId ? { ...t, layout: setSplitSizes(t.layout, splitId, sizes) } : t)),
     }));
   },
 

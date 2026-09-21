@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAppStore, type PaneNode } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
@@ -24,9 +24,26 @@ interface Props {
  * Every leaf in the tree is rendered regardless of which tab is active;
  * `tabVisible` (not this component's own state) decides whether any of
  * them are actually shown, so backgrounded tabs keep their xterm instances
- * alive exactly like before splits existed. */
-function PaneTree({ node, tabVisible, activePaneId, tabId }: { node: PaneNode; tabVisible: boolean; activePaneId: string; tabId: string }) {
+ * alive exactly like before splits existed.
+ *
+ * `multiPane` (true once the tab's root is a split, same for every pane in
+ * it) gates the per-pane close button — a lone pane closes via the tab's own
+ * close button, so it doesn't need a second one sitting on top of it. */
+function PaneTree({
+  node,
+  tabVisible,
+  activePaneId,
+  tabId,
+  multiPane,
+}: {
+  node: PaneNode;
+  tabVisible: boolean;
+  activePaneId: string;
+  tabId: string;
+  multiPane: boolean;
+}) {
   const setActivePane = useAppStore((s) => s.setActivePane);
+  const closeTerminal = useAppStore((s) => s.closeTerminal);
 
   if (node.type === "leaf") {
     return (
@@ -38,12 +55,27 @@ function PaneTree({ node, tabVisible, activePaneId, tabId }: { node: PaneNode; t
         onMouseDown={() => setActivePane(tabId, node.sessionId)}
       >
         <PaneLeafView sessionId={node.sessionId} visible={tabVisible} tabId={tabId} />
+        {multiPane && (
+          <button
+            className="pane-close-btn"
+            title="Close pane"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeTerminal(node.sessionId);
+            }}
+          >
+            <IconClose size={11} />
+          </button>
+        )}
       </div>
     );
   }
 
+  const childCount = node.children.length;
+  const sizes = node.sizes ?? node.children.map(() => 1);
+
   return (
-    <div className={`pane-split pane-split-${node.direction}`}>
+    <PaneSplitRow node={node} sizes={sizes} tabId={tabId}>
       {node.children.map((child, i) => {
         // The active-pane highlight lives on this wrapper (not .pane-leaf
         // itself) because .pane-leaf's xterm canvas fills it edge-to-edge —
@@ -52,11 +84,99 @@ function PaneTree({ node, tabVisible, activePaneId, tabId }: { node: PaneNode; t
         // itself instead (see the CSS), which nothing paints over.
         const isActiveBranch = child.type === "leaf" && child.sessionId === activePaneId;
         return (
-          <div className={`pane-split-child ${isActiveBranch ? "active" : ""}`} key={i}>
-            <PaneTree node={child} tabVisible={tabVisible} activePaneId={activePaneId} tabId={tabId} />
+          <div
+            className={`pane-split-child ${isActiveBranch ? "active" : ""}`}
+            style={{ flex: `${sizes[i]} 1 0%` }}
+            key={i}
+          >
+            <PaneTree node={child} tabVisible={tabVisible} activePaneId={activePaneId} tabId={tabId} multiPane={multiPane} />
           </div>
         );
       })}
+    </PaneSplitRow>
+  );
+}
+
+/** The split container plus its draggable resize handles, one between each
+ * pair of adjacent children. Split out from PaneTree mainly so the drag
+ * math (which needs the container's live pixel size) has a single ref to
+ * work with instead of threading one through PaneTree's recursion. */
+function PaneSplitRow({
+  node,
+  sizes,
+  tabId,
+  children,
+}: {
+  node: Extract<PaneNode, { type: "split" }>;
+  sizes: number[];
+  tabId: string;
+  children: React.ReactNode[];
+}) {
+  const resizeSplit = useAppStore((s) => s.resizeSplit);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  function startResize(e: React.MouseEvent, index: number) {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const totalPx = node.direction === "row" ? rect.width : rect.height;
+    const startPos = node.direction === "row" ? e.clientX : e.clientY;
+    const startSizes = [...sizes];
+    const total = startSizes.reduce((a, b) => a + b, 0);
+
+    setDraggingIndex(index);
+    document.body.style.cursor = node.direction === "row" ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+
+    function onMove(ev: MouseEvent) {
+      const pos = node.direction === "row" ? ev.clientX : ev.clientY;
+      const deltaFrac = ((pos - startPos) / totalPx) * total;
+      const minSize = total * 0.1;
+      let a = startSizes[index] + deltaFrac;
+      let b = startSizes[index + 1] - deltaFrac;
+      if (a < minSize) {
+        b -= minSize - a;
+        a = minSize;
+      }
+      if (b < minSize) {
+        a -= minSize - b;
+        b = minSize;
+      }
+      const next = [...startSizes];
+      next[index] = a;
+      next[index + 1] = b;
+      resizeSplit(tabId, node.id, next);
+    }
+    function onUp() {
+      setDraggingIndex(null);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  const items: React.ReactNode[] = [];
+  children.forEach((child, i) => {
+    items.push(child);
+    if (i < children.length - 1) {
+      items.push(
+        <div
+          key={`handle-${i}`}
+          className={`pane-resize-handle pane-resize-handle-${node.direction} ${draggingIndex === i ? "dragging" : ""}`}
+          onMouseDown={(e) => startResize(e, i)}
+        />,
+      );
+    }
+  });
+
+  return (
+    <div className={`pane-split pane-split-${node.direction}`} ref={containerRef}>
+      {items}
     </div>
   );
 }
@@ -177,6 +297,7 @@ export function TerminalPanel({ hidden }: Props) {
               tabVisible={!hidden && tab.tabId === activeTabId}
               activePaneId={tab.activePaneId}
               tabId={tab.tabId}
+              multiPane={tab.layout.type === "split"}
             />
           </div>
         ))}

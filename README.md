@@ -18,8 +18,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   independent app windows (each with their own tabs)
 - Split-pane terminals — right-click a terminal → Split Right/Split Down to
   divide a tab into independent panes (each its own session, nestable by
-  splitting again), click a pane to focus it, right-click → Close Pane to
-  collapse back down
+  splitting again), click a pane to focus it; drag the divider between two
+  panes to resize them, or hit the × in a pane's corner (or right-click →
+  Close Pane) to close just that one and collapse the split back down
 - Quick Connect (`Ctrl/Cmd+K`) — jump straight to a host from anywhere;
   the sidebar also has an inline filter box
 - In-terminal find (`Ctrl/Cmd+F`), right-click copy/paste/select-all/clear
