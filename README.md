@@ -27,6 +27,11 @@ A personal SSH/SFTP terminal client, Termius-style.
   via a row's send button or by dragging it onto the other pane, drag-and-
   drop upload from the OS still works too; recursive filename search under
   a remote folder with "reveal in folder" on a result
+- Server-to-server SFTP — the "Other side" picker above the left pane swaps
+  it from the local machine to any other saved host, turning the browser
+  into two remote panes; transfers between them (send button, right-click,
+  or drag-and-drop, same as local↔remote) stream directly between the two
+  SFTP sessions in the main process — the file never touches local disk
 - Built-in remote file editor — double-click a text file in the SFTP
   browser (or right-click → Edit…) to edit it in place and save straight
   back over SFTP, no download/re-upload round trip (plain text, capped at
@@ -304,6 +309,10 @@ src/
   in the wrong spot. For a remote session, the suggestion updates in the
   same lockstep as your own typed characters already do (both wait on the
   shell's echo), so it can lag slightly on a high-latency connection.
+- Server-to-server SFTP transfers one file at a time (same as local↔remote
+  — dragging/sending a folder isn't recursive); progress shows in the
+  destination pane only, and both hosts' connections go through the same
+  known_hosts/jump-host handling normal browsing already uses.
 
 ## Security notes
 

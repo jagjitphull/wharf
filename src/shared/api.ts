@@ -84,6 +84,8 @@ export interface WharfApi {
     download(hostId: string, remotePath: string): Promise<string | null>;
     /** Downloads straight into `localDir` (basename kept, no picker) — used by the dual-pane browser to transfer directly between panes. */
     downloadToPath(hostId: string, remotePath: string, localDir: string): Promise<string>;
+    /** Transfers a file directly between two remote hosts (server-to-server) — streamed through the main process without ever touching local disk. Used by the dual-pane browser when both panes are remote. */
+    transferBetweenHosts(sourceHostId: string, sourcePath: string, destHostId: string, destDir: string): Promise<string>;
     onProgress(cb: (event: SftpTransferProgress) => void): Unsubscribe;
     /** Recursively searches under `rootPath` for entries whose name contains `query` (case-insensitive), capped to a bounded scan. */
     search(hostId: string, rootPath: string, query: string): Promise<SftpEntry[]>;

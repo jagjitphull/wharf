@@ -85,4 +85,11 @@ export function registerSftpIpc(): void {
       return sftpManager.download(hostId, remotePath, localPath);
     },
   );
+
+  ipcMain.handle(
+    IPC.sftp.transferBetweenHosts,
+    async (_event, sourceHostId: string, sourcePath: string, destHostId: string, destDir: string): Promise<string> => {
+      return sftpManager.transferBetweenHosts(sourceHostId, sourcePath, destHostId, destDir);
+    },
+  );
 }

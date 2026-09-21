@@ -12,12 +12,17 @@ interface Props {
   host: HostRecord;
   path: string;
   onPathChange(path: string): void;
-  /** "Send to local pane" button on a remote row, and a local row dropped here (upload). */
-  onTransferToLocal(remotePath: string): void;
-  onTransferFromLocal(localPath: string): void;
+  /** Label for the *other* pane, used in the "Send to…" row action — "local
+   * pane" when paired with LocalPane, or the other host's name when paired
+   * with a second RemotePane (remote-to-remote). */
+  otherPaneLabel: string;
+  /** "Send to…" button/menu item on a remote row, and a row from the other
+   * pane dropped here (download from this pane's perspective). */
+  onTransferToOther(remotePath: string): void;
+  onTransferFromOther(sourcePath: string): void;
 }
 
-export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTransferFromLocal }: Props) {
+export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransferToOther, onTransferFromOther }: Props) {
   const [entries, setEntries] = useState<SftpEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,8 +105,12 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
 
     const transfer = readTransferData(e);
     if (transfer) {
-      if (transfer.source === "local") onTransferFromLocal(transfer.path);
-      return; // a remote row dropped on the remote pane itself is a no-op
+      // A row dropped on this same remote pane (dragged from itself) is a
+      // no-op either way — otherwise it's a real transfer in from whichever
+      // pane it came from, local or another remote host.
+      if (transfer.source === "local") onTransferFromOther(transfer.path);
+      else if (transfer.source === "remote" && transfer.hostId !== host.id) onTransferFromOther(transfer.path);
+      return;
     }
 
     const files = Array.from(e.dataTransfer.files) as (File & { path?: string })[];
@@ -281,7 +290,7 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
               className="sftp-row"
               key={entry.path}
               draggable
-              onDragStart={(e) => setTransferData(e, { source: "remote", path: entry.path, isDir: entry.type === "directory" })}
+              onDragStart={(e) => setTransferData(e, { source: "remote", hostId: host.id, path: entry.path, isDir: entry.type === "directory" })}
               onDoubleClick={() => (inSearchMode ? revealResult(entry) : openEntry(entry))}
               onContextMenu={(e) =>
                 openMenu(e, [
@@ -294,7 +303,7 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
                           { label: "Download…", onClick: () => handleDownload(entry) },
                         ]),
                   ...(entry.type !== "directory"
-                    ? [{ label: "Send to local pane", onClick: () => onTransferToLocal(entry.path) }]
+                    ? [{ label: `Send to ${otherPaneLabel}`, onClick: () => onTransferToOther(entry.path) }]
                     : []),
                   { label: "Rename…", onClick: () => handleRename(entry) },
                   { separator: true },
@@ -315,7 +324,7 @@ export function RemotePane({ host, path, onPathChange, onTransferToLocal, onTran
                     <button onClick={() => handleDownload(entry)} title="Download (pick location)…">
                       <IconDownload />
                     </button>
-                    <button onClick={() => onTransferToLocal(entry.path)} title="Send to local pane">
+                    <button onClick={() => onTransferToOther(entry.path)} title={`Send to ${otherPaneLabel}`}>
                       →
                     </button>
                   </>

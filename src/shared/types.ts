@@ -337,6 +337,7 @@ export const IPC = {
     uploadPath: "sftp:upload-path",
     download: "sftp:download",
     downloadToPath: "sftp:download-to-path",
+    transferBetweenHosts: "sftp:transfer-between-hosts",
     onProgress: "sftp:progress",
     search: "sftp:search",
     readFile: "sftp:read-file",

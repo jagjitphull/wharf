@@ -6,6 +6,10 @@ export const TRANSFER_MIME = "application/x-wharf-transfer";
 
 export interface TransferPayload {
   source: "local" | "remote";
+  /** Which host a "remote" drag came from — lets a remote pane tell a drop
+   * from a *different* remote host (a real cross-server transfer) apart
+   * from a row dragged onto its own pane (a no-op). Unused for "local". */
+  hostId?: string;
   path: string;
   isDir: boolean;
 }

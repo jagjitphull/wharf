@@ -194,6 +194,57 @@ export async function upload(hostId: string, localPath: string, remotePath: stri
   return transferId;
 }
 
+/** Transfers a file directly between two remote hosts, server-to-server —
+ * a read stream from the source host's SFTP session piped straight into a
+ * write stream on the destination host's, entirely inside this process.
+ * Local disk is never involved (no temp file, no download-then-upload
+ * round trip), so this is both faster and doesn't need scratch space for
+ * a large file. Progress is reported against the destination host, same
+ * "upload" convention as a local->remote transfer already uses. */
+export async function transferBetweenHosts(
+  sourceHostId: string,
+  sourcePath: string,
+  destHostId: string,
+  destDir: string,
+): Promise<string> {
+  const sourceSftp = await getSftp(sourceHostId);
+  const destSftp = await getSftp(destHostId);
+  const transferId = randomUUID();
+  const fileName = path.posix.basename(sourcePath);
+  const destPath = path.posix.join(destDir, fileName);
+
+  const totalBytes = await new Promise<number>((resolve, reject) => {
+    sourceSftp.stat(sourcePath, (err, stats) => (err ? reject(err) : resolve(stats.size)));
+  });
+
+  let transferred = 0;
+  const report = (done: boolean, error?: string) => {
+    broadcast(IPC.sftp.onProgress, {
+      transferId,
+      hostId: destHostId,
+      direction: "upload",
+      fileName,
+      bytesTransferred: transferred,
+      totalBytes,
+      done,
+      error,
+    });
+  };
+
+  const readStream = sourceSftp.createReadStream(sourcePath);
+  const writeStream = destSftp.createWriteStream(destPath);
+  readStream.on("data", (chunk: Buffer) => {
+    transferred += chunk.length;
+    report(false);
+  });
+  readStream.on("error", (err: Error) => report(true, err.message));
+  writeStream.on("error", (err: Error) => report(true, err.message));
+  writeStream.on("close", () => report(true));
+  readStream.pipe(writeStream);
+
+  return transferId;
+}
+
 // Recursive search is capped on three axes so a huge or oddly-structured
 // remote tree (or a typo'd root like "/") can't turn one search into a
 // runaway scan: how many matches to collect, how many entries to look at
