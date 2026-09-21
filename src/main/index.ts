@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, shell } from "electron";
 import { IPC } from "../shared/types";
 import { registerHostsIpc } from "./ipc/hosts";
 import { registerGroupsIpc } from "./ipc/groups";
@@ -25,6 +25,18 @@ const isMac = process.platform === "darwin";
 const DEFAULT_WIDTH = 1280;
 const DEFAULT_HEIGHT = 800;
 
+// The OS-level app/installer icon (taskbar pin, .desktop file, DMG/NSIS
+// artwork) comes from electron-builder's mac/win/linux `icon` config and
+// needs no runtime wiring. This is only for the *running window's* icon —
+// window managers (especially on Linux, including inside an AppImage) don't
+// reliably reuse the launcher icon for an already-open window, so it's set
+// explicitly here. extraResources copies resources/icons alongside the
+// packaged app; in dev it's read straight from the repo.
+const windowIconPath = app.isPackaged
+  ? path.join(process.resourcesPath, "icons", "256x256.png")
+  : path.join(__dirname, "..", "..", "resources", "icons", "256x256.png");
+const windowIcon = nativeImage.createFromPath(windowIconPath);
+
 /**
  * @param primary Restore the exact saved position (x/y) as well as size —
  * used for the app's first window. Secondary windows ("New Window") only
@@ -45,6 +57,7 @@ function createWindow(primary: boolean): BrowserWindow {
     minHeight: 560,
     backgroundColor: "#111318",
     title: "Wharf",
+    ...(windowIcon.isEmpty() ? {} : { icon: windowIcon }),
     show: false,
     // Frameless everywhere: we draw our own title bar in the renderer so
     // minimize/maximize/close are always visible regardless of the host
@@ -156,6 +169,11 @@ app.whenReady().then(() => {
   registerCommandHistoryIpc();
   registerAiIpc();
   registerCommandBlocksIpc();
+
+  // Packaged macOS builds get the dock icon from icon.icns automatically;
+  // in dev the app runs as plain Electron, so without this it shows
+  // Electron's own icon in the dock.
+  if (isMac && isDev && !windowIcon.isEmpty()) app.dock?.setIcon(windowIcon);
 
   installAppMenu();
   createWindow(true);
