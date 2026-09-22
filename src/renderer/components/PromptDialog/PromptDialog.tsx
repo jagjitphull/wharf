@@ -25,8 +25,19 @@ export function PromptDialog({ title, label, defaultValue, placeholder, confirmL
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    // Deferred a frame rather than called synchronously here — this dialog
+    // always opens in response to a button click, and stealing focus in the
+    // very same tick as that click risks losing the race for real OS-level
+    // keyboard focus on some Linux/Electron setups (reported: the input
+    // visibly shows its default text selected, but typed keystrokes don't
+    // land — consistent with the button that opened the dialog still
+    // actually holding focus). Same fix already used for Terminal's own
+    // search bar (Terminal.tsx) for the same class of issue.
+    const raf = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   useEffect(() => {
