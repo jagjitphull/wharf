@@ -34,6 +34,13 @@ function readStoredUiZoom(): number {
 // chrome text/controls.
 function applyToDocument(zoom: number): void {
   document.documentElement.style.setProperty("--ui-zoom", String(zoom));
+  // .tab-pane-container only pays for the counter-zoom's extra width/height
+  // calc() (and the zoom property itself, which forces its own compositing
+  // layer) while a non-default interface size is actually in effect — see
+  // the .ui-zoom-active rule in TerminalPanel.css. At the default 1x most
+  // users never touch, this keeps that element on the plainer, better-worn
+  // `inset: 0` box it always used pre-Interface Size.
+  document.documentElement.classList.toggle("ui-zoom-active", zoom !== DEFAULT_UI_ZOOM);
 }
 
 interface UiPrefsState {

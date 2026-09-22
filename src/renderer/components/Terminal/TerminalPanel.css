@@ -157,11 +157,17 @@
 /* Each tab gets its own absolutely-positioned layer filling .terminal-stack
    (same trick .terminal-pane always used) — only the active tab's is
    display:flex, the rest display:none, so their xterm instances stay alive
-   in the background without needing to be laid out. */
+   in the background without needing to be laid out. Plain `inset: 0` at
+   rest (the vast majority of sessions, since most users never touch
+   Interface Size): the `.ui-zoom-active` override below only engages once
+   --ui-zoom is actually something other than 1, so nothing here pays for
+   the counter-zoom's calc() and its own compositing layer otherwise. */
 .tab-pane-container {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
+}
+
+.ui-zoom-active .tab-pane-container {
   /* Cancels .app-root's interface-size zoom back out for a session's real
      terminal content (sized only by Settings → Terminal's own font size,
      never the interface-size preference) — same pre-shrink trick as
@@ -171,7 +177,10 @@
      don't cancel by simply mirroring app-root's multiply/divide choice,
      since the ambient app-root zoom this element also sits under changes
      which operation is needed here), instead of drifting by a factor of
-     --ui-zoom the way a plain `inset: 0` did. */
+     --ui-zoom the way a plain `inset: 0` did. `right`/`bottom` from the
+     base rule's `inset: 0` are over-constrained against the explicit
+     width/height here and are correctly ignored per the absolute-position
+     sizing algorithm — top/left+width/height win. */
   width: calc(100% / var(--ui-zoom));
   height: calc(100% / var(--ui-zoom));
   zoom: calc(1 / var(--ui-zoom));
