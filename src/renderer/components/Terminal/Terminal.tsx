@@ -649,14 +649,29 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       historyCacheRef.current = createGhostHistoryCache(scoped);
     });
 
-    const resizeObserver = new ResizeObserver(() => {
+    const refit = () => {
       if (el.offsetParent === null) return; // hidden tab, skip
       const wasAtBottom = isScrolledToBottom(el);
       fit.fit();
       if (wasAtBottom) term.scrollToBottom();
       wharf.ssh.resize(sessionId, term.cols, term.rows);
-    });
+    };
+
+    const resizeObserver = new ResizeObserver(refit);
     resizeObserver.observe(el);
+
+    // Belt-and-suspenders for window managers (reported on Pop!_OS/GNOME)
+    // that animate a maximize/restore over several compositor frames:
+    // ResizeObserver is supposed to fire for the true final size, but a
+    // maximize that settles into a size matching an already-seen transient
+    // frame won't fire again, leaving the pane fit to that transient size.
+    // win.on("maximize"/"unmaximize") (see main/index.ts) fires once the OS
+    // itself reports the state change, so a refit a beat after that — long
+    // enough to outlast a typical WM animation — is a reliable correction
+    // independent of ResizeObserver's own timing.
+    const offMaximizedChange = wharf.window.onMaximizedChange(() => {
+      setTimeout(refit, 250);
+    });
 
     return () => {
       offData();
@@ -666,6 +681,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       dataDisposable.dispose();
       oscDisposable.dispose();
       resizeObserver.disconnect();
+      offMaximizedChange();
       disposeAllDecorations(highlightStateRef.current);
       disposeGhostSuggestion();
       term.dispose();
