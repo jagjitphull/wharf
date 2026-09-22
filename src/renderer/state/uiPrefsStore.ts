@@ -28,9 +28,10 @@ function readStoredUiZoom(): number {
 
 // Everything but the terminal's own pane content (title bar, sidebar, tab
 // bar, dialogs, Settings/SFTP/Tunnels/History) lives under .app-root and
-// scales with it; .terminal-stack carries the inverse zoom in global.css
-// specifically to cancel this back out, so a session's actual terminal
-// size/rendering is never affected — only the app's own chrome text/controls.
+// scales with it; .tab-pane-container carries the inverse zoom in
+// TerminalPanel.css specifically to cancel this back out, so a session's
+// actual terminal size/rendering is never affected — only the app's own
+// chrome text/controls.
 function applyToDocument(zoom: number): void {
   document.documentElement.style.setProperty("--ui-zoom", String(zoom));
 }

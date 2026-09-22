@@ -162,11 +162,12 @@ h3 {
      chrome — title bar, sidebar, tab bar, Settings/SFTP/Tunnels — via this
      single zoom. A session's actual terminal content must never move with
      it (a "resize the interface" preference, not the terminal one right
-     next to it), so .terminal-stack below carries the exact inverse zoom
-     to cancel this back out for that one subtree. Dialogs and context
-     menus (position: fixed) are naturally unaffected either way — zoom,
-     unlike transform, doesn't establish a new containing block for them,
-     so Chromium renders and positions them against the real viewport. */
+     next to it), so .tab-pane-container (TerminalPanel.css) carries the
+     exact inverse zoom to cancel this back out for that one subtree.
+     Dialogs and context menus (position: fixed) are naturally unaffected
+     either way — zoom, unlike transform, doesn't establish a new
+     containing block for them, so Chromium renders and positions them
+     against the real viewport. */
   zoom: var(--ui-zoom);
 }
 

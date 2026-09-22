@@ -141,10 +141,17 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  /* Cancels .app-root's interface-size zoom back out (see the comment
-     there) — a session's real terminal content is sized only by Settings
-     → Terminal's own font size, never by the interface-size preference. */
-  zoom: calc(1 / var(--ui-zoom));
+  /* No zoom here — this box's size comes from flex:1 (whatever's left
+     after .tab-bar), computed by .terminal-panel's flex layout in the
+     ambient interface-size zoom, same as .tab-bar. Putting the
+     counter-zoom on the flex item itself (as this used to do) rescaled
+     that already-flex-assigned box a second time: flexbox doesn't know
+     the item will then shrink/grow again, so the on-screen result drifted
+     from what flex:1 intended — leaving a gap below the terminal with the
+     interface enlarged, or spilling terminal content past the pane border
+     into the status bar with it shrunk. The counter-zoom instead lives on
+     .tab-pane-container below, which (like .app-root) has an explicit
+     size the same pre-shrink trick can compensate. */
 }
 
 /* Each tab gets its own absolutely-positioned layer filling .terminal-stack
@@ -153,7 +160,21 @@
    in the background without needing to be laid out. */
 .tab-pane-container {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  /* Cancels .app-root's interface-size zoom back out for a session's real
+     terminal content (sized only by Settings → Terminal's own font size,
+     never the interface-size preference) — same pre-shrink trick as
+     .app-root (see global.css): dividing by --ui-zoom here before this
+     element's own 1/--ui-zoom zoom is applied lands exactly on 100% of
+     .terminal-stack (confirmed empirically — the two nested, inverse zooms
+     don't cancel by simply mirroring app-root's multiply/divide choice,
+     since the ambient app-root zoom this element also sits under changes
+     which operation is needed here), instead of drifting by a factor of
+     --ui-zoom the way a plain `inset: 0` did. */
+  width: calc(100% / var(--ui-zoom));
+  height: calc(100% / var(--ui-zoom));
+  zoom: calc(1 / var(--ui-zoom));
 }
 
 .tab-pane-container.broadcasting {
