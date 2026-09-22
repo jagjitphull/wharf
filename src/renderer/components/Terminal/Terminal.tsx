@@ -78,6 +78,20 @@ interface GhostSuggestionState {
   typedLength: number;
 }
 
+/** Whether xterm's viewport is currently scrolled all the way down (i.e.
+ * "following" live output) — checked before a resize so the fix below can
+ * decide whether to re-anchor to the bottom afterward. FitAddon.fit()
+ * changes the row count but doesn't itself preserve "am I following the
+ * tail", so a pane that grows (e.g. the window being maximized) can leave
+ * the newest lines — including the active prompt — scrolled just out of
+ * view below the visible area, which reads as the prompt having vanished
+ * behind whatever sits right below the pane (the status bar). */
+function isScrolledToBottom(container: HTMLElement): boolean {
+  const viewport = container.querySelector<HTMLElement>(".xterm-viewport");
+  if (!viewport) return true;
+  return viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 2;
+}
+
 export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tabId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -637,7 +651,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
 
     const resizeObserver = new ResizeObserver(() => {
       if (el.offsetParent === null) return; // hidden tab, skip
+      const wasAtBottom = isScrolledToBottom(el);
       fit.fit();
+      if (wasAtBottom) term.scrollToBottom();
       wharf.ssh.resize(sessionId, term.cols, term.rows);
     });
     resizeObserver.observe(el);
@@ -697,7 +713,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     if (!term) return;
     term.options.fontFamily = fontFamily;
     term.options.fontSize = fontSize;
+    const wasAtBottom = containerRef.current ? isScrolledToBottom(containerRef.current) : true;
     fitRef.current?.fit();
+    if (wasAtBottom) term.scrollToBottom();
     wharf.ssh.resize(sessionId, term.cols, term.rows);
   }, [fontSize, fontFamily, sessionId]);
 
