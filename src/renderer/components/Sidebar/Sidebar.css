@@ -11,6 +11,7 @@
 
 .sidebar-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 10px 10px 0;
 }
@@ -54,7 +55,15 @@
 }
 
 .nav-item {
-  flex: 1;
+  /* Sized to its own label (not stretched to share the row equally) and
+     free to wrap onto a second line via .sidebar-nav's flex-wrap — with
+     5 items (Hosts/Tunnels/Workspaces/History/Settings), the old `flex: 1`
+     forced every button to an equal share of one row's width, but none of
+     them had `min-width: 0` to let that share actually shrink below the
+     label's own text width. The row silently overflowed the 280px
+     sidebar instead, pushing Settings entirely out of view with no wrap
+     or scroll to reach it. */
+  flex: 0 1 auto;
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -66,6 +75,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
+  white-space: nowrap;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
