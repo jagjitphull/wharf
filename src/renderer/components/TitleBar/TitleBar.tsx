@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
-import { IconAnchor, IconDuplicate } from "../Icons/Icons";
+import { useAppStore, type ActiveView } from "../../state/store";
+import { IconAnchor, IconChevronDown, IconChevronUp, IconDuplicate } from "../Icons/Icons";
 import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
@@ -17,11 +18,28 @@ export function TitleBar({ onOpenShortcuts }: Props) {
   const setMode = useThemeStore((s) => s.setMode);
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiPrefsStore((s) => s.toggleSidebar);
+  const topNavCollapsed = useUiPrefsStore((s) => s.topNavCollapsed);
+  const toggleTopNav = useUiPrefsStore((s) => s.toggleTopNav);
+  const activeView = useAppStore((s) => s.activeView);
+  const setActiveView = useAppStore((s) => s.setActiveView);
 
   useEffect(() => {
     wharf.window.isMaximized().then(setMaximized);
     return wharf.window.onMaximizedChange(setMaximized);
   }, []);
+
+  const navItem = (view: ActiveView, label: string) => (
+    <button
+      key={view}
+      className={`title-bar-nav-item ${activeView === view ? "active" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setActiveView(view);
+      }}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div
@@ -105,6 +123,28 @@ export function TitleBar({ onOpenShortcuts }: Props) {
             <circle cx="8" cy="11.3" r="0.7" fill="currentColor" />
           </svg>
         </button>
+      </div>
+
+      <div className="title-bar-nav-wrap">
+        <button
+          className="title-bar-icon-btn"
+          title={topNavCollapsed ? "Show navigation" : "Hide navigation"}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleTopNav();
+          }}
+        >
+          {topNavCollapsed ? <IconChevronDown size={12} /> : <IconChevronUp size={12} />}
+        </button>
+        {!topNavCollapsed && (
+          <nav className="title-bar-nav">
+            {navItem("hosts", "Hosts")}
+            {navItem("tunnels", "Tunnels")}
+            {navItem("workspaces", "Workspaces")}
+            {navItem("history", "History")}
+            {navItem("settings", "Settings")}
+          </nav>
+        )}
       </div>
 
       {!isMac && (

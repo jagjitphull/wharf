@@ -74,6 +74,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   independent of the app's own theme; Settings shows a live preview
 - Drag the sidebar's right edge to resize it (double-click to reset,
   drag it nearly shut to collapse — same as the explicit toggle)
+- The Hosts/Tunnels/Workspaces/History/Settings switcher lives in the title
+  bar, collapsible via the chevron next to it — the sidebar itself is just
+  the host list, unaffected by whichever of those is open
 - Import hosts straight from `~/.ssh/config` (`Include` and `Host *`
   defaults supported), reviewable before importing
 - Per-session logging — record a terminal's raw output to a file, toggled

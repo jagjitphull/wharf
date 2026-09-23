@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 const SIDEBAR_COLLAPSED_KEY = "wharf-sidebar-collapsed";
 const SIDEBAR_WIDTH_KEY = "wharf-sidebar-width";
+const TOP_NAV_COLLAPSED_KEY = "wharf-top-nav-collapsed";
 const UI_ZOOM_KEY = "wharf-ui-zoom";
 
 export const DEFAULT_UI_ZOOM = 1;
@@ -35,6 +36,14 @@ function readStoredSidebarWidth(): number {
   return DEFAULT_SIDEBAR_WIDTH;
 }
 
+function readStoredTopNavCollapsed(): boolean {
+  try {
+    return localStorage.getItem(TOP_NAV_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function readStoredUiZoom(): number {
   try {
     const v = Number(localStorage.getItem(UI_ZOOM_KEY));
@@ -65,9 +74,15 @@ function applyToDocument(zoom: number): void {
 interface UiPrefsState {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
+  /** Hides the Hosts/Tunnels/Workspaces/History/Settings strip in the
+   * title bar — independent of sidebarCollapsed, which hides the host
+   * list instead. */
+  topNavCollapsed: boolean;
   uiZoom: number;
   toggleSidebar(): void;
   setSidebarCollapsed(collapsed: boolean): void;
+  toggleTopNav(): void;
+  setTopNavCollapsed(collapsed: boolean): void;
   /** Sets the sidebar's dragged width. Values at or below
    * SIDEBAR_COLLAPSE_THRESHOLD collapse the sidebar instead (see
    * SIDEBAR_COLLAPSE_THRESHOLD) rather than clamping up to MIN_SIDEBAR_WIDTH
@@ -88,6 +103,7 @@ applyToDocument(initialUiZoom);
 export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
   sidebarCollapsed: readStoredCollapsed(),
   sidebarWidth: readStoredSidebarWidth(),
+  topNavCollapsed: readStoredTopNavCollapsed(),
   uiZoom: initialUiZoom,
 
   toggleSidebar() {
@@ -101,6 +117,19 @@ export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
       /* best-effort persistence only */
     }
     set({ sidebarCollapsed: collapsed });
+  },
+
+  toggleTopNav() {
+    get().setTopNavCollapsed(!get().topNavCollapsed);
+  },
+
+  setTopNavCollapsed(collapsed) {
+    try {
+      localStorage.setItem(TOP_NAV_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ topNavCollapsed: collapsed });
   },
 
   setSidebarWidth(width) {
