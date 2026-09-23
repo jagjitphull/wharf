@@ -56,10 +56,16 @@ export function ContextMenu({ menu, onClose }: Props) {
 
   if (!menu) return null;
 
+  // Clamped against the near edge (0) as well as the far one: on a short
+  // window with a long menu (the terminal's easily runs to 15+ items),
+  // `window.innerHeight - estimatedHeight` goes negative, and without the
+  // Math.max floor this set `top` to that negative value outright — pushing
+  // the menu's first items (Copy included) above y=0 and off-screen, not
+  // just tight against the bottom edge.
   const estimatedHeight = menu.items.reduce((h, item) => h + (item.custom ? 46 : 30), 8);
   const style: React.CSSProperties = {
-    left: Math.min(menu.x, window.innerWidth - 200),
-    top: Math.min(menu.y, window.innerHeight - estimatedHeight),
+    left: Math.max(0, Math.min(menu.x, window.innerWidth - 200)),
+    top: Math.max(0, Math.min(menu.y, window.innerHeight - estimatedHeight)),
   };
 
   return (
