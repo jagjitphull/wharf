@@ -1,4 +1,5 @@
 .title-bar {
+  position: relative;
   display: flex;
   align-items: center;
   height: 38px;
@@ -53,18 +54,26 @@
   color: var(--text);
 }
 
-/* Takes all the space left after .title-bar-left and .title-bar-controls
-   (natural width, no flex applied to either), so its own centered content
-   lands in the middle of that remaining space rather than needing the
-   whole title bar's three sections manually balanced against each other. */
+/* Absolutely positioned and centered on .title-bar, sized to its own
+   content rather than stretched with flex:1 — a stretched, no-drag flex
+   item here would claim the ENTIRE middle strip of the title bar as its
+   hit-box even where it's visually empty (most of the bar's width, and
+   effectively all of it while the nav is collapsed to just the toggle
+   button), which is exactly the region users grab to drag/move the window.
+   Sizing to content instead keeps the no-drag area limited to the pills
+   actually drawn, leaving the empty space around them draggable — same as
+   it was before this existed. */
 .title-bar-nav-wrap {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  min-width: 0;
+  max-width: calc(100% - 260px);
   gap: 4px;
-  height: 100%;
   -webkit-app-region: no-drag;
 }
 
