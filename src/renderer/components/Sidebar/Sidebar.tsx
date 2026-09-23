@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { GroupRecord, HostRecord } from "@shared/types";
 import { useAppStore, type ActiveView } from "../../state/store";
+import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
@@ -227,8 +228,10 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     </button>
   );
 
+  const sidebarWidth = useUiPrefsStore((s) => s.sidebarWidth);
+
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{ width: sidebarWidth }}>
       <nav className="sidebar-nav">
         {navItem("hosts", "Hosts")}
         {navItem("tunnels", "Tunnels")}

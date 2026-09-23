@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Sidebar } from "./components/Sidebar/Sidebar";
+import { SidebarResizeHandle } from "./components/Sidebar/SidebarResizeHandle";
 import { TerminalPanel } from "./components/Terminal/TerminalPanel";
 import { SftpBrowser } from "./components/SftpBrowser/SftpBrowser";
 import { Tunnels } from "./components/Tunnels/Tunnels";
@@ -109,7 +110,12 @@ export default function App() {
     <div className="app-root">
       <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} />
       <div className="app-shell">
-        {!sidebarCollapsed && <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />}
+        {!sidebarCollapsed && (
+          <>
+            <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />
+            <SidebarResizeHandle />
+          </>
+        )}
         <main className="app-main">
           {/* Always mounted (display:none rather than unmounted) — switching
               to Settings/SFTP/Tunnels and back must not tear down and

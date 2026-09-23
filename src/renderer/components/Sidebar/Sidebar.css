@@ -1,12 +1,33 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 280px;
-  min-width: 280px;
+  /* Width comes from the sidebarWidth store value via an inline style
+     (dragged by .sidebar-resize-handle in App.tsx) — flex:none so it
+     doesn't get stretched/shrunk by .app-shell's flex layout despite the
+     explicit width. */
+  flex: none;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   height: 100%;
   overflow: hidden;
+}
+
+/* Same drag-handle treatment as .pane-resize-handle in TerminalPanel.css —
+   sits centered on the sidebar's existing right border (negative margin so
+   it doesn't widen the gap), invisible until hovered/dragged. */
+.sidebar-resize-handle {
+  flex: none;
+  width: 7px;
+  margin: 0 -3.5px;
+  z-index: 5;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.1s ease;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.dragging {
+  background: var(--accent);
 }
 
 .sidebar-nav {
