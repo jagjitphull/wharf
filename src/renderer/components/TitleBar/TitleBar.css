@@ -2,6 +2,14 @@
   position: relative;
   display: flex;
   align-items: center;
+  /* .title-bar-nav-wrap is absolutely positioned (out of flow, centered
+     independently — see its own comment), so the only two real flex
+     children left here are .title-bar-left and .title-bar-controls;
+     space-between pushes those to the two ends as before. Without it they
+     just pack together at the start (flex-basis default), which is what
+     put the window controls right next to the left icons instead of at
+     the far right. */
+  justify-content: space-between;
   height: 38px;
   min-height: 38px;
   background: var(--bg-sidebar);
