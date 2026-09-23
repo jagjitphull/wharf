@@ -12,7 +12,13 @@
   justify-content: space-between;
   height: 38px;
   min-height: 38px;
-  background: var(--bg-sidebar);
+  /* A light wash of the user's own accent color (the same --accent-bg used
+     for selected/highlighted surfaces throughout the app — drop zones,
+     active list rows, etc.) rather than a new hardcoded color, so this
+     stays in sync with both their accent choice and the light/dark theme.
+     Was plain --bg-sidebar, identical to the sidebar right below it, which
+     made the two hard to tell apart at a glance. */
+  background: var(--accent-bg);
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
   user-select: none;

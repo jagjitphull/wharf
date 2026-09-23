@@ -158,7 +158,7 @@ export function TitleBar({ onOpenShortcuts }: Props) {
             {maximized ? (
               <svg width="10" height="10" viewBox="0 0 10 10">
                 <rect x="1.5" y="0" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1" />
-                <rect x="0" y="2.5" width="7" height="7" fill="var(--bg-sidebar)" stroke="currentColor" strokeWidth="1" />
+                <rect x="0" y="2.5" width="7" height="7" fill="var(--accent-bg)" stroke="currentColor" strokeWidth="1" />
               </svg>
             ) : (
               <svg width="10" height="10" viewBox="0 0 10 10">
