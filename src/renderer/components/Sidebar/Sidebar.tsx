@@ -7,8 +7,21 @@ import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import { IconFolder, IconPencil, IconPlay, IconPlus, IconTerminal, IconTrash } from "../Icons/Icons";
+import {
+  IconChevronDown,
+  IconFolder,
+  IconFolderOpen,
+  IconPencil,
+  IconPlay,
+  IconPlus,
+  IconTerminal,
+  IconTrash,
+} from "../Icons/Icons";
 import "./Sidebar.css";
+
+/** Sentinel ID for the root "Hosts" tree node's own collapse state, stored
+ * alongside real group IDs in uiPrefsStore's collapsedGroupIds. */
+const ROOT_NODE_ID = "__root__";
 
 interface Props {
   onOpenQuickConnect(): void;
@@ -44,6 +57,8 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
   const [draggingHostId, setDraggingHostId] = useState<string | null>(null);
   const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
+  const collapsedGroupIds = useUiPrefsStore((s) => s.collapsedGroupIds);
+  const toggleGroupCollapsed = useUiPrefsStore((s) => s.toggleGroupCollapsed);
 
   function endHostDrag() {
     setDraggingHostId(null);
@@ -168,16 +183,26 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     );
   }
 
+  // While filtering, every matching node is forced open so results are
+  // never hidden behind a collapsed folder the user didn't touch.
+  function isExpanded(nodeId: string): boolean {
+    return normalizedFilter !== "" || !collapsedGroupIds.has(nodeId);
+  }
+
   function renderGroup(group: GroupRecord | null, depth = 0): React.ReactNode {
     const childGroups = groups.filter((g) => g.parentId === (group?.id ?? null));
     const groupHosts = visibleHosts.filter((h) => h.groupId === (group?.id ?? null));
-    const renderedChildGroups = childGroups.map((g) => renderGroup(g, depth + 1)).filter(Boolean);
+    const expanded = group ? isExpanded(group.id) : true;
+    // isExpanded forces every node open while filtering, so this already
+    // recurses into what would otherwise be a collapsed folder — a match
+    // buried in one still surfaces.
+    const renderedChildGroups = expanded ? childGroups.map((g) => renderGroup(g, depth + 1)).filter(Boolean) : [];
     // While filtering, hide groups that have no matching hosts anywhere in their subtree.
     if (normalizedFilter && groupHosts.length === 0 && renderedChildGroups.length === 0) return null;
     if (!group && childGroups.length === 0 && groupHosts.length === 0) return null;
 
     return (
-      <div className="group-node" style={{ marginLeft: depth * 12 }} key={group?.id ?? "root"}>
+      <div className="group-node" style={{ marginLeft: depth * 14 }} key={group?.id ?? "root"}>
         {group && (
           <div
             className={`group-row ${dropTargetGroupId === group.id ? "drop-target" : ""}`}
@@ -201,7 +226,17 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
               ])
             }
           >
-            <span className="group-name">{group.name}</span>
+            <button
+              className="group-disclosure"
+              onClick={() => toggleGroupCollapsed(group.id)}
+              title={expanded ? "Collapse" : "Expand"}
+            >
+              <span className={`group-chevron ${expanded ? "expanded" : ""}`}>
+                <IconChevronDown size={11} />
+              </span>
+              {expanded ? <IconFolderOpen size={13} /> : <IconFolder size={13} />}
+              <span className="group-name">{group.name}</span>
+            </button>
             <div className="group-actions">
               <button title="Add host here" onClick={() => setHostDialog({ host: null, groupId: group.id })}>
                 <IconPlus />
@@ -215,7 +250,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
             </div>
           </div>
         )}
-        {groupHosts.map(renderHost)}
+        {expanded && groupHosts.map(renderHost)}
         {renderedChildGroups}
       </div>
     );
@@ -258,7 +293,25 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
       {error && <div className="sidebar-error">{error}</div>}
 
       <div className="host-tree">
-        {renderGroup(null)}
+        {(() => {
+          const rootExpanded = isExpanded(ROOT_NODE_ID);
+          return (
+            <div className="group-node">
+              <button
+                className="group-row group-row-root group-disclosure"
+                onClick={() => toggleGroupCollapsed(ROOT_NODE_ID)}
+                title={rootExpanded ? "Collapse" : "Expand"}
+              >
+                <span className={`group-chevron ${rootExpanded ? "expanded" : ""}`}>
+                  <IconChevronDown size={11} />
+                </span>
+                {rootExpanded ? <IconFolderOpen size={13} /> : <IconFolder size={13} />}
+                <span className="group-name">Hosts</span>
+              </button>
+              {rootExpanded && renderGroup(null, 1)}
+            </div>
+          );
+        })()}
         {normalizedFilter && visibleHosts.length === 0 && <p className="sidebar-empty">No hosts match "{filter}".</p>}
       </div>
 

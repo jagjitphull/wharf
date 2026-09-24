@@ -31,6 +31,17 @@ export function IconFolder({ size = 14 }: IconProps) {
   );
 }
 
+/** Same folder silhouette as IconFolder but with the flap propped open —
+ * used for an expanded group node in the sidebar's host tree. */
+export function IconFolderOpen({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M2 5.5V4.5c0-.55.45-1 1-1h3.2l1.2 1.5H13c.55 0 1 .45 1 1v.5" />
+      <path d="M2 5.5h11.5l-1 6a1 1 0 0 1-1 .8H4a1 1 0 0 1-1-.85L2 5.5z" />
+    </svg>
+  );
+}
+
 export function IconPencil({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" {...common}>

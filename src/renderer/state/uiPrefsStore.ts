@@ -4,6 +4,7 @@ const SIDEBAR_COLLAPSED_KEY = "wharf-sidebar-collapsed";
 const SIDEBAR_WIDTH_KEY = "wharf-sidebar-width";
 const TOP_NAV_COLLAPSED_KEY = "wharf-top-nav-collapsed";
 const UI_ZOOM_KEY = "wharf-ui-zoom";
+const COLLAPSED_GROUPS_KEY = "wharf-collapsed-groups";
 
 export const DEFAULT_UI_ZOOM = 1;
 export const MIN_UI_ZOOM = 0.85;
@@ -41,6 +42,17 @@ function readStoredTopNavCollapsed(): boolean {
     return localStorage.getItem(TOP_NAV_COLLAPSED_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+function readStoredCollapsedGroups(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_GROUPS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((id) => typeof id === "string")) : new Set();
+  } catch {
+    return new Set();
   }
 }
 
@@ -93,6 +105,10 @@ interface UiPrefsState {
   increaseUiZoom(): void;
   decreaseUiZoom(): void;
   resetUiZoom(): void;
+  /** IDs of collapsed nodes in the sidebar's host tree — real group IDs,
+   * plus the "__root__" sentinel for the top-level "Hosts" node itself. */
+  collapsedGroupIds: Set<string>;
+  toggleGroupCollapsed(id: string): void;
 }
 
 const initialUiZoom = readStoredUiZoom();
@@ -167,5 +183,19 @@ export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
 
   resetUiZoom() {
     get().setUiZoom(DEFAULT_UI_ZOOM);
+  },
+
+  collapsedGroupIds: readStoredCollapsedGroups(),
+
+  toggleGroupCollapsed(id) {
+    const next = new Set(get().collapsedGroupIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    try {
+      localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...next]));
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ collapsedGroupIds: next });
   },
 }));
