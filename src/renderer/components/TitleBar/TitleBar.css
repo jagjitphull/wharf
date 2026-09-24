@@ -125,29 +125,109 @@
 
 .title-bar-controls {
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 2px;
   height: 100%;
+  padding: 0 10px;
   -webkit-app-region: no-drag;
 }
 
-.title-bar-controls button {
+/* Each button is the actual hit target (roomier than the visible dot, same
+   idea as macOS/GNOME traffic lights) — the colored circle inside it is
+   purely visual. */
+.title-bar-controls .win-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 100%;
+  width: 26px;
+  height: 26px;
   background: transparent;
   border: none;
-  color: var(--text-dim);
+  border-radius: 6px;
   cursor: pointer;
+  padding: 0;
 }
 
-.title-bar-controls button:hover {
+.win-btn-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  transition: filter 0.1s ease, background-color 0.1s ease, border-color 0.1s ease;
+}
+
+.win-btn-glyph {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+/* Glyphs reveal on hover of the whole control group, like macOS traffic
+   lights — a subtle hint of what each dot does without cluttering the bar
+   at rest. */
+.title-bar-controls:hover .win-btn-glyph {
+  opacity: 1;
+}
+
+/* --- style-dots: default (Windows, or an unrecognized Linux distro) ---
+   Always-colored traffic-light dots, closest to how Termius itself renders
+   these across platforms. */
+.title-bar-controls.style-dots .win-btn-dot.win-btn-minimize {
+  background: #f6bd39;
+  color: #8a5a00;
+}
+.title-bar-controls.style-dots .win-btn-dot.win-btn-maximize {
+  background: #61c454;
+  color: #1f5c17;
+}
+.title-bar-controls.style-dots .win-btn-dot.win-btn-close {
+  background: #ee6a5f;
+  color: #7a1610;
+}
+.title-bar-controls.style-dots .win-btn:hover .win-btn-dot {
+  filter: brightness(1.08);
+}
+
+/* --- style-ubuntu: approximates Ubuntu's Yaru theme --- minimize/maximize
+   are plain circles, close is filled with Ubuntu's signature orange. */
+.title-bar-controls.style-ubuntu .win-btn-dot.win-btn-minimize,
+.title-bar-controls.style-ubuntu .win-btn-dot.win-btn-maximize {
   background: var(--bg-active);
-  color: var(--text);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.title-bar-controls.style-ubuntu .win-btn-minimize .win-btn-glyph,
+.title-bar-controls.style-ubuntu .win-btn-maximize .win-btn-glyph {
+  opacity: 1;
+}
+.title-bar-controls.style-ubuntu .win-btn-dot.win-btn-close {
+  background: #e95420;
+  color: #fff;
+}
+.title-bar-controls.style-ubuntu .win-btn-close .win-btn-glyph {
+  opacity: 1;
+}
+.title-bar-controls.style-ubuntu .win-btn:hover .win-btn-dot {
+  filter: brightness(1.1);
 }
 
-.title-bar-controls button.title-bar-close:hover {
-  background: #e81123;
+/* --- style-fedora: approximates Fedora/RHEL/Rocky's Adwaita/GNOME theme ---
+   all three dots stay plain/neutral; close only reddens on hover, matching
+   Adwaita's own restrained convention. */
+.title-bar-controls.style-fedora .win-btn-dot {
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.title-bar-controls.style-fedora .win-btn-glyph {
+  opacity: 1;
+}
+.title-bar-controls.style-fedora .win-btn:hover .win-btn-dot {
+  background: var(--bg-hover);
+}
+.title-bar-controls.style-fedora .win-btn:hover .win-btn-dot.win-btn-close {
+  background: #e01b24;
+  border-color: #e01b24;
   color: #fff;
 }

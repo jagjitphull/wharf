@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { app, BrowserWindow, Menu, nativeImage, shell } from "electron";
 import { IPC } from "../shared/types";
 import { registerHostsIpc } from "./ipc/hosts";
@@ -42,6 +43,34 @@ const windowIconPath = app.isPackaged
 const windowIcon = nativeImage.createFromPath(windowIconPath);
 
 /**
+ * Reads ID/ID_LIKE from /etc/os-release to classify the running distro into a
+ * coarse styling family — used only so the renderer can pick a title-bar
+ * button style approximating the native look (Ubuntu/Yaru-ish vs
+ * Fedora-Rocky/Adwaita-ish). Computed here (not in preload.ts) because
+ * preload runs sandboxed and can't require Node's "fs" module directly —
+ * the result is instead handed to it via webPreferences.additionalArguments,
+ * which a sandboxed preload script can read from process.argv.
+ */
+function detectLinuxDistroFamily(): "ubuntu" | "fedora" | "" {
+  if (process.platform !== "linux") return "";
+  try {
+    const osRelease = readFileSync("/etc/os-release", "utf-8");
+    const fields = new Map<string, string>();
+    for (const line of osRelease.split("\n")) {
+      const match = line.match(/^([A-Z_]+)=(.*)$/);
+      if (match) fields.set(match[1], match[2].replace(/^"|"$/g, ""));
+    }
+    const haystack = `${fields.get("ID") ?? ""} ${fields.get("ID_LIKE") ?? ""}`.toLowerCase();
+    if (/\bubuntu\b|\bdebian\b|\bmint\b|\bpop\b/.test(haystack)) return "ubuntu";
+    if (/\bfedora\b|\brhel\b|\brocky\b|\bcentos\b|\balma\b/.test(haystack)) return "fedora";
+  } catch {
+    /* /etc/os-release missing or unreadable — fall back to the default style */
+  }
+  return "";
+}
+const linuxDistroFamily = detectLinuxDistroFamily();
+
+/**
  * @param primary Restore the exact saved position (x/y) as well as size —
  * used for the app's first window. Secondary windows ("New Window") only
  * reuse the saved size so the OS can cascade their position normally
@@ -75,6 +104,7 @@ function createWindow(primary: boolean): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      additionalArguments: [`--linux-distro-family=${linuxDistroFamily}`],
     },
   });
 

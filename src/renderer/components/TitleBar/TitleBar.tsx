@@ -7,6 +7,19 @@ import { IconAnchor, IconChevronDown, IconChevronUp, IconDuplicate } from "../Ic
 import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
+// Window-control button styling family: colored circular "traffic light"
+// dots everywhere by default (Windows, or an unrecognized Linux distro),
+// with an approximation of Ubuntu's Yaru theme (orange close, plain
+// min/max) or Fedora/Rocky's Adwaita theme (all plain, close reddens only
+// on hover) when that distro is detected — see detectLinuxDistroFamily in
+// preload.ts. Electron has no API for the live desktop icon theme, so this
+// is a stylistic approximation, not a pixel-accurate native match.
+const controlsStyleClass =
+  wharf.window.linuxDistroFamily === "ubuntu"
+    ? "style-ubuntu"
+    : wharf.window.linuxDistroFamily === "fedora"
+      ? "style-fedora"
+      : "style-dots";
 
 interface Props {
   onOpenShortcuts(): void;
@@ -148,29 +161,39 @@ export function TitleBar({ onOpenShortcuts }: Props) {
       </div>
 
       {!isMac && (
-        <div className="title-bar-controls">
-          <button title="Minimize" onClick={() => wharf.window.minimize()}>
-            <svg width="10" height="10" viewBox="0 0 10 10">
-              <rect x="0" y="4.5" width="10" height="1" fill="currentColor" />
-            </svg>
-          </button>
-          <button title={maximized ? "Restore" : "Maximize"} onClick={() => wharf.window.toggleMaximize()}>
-            {maximized ? (
-              <svg width="10" height="10" viewBox="0 0 10 10">
-                <rect x="1.5" y="0" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1" />
-                <rect x="0" y="2.5" width="7" height="7" fill="var(--accent-bg)" stroke="currentColor" strokeWidth="1" />
+        <div className={`title-bar-controls ${controlsStyleClass}`}>
+          <button className="win-btn" title="Minimize" onClick={() => wharf.window.minimize()}>
+            <span className="win-btn-dot win-btn-minimize">
+              <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
+                <rect x="0" y="3.3" width="8" height="1.3" fill="currentColor" />
               </svg>
-            ) : (
-              <svg width="10" height="10" viewBox="0 0 10 10">
-                <rect x="0" y="0" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1" />
-              </svg>
-            )}
+            </span>
           </button>
-          <button className="title-bar-close" title="Close" onClick={() => wharf.window.close()}>
-            <svg width="10" height="10" viewBox="0 0 10 10">
-              <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1" />
-              <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" strokeWidth="1" />
-            </svg>
+          <button
+            className="win-btn"
+            title={maximized ? "Restore" : "Maximize"}
+            onClick={() => wharf.window.toggleMaximize()}
+          >
+            <span className="win-btn-dot win-btn-maximize">
+              {maximized ? (
+                <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
+                  <rect x="1.6" y="0" width="6.4" height="6.4" fill="none" stroke="currentColor" strokeWidth="1.1" />
+                  <rect x="0" y="1.6" width="6.4" height="6.4" fill="none" stroke="currentColor" strokeWidth="1.1" />
+                </svg>
+              ) : (
+                <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
+                  <rect x="0" y="0" width="7.4" height="7.4" fill="none" stroke="currentColor" strokeWidth="1.1" />
+                </svg>
+              )}
+            </span>
+          </button>
+          <button className="win-btn" title="Close" onClick={() => wharf.window.close()}>
+            <span className="win-btn-dot win-btn-close">
+              <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
+                <line x1="0" y1="0" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="8" y1="0" x2="0" y2="8" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+            </span>
           </button>
         </div>
       )}
