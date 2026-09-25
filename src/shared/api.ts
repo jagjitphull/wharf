@@ -117,16 +117,6 @@ export interface WharfApi {
   window: {
     /** "darwin" | "win32" | "linux" | ... — process.platform, read at preload time. */
     platform: string;
-    /**
-     * Coarse Linux desktop styling family, read from /etc/os-release's ID/ID_LIKE
-     * at preload time. "ubuntu" for Ubuntu and its derivatives (Pop!_OS, Mint, ...),
-     * "fedora" for Fedora/RHEL/Rocky/CentOS-family (GNOME/Adwaita-style), null
-     * everywhere else (non-Linux, or an unrecognized distro) — those fall back to
-     * the default title-bar button style. Only affects window-control button
-     * colors/shape, an approximation of each distro's native look, not a true
-     * native theme match.
-     */
-    linuxDistroFamily: "ubuntu" | "fedora" | null;
     minimize(): void;
     toggleMaximize(): void;
     close(): void;

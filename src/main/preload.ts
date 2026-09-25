@@ -8,16 +8,6 @@ function on(channel: string, cb: (...args: unknown[]) => void) {
   return () => ipcRenderer.removeListener(channel, listener);
 }
 
-/** Reads the --linux-distro-family=<value> flag that main/index.ts computed
- * (via /etc/os-release, which needs Node's "fs" — unavailable to this
- * sandboxed preload script) and passed in through
- * webPreferences.additionalArguments. */
-function detectLinuxDistroFamily(): "ubuntu" | "fedora" | null {
-  const arg = process.argv.find((a) => a.startsWith("--linux-distro-family="));
-  const value = arg?.slice("--linux-distro-family=".length);
-  return value === "ubuntu" || value === "fedora" ? value : null;
-}
-
 const api: WharfApi = {
   hosts: {
     list: () => ipcRenderer.invoke(IPC.hosts.list),
@@ -86,7 +76,6 @@ const api: WharfApi = {
   },
   window: {
     platform: process.platform,
-    linuxDistroFamily: detectLinuxDistroFamily(),
     minimize: () => ipcRenderer.send(IPC.window.minimize),
     toggleMaximize: () => ipcRenderer.send(IPC.window.toggleMaximize),
     close: () => ipcRenderer.send(IPC.window.close),

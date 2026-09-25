@@ -7,19 +7,6 @@ import { IconAnchor, IconChevronDown, IconChevronUp, IconDuplicate } from "../Ic
 import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
-// Window-control button styling family: colored circular "traffic light"
-// dots everywhere by default (Windows, or an unrecognized Linux distro),
-// with an approximation of Ubuntu's Yaru theme (orange close, plain
-// min/max) or Fedora/Rocky's Adwaita theme (all plain, close reddens only
-// on hover) when that distro is detected — see detectLinuxDistroFamily in
-// preload.ts. Electron has no API for the live desktop icon theme, so this
-// is a stylistic approximation, not a pixel-accurate native match.
-const controlsStyleClass =
-  wharf.window.linuxDistroFamily === "ubuntu"
-    ? "style-ubuntu"
-    : wharf.window.linuxDistroFamily === "fedora"
-      ? "style-fedora"
-      : "style-dots";
 
 interface Props {
   onOpenShortcuts(): void;
@@ -161,7 +148,7 @@ export function TitleBar({ onOpenShortcuts }: Props) {
       </div>
 
       {!isMac && (
-        <div className={`title-bar-controls ${controlsStyleClass}`}>
+        <div className="title-bar-controls">
           <button className="win-btn" title="Minimize" onClick={() => wharf.window.minimize()}>
             <span className="win-btn-dot win-btn-minimize">
               <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
