@@ -1,0 +1,224 @@
+.settings-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.settings-panel {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  max-width: 620px;
+}
+
+.settings-preview-pane {
+  display: none;
+}
+
+/* Only when the window is wide enough to fit both the settings column and
+   a comfortably-sized preview without either feeling cramped — narrower
+   windows just get the settings column at full width, no preview. */
+@media (min-width: 980px) {
+  .settings-preview-pane {
+    flex: none;
+    width: 340px;
+    height: 100%;
+    padding: 20px;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+.settings-preview-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
+.settings-preview-term {
+  flex: none;
+  height: 220px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.settings-preview-term .xterm {
+  height: 100%;
+}
+
+.settings-panel h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.settings-panel h2:not(:first-child) {
+  margin-top: 28px;
+}
+
+.appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.appearance-label {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.mode-switch {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.accent-swatches {
+  display: flex;
+  gap: 8px;
+}
+
+.accent-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.accent-swatch.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg-panel);
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.appearance-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.appearance-row.column .hint {
+  margin: 0;
+}
+
+.term-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.term-theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 10px 8px;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.term-theme-card:hover {
+  filter: brightness(1.08);
+}
+
+.term-theme-card.active {
+  border-color: var(--accent);
+}
+
+.term-theme-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.term-theme-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.term-theme-dots-app {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.term-theme-name {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.font-size-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.font-size-value {
+  font-size: 13px;
+  font-family: monospace;
+  min-width: 34px;
+  text-align: center;
+}
+
+.font-family-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--text);
+  font-size: 12.5px;
+  min-width: 180px;
+}
+
+.hint code {
+  background: var(--bg-input);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.backup-message {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--accent-bg);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 12.5px;
+}

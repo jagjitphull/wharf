@@ -1,0 +1,72 @@
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 12px;
+  background: var(--bg-sidebar);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex: none;
+}
+
+.status-dot.connected {
+  background: var(--success);
+}
+
+.status-dot.closed {
+  background: var(--danger-text);
+}
+
+.status-dot.reconnecting {
+  background: #e0a63c;
+  animation: status-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes status-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.status-text {
+  color: var(--text);
+}
+
+.status-host,
+.status-duration {
+  font-family: monospace;
+}
+
+.status-error {
+  color: var(--danger-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-stats {
+  font-family: monospace;
+  color: var(--text-dim);
+}
+
+.status-spacer {
+  flex: 1;
+}
+
+.status-dim {
+  color: var(--text-dim);
+}

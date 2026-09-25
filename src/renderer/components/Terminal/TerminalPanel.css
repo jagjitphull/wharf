@@ -1,0 +1,303 @@
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 6px 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 7px 7px 0 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.tab:hover:not(.active) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.tab.active {
+  /* A touch of accent tint mixed into the base background (rather than
+     plain var(--bg)) so the active tab reads clearly even next to an
+     inactive tab that's nearly the same color — the old flat var(--bg)
+     was too close to the tab bar's own var(--bg-panel) to notice at a
+     glance. The top accent/host-color line itself is set inline per-tab
+     (see TabButton) since it also depends on the tab's host color. */
+  background: color-mix(in srgb, var(--bg) 88%, var(--accent) 12%);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tab.closed {
+  color: var(--danger-text);
+}
+
+.tab.dragging {
+  opacity: 0.5;
+}
+
+.tab.drop-target {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger-text);
+}
+
+.tab-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.tab-theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.tab-logging-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--danger-text);
+  animation: tab-logging-pulse 2s ease-in-out infinite;
+}
+
+.tab-broadcast-badge {
+  display: flex;
+  align-items: center;
+  flex: none;
+  color: #e0a63c;
+}
+
+@keyframes tab-logging-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tab-close,
+.tab-duplicate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 4px;
+  padding: 3px;
+  transition: background-color 0.12s ease, opacity 0.12s ease;
+}
+
+.tab-close:hover,
+.tab-duplicate:hover {
+  opacity: 1;
+  background: var(--bg-active);
+}
+
+.tab-close:hover {
+  color: var(--danger-text);
+}
+
+.terminal-stack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  /* No zoom here — this box's size comes from flex:1 (whatever's left
+     after .tab-bar), computed by .terminal-panel's flex layout in the
+     ambient interface-size zoom, same as .tab-bar. Putting the
+     counter-zoom on the flex item itself (as this used to do) rescaled
+     that already-flex-assigned box a second time: flexbox doesn't know
+     the item will then shrink/grow again, so the on-screen result drifted
+     from what flex:1 intended — leaving a gap below the terminal with the
+     interface enlarged, or spilling terminal content past the pane border
+     into the status bar with it shrunk. The counter-zoom instead lives on
+     .tab-pane-container below, which (like .app-root) has an explicit
+     size the same pre-shrink trick can compensate. */
+}
+
+/* Each tab gets its own absolutely-positioned layer filling .terminal-stack
+   (same trick .terminal-pane always used) — only the active tab's is
+   display:flex, the rest display:none, so their xterm instances stay alive
+   in the background without needing to be laid out. Plain `inset: 0` at
+   rest (the vast majority of sessions, since most users never touch
+   Interface Size): the `.ui-zoom-active` override below only engages once
+   --ui-zoom is actually something other than 1, so nothing here pays for
+   the counter-zoom's calc() and its own compositing layer otherwise. */
+.tab-pane-container {
+  position: absolute;
+  inset: 0;
+}
+
+.ui-zoom-active .tab-pane-container {
+  /* Cancels .app-root's interface-size zoom back out for a session's real
+     terminal content (sized only by Settings → Terminal's own font size,
+     never the interface-size preference) — same pre-shrink trick as
+     .app-root (see global.css): dividing by --ui-zoom here before this
+     element's own 1/--ui-zoom zoom is applied lands exactly on 100% of
+     .terminal-stack (confirmed empirically — the two nested, inverse zooms
+     don't cancel by simply mirroring app-root's multiply/divide choice,
+     since the ambient app-root zoom this element also sits under changes
+     which operation is needed here), instead of drifting by a factor of
+     --ui-zoom the way a plain `inset: 0` did. `right`/`bottom` from the
+     base rule's `inset: 0` are over-constrained against the explicit
+     width/height here and are correctly ignored per the absolute-position
+     sizing algorithm — top/left+width/height win. */
+  width: calc(100% / var(--ui-zoom));
+  height: calc(100% / var(--ui-zoom));
+  zoom: calc(1 / var(--ui-zoom));
+}
+
+.tab-pane-container.broadcasting {
+  /* outline, not box-shadow: an inset box-shadow here paints behind
+     .pane-split's own opaque background, which fills this container
+     edge-to-edge — completely invisible. outline always paints on top of
+     a box's descendants regardless of offset, so it actually shows. */
+  outline: 2px solid #e0a63c;
+  outline-offset: -2px;
+}
+
+.pane-split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane-split-row {
+  flex-direction: row;
+}
+
+.pane-split-column {
+  flex-direction: column;
+}
+
+/* This wrapper's own background is what actually shows: .pane-leaf inside
+   it leaves a small margin (below) rather than filling it completely, so
+   this always-visible 2px ring both separates adjacent panes and — turning
+   var(--accent) via .active — highlights whichever one has focus. A
+   shadow/outline directly on .pane-leaf doesn't work here: its xterm canvas
+   fills it edge-to-edge and paints over it. */
+.pane-split-child {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  background: var(--border);
+  transition: background-color 0.15s ease;
+}
+
+.pane-split-child.active {
+  background: var(--accent);
+}
+
+.pane-leaf {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  margin: 2px;
+  border-radius: 5px;
+}
+
+.pane-close-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.pane-leaf:hover .pane-close-btn {
+  opacity: 0.85;
+}
+
+.pane-close-btn:hover {
+  opacity: 1;
+  color: var(--danger-text);
+}
+
+/* Sits centered on the gap .pane-split-child's background already draws
+   between adjacent panes (negative margin so it doesn't widen that gap) —
+   invisible until hovered/dragged, so it doesn't look like a permanent
+   seam through the middle of the terminal. */
+.pane-resize-handle {
+  flex: none;
+  z-index: 2;
+  background: transparent;
+  transition: background-color 0.1s ease;
+}
+
+.pane-resize-handle-row {
+  width: 7px;
+  margin: 0 -3.5px;
+  cursor: col-resize;
+}
+
+.pane-resize-handle-column {
+  height: 7px;
+  margin: -3.5px 0;
+  cursor: row-resize;
+}
+
+.pane-resize-handle:hover,
+.pane-resize-handle.dragging {
+  background: var(--accent);
+}
+

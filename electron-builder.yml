@@ -1,0 +1,43 @@
+appId: com.wharf.app
+productName: Wharf
+# ssh2's two native add-ons (cpu-features, its bundled sshcrypto.node) are
+# both optional performance boosts — ssh2 wraps requiring each in try/catch
+# and falls back to pure-JS crypto if either is missing or fails to load
+# (e.g. compiled against a different Node ABI than Electron's). Nothing else
+# in the dependency tree is native, so skipping electron-builder's rebuild
+# step is safe and avoids it needing network access to Electron's headers.
+npmRebuild: false
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist-electron/**/*
+  - package.json
+# BrowserWindow's runtime `icon` option (see src/main/index.ts) reads this at
+# app.isPackaged time via process.resourcesPath — needed because Linux window
+# managers don't reliably pick up the hicolor-theme icon below for an
+# AppImage's own running window, only for its launcher/taskbar pin.
+extraResources:
+  - from: resources/icons
+    to: icons
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.icns
+  target:
+    - dmg
+win:
+  icon: resources/icon.ico
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  maintainer: Wharf <noreply@example.com>
+  # A directory of size-named PNGs (16x16.png … 1024x1024.png) instead of a
+  # single flat icon.png — electron-builder installs these into the correct
+  # hicolor/<size>/apps directories. With just one flat PNG it couldn't
+  # detect the size and fell back to an invalid "hicolor/0x0/apps" bucket
+  # that GTK icon theme lookups don't recognize.
+  icon: resources/icons
