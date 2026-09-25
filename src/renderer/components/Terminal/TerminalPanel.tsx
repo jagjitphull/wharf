@@ -357,7 +357,23 @@ function TabButton(p: TabButtonProps) {
       className={`tab ${p.isActive ? "active" : ""} ${p.closed ? "closed" : ""} ${
         p.tabId === p.draggingId ? "dragging" : ""
       } ${p.tabId === p.dropTargetId ? "drop-target" : ""}`}
-      style={hostColor ? { boxShadow: `inset 0 2px 0 ${hostColor}` } : undefined}
+      // A host color used to draw the exact same top bar whether or not the tab
+      // was active, which drowned out the active indicator entirely once more than
+      // one tab shared a color — worse, EVERY tab got that same fixed 2px line
+      // regardless of state, so the active tab had nothing left to stand out with
+      // besides a barely-different background. Now the active tab's line is
+      // thicker and full strength (falling back to the theme accent when the tab
+      // has no host color of its own, matching .tab.active's old default), while
+      // every inactive tab's line — host-colored or not — is thin and faint, so
+      // it still hints at which host a tab belongs to without competing for
+      // attention with whichever tab is actually active.
+      style={{
+        boxShadow: p.isActive
+          ? `inset 0 3px 0 ${hostColor ?? "var(--accent)"}`
+          : hostColor
+            ? `inset 0 1px 0 ${hostColor}55`
+            : undefined,
+      }}
       onClick={p.onClick}
       onContextMenu={(e) =>
         p.openMenu(e, [
