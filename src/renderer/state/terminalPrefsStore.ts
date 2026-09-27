@@ -9,15 +9,29 @@ export const DEFAULT_FONT_SIZE = 13;
 export const MIN_FONT_SIZE = 9;
 export const MAX_FONT_SIZE = 28;
 
+/**
+ * Everything from "JetBrains Mono" down is bundled as actual font files
+ * (see styles/fonts.css + assets/fonts/) rather than just a CSS name — the
+ * earlier list relied entirely on whatever happened to already be
+ * installed on the user's system, so on a fresh Linux install most of
+ * these silently fell back to a plain generic monospace regardless of
+ * which one was picked, and the picker didn't actually change much of
+ * anything. "System default" and the three below it still name real
+ * system fonts on purpose, for anyone who prefers matching their OS.
+ */
 export const FONT_FAMILY_PRESETS = [
   { name: "System default", value: "'SF Mono', Menlo, Consolas, monospace" },
   { name: "Menlo", value: "Menlo, monospace" },
   { name: "Consolas", value: "Consolas, monospace" },
-  { name: "Courier New", value: "'Courier New', monospace" },
-  { name: "Fira Code", value: "'Fira Code', monospace" },
-  { name: "JetBrains Mono", value: "'JetBrains Mono', monospace" },
-  { name: "Cascadia Code", value: "'Cascadia Code', monospace" },
   { name: "Ubuntu Mono", value: "'Ubuntu Mono', monospace" },
+  { name: "JetBrains Mono", value: "'JetBrains Mono', monospace" },
+  { name: "Fira Code", value: "'Fira Code', monospace" },
+  { name: "Cascadia Code", value: "'Cascadia Code', monospace" },
+  { name: "IBM Plex Mono", value: "'IBM Plex Mono', monospace" },
+  { name: "Source Code Pro", value: "'Source Code Pro', monospace" },
+  { name: "Roboto Mono", value: "'Roboto Mono', monospace" },
+  { name: "Inconsolata", value: "'Inconsolata', monospace" },
+  { name: "Space Mono", value: "'Space Mono', monospace" },
 ] as const;
 
 const DEFAULT_FONT_FAMILY = FONT_FAMILY_PRESETS[0].value;
