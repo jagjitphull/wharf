@@ -338,6 +338,11 @@ interface TabButtonProps {
 function TabButton(p: TabButtonProps) {
   const hosts = useAppStore((s) => s.hosts);
   const hostColor = hosts.find((h) => h.id === p.hostId)?.color;
+  // undefined for the "Match App Theme" preset (the default for every tab
+  // until someone deliberately picks one from the tab's right-click menu),
+  // so tabs nobody has assigned a color theme to keep the plain look below
+  // — only a tab someone actually colored gets a tinted background.
+  const themeBg = getTerminalThemePreset(p.themeId ?? p.globalTerminalThemeId).theme?.background;
 
   return (
     <div
@@ -373,7 +378,30 @@ function TabButton(p: TabButtonProps) {
           : hostColor
             ? `inset 0 1px 0 ${hostColor}55`
             : undefined,
-      }}
+        // A tab's own color theme tints its background too (not just the
+        // small tab-theme-dot), so tabs on different themes are
+        // distinguishable at a glance without hovering or opening each one.
+        // This can't just set `background` directly: an inline style always
+        // wins over a stylesheet rule regardless of specificity or pseudo-
+        // classes, which would permanently defeat .tab:hover and .tab.active's
+        // own CSS rules the moment a theme was set. Setting only these custom
+        // properties instead lets TerminalPanel.css's rules for each state
+        // (rest/hover/active) consume whichever one applies via var(), same
+        // as any other background they'd otherwise fall back to. Most of
+        // these presets are deliberately dark, muted palettes (see
+        // terminalThemes.ts), so a subtle tint gets swallowed entirely by the
+        // app's own near-black chrome — needs a strong mix for a theme's
+        // actual hue (Dracula's purple, Nord's blue-gray, Solarized's teal,
+        // ...) to read as a distinct tab color rather than just a
+        // barely-different shade of black.
+        ...(themeBg
+          ? {
+              "--tab-theme-bg": `color-mix(in srgb, var(--bg-panel) 70%, ${themeBg} 30%)`,
+              "--tab-theme-hover-bg": `color-mix(in srgb, var(--bg-hover) 55%, ${themeBg} 45%)`,
+              "--tab-theme-active-bg": `color-mix(in srgb, var(--bg) 45%, ${themeBg} 55%)`,
+            }
+          : {}),
+      } as React.CSSProperties}
       onClick={p.onClick}
       onContextMenu={(e) =>
         p.openMenu(e, [

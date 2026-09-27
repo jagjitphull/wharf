@@ -26,7 +26,16 @@
   gap: 6px;
   padding: 7px 8px 7px 10px;
   border-radius: 7px 7px 0 0;
-  background: transparent;
+  /* --tab-theme-bg/-hover-bg/-active-bg are set inline per-tab (see
+     TabButton) only when that tab has its own color theme, so each state
+     below can pick up its themed tint instead of the plain default —
+     falling back to that default (transparent/var(--bg-hover)/the accent
+     mix) exactly as before for every tab nobody's themed. This has to be a
+     custom property rather than TabButton just setting `background`
+     directly: an inline style always wins over a stylesheet rule
+     regardless of specificity or pseudo-classes, which would permanently
+     defeat the :hover and .active rules below the moment a theme was set. */
+  background: var(--tab-theme-bg, transparent);
   color: var(--text-dim);
   font-size: 12.5px;
   cursor: pointer;
@@ -35,7 +44,7 @@
 }
 
 .tab:hover:not(.active) {
-  background: var(--bg-hover);
+  background: var(--tab-theme-hover-bg, var(--bg-hover));
   color: var(--text);
 }
 
@@ -46,7 +55,7 @@
      was too close to the tab bar's own var(--bg-panel) to notice at a
      glance. The top accent/host-color line itself is set inline per-tab
      (see TabButton) since it also depends on the tab's host color. */
-  background: color-mix(in srgb, var(--bg) 88%, var(--accent) 12%);
+  background: var(--tab-theme-active-bg, color-mix(in srgb, var(--bg) 88%, var(--accent) 12%));
   color: var(--text);
   font-weight: 600;
 }
