@@ -58,7 +58,40 @@ export interface TerminalTab {
    * same command across several hosts split side by side. Off by default;
    * per-tab, not global, since it's easy to forget is on. */
   broadcastInput?: boolean;
+  /** Which TabGroup (see below) this tab belongs to, if any. Membership is
+   * just this id — the tab bar's visual bracket/label groups whichever
+   * *consecutive* tabs currently share one, so dragging a tab out of its
+   * group's run splits the group into two separate-looking clusters rather
+   * than needing special-cased drag handling to keep it contiguous; they
+   * re-merge visually the moment they're adjacent again. */
+  groupId?: string;
 }
+
+/** A named, colored cluster of tabs in the tab bar (Chrome/Edge-style tab
+ * groups) — purely a renderer-side grouping of already-open tabs, not
+ * persisted, same as tabs themselves. */
+export interface TabGroup {
+  id: string;
+  name: string;
+  /** One of TAB_GROUP_COLORS. */
+  color: string;
+  collapsed: boolean;
+}
+
+/** Curated palette for tab group labels — deliberately separate from
+ * HOST_COLOR_PRESETS (host identity) and the terminal theme presets (a
+ * pane's own color scheme); this is just for telling groups of tabs apart
+ * in the bar. */
+export const TAB_GROUP_COLORS = [
+  "#e0575f", // red
+  "#e08a3c", // orange
+  "#dbb642", // yellow
+  "#35c76e", // green
+  "#2bb3a3", // teal
+  "#5b8def", // blue
+  "#8b6cef", // purple
+  "#e0619f", // pink
+] as const;
 
 export type ActiveView = "hosts" | "sftp" | "tunnels" | "history" | "settings" | "workspaces";
 
@@ -125,6 +158,7 @@ interface AppState {
   activeTabId: string | null;
   /** Per-pane (per-session) state; see PaneMeta. */
   paneMeta: Record<string, PaneMeta>;
+  tabGroups: TabGroup[];
 
   activeView: ActiveView;
   /** Host currently in focus for the SFTP/Tunnels panels (independent from which terminal tab is active). */
@@ -160,6 +194,25 @@ interface AppState {
   closeTab(tabId: string): Promise<void>;
   duplicateTab(tabId: string): Promise<void>;
   reorderTab(tabId: string, beforeTabId: string): void;
+  /** Creates a new tab group containing just `tabId`, with a freshly-picked
+   * color (round-robins TAB_GROUP_COLORS by how many groups already exist,
+   * so successive new groups don't all start out the same color). */
+  createTabGroup(tabId: string, name: string): void;
+  /** Moves `tabId` into an existing group, reordering it to sit right after
+   * that group's other tabs so it starts out contiguous with them. */
+  addTabToGroup(tabId: string, groupId: string): void;
+  /** Clears a tab's group membership; deletes the group entirely once its
+   * last tab leaves it. */
+  removeTabFromGroup(tabId: string): void;
+  renameTabGroup(groupId: string, name: string): void;
+  setTabGroupColor(groupId: string, color: string): void;
+  toggleTabGroupCollapsed(groupId: string): void;
+  /** Clears every one of the group's tabs' membership and deletes the
+   * group, leaving the tabs themselves open. */
+  ungroupTabs(groupId: string): void;
+  /** Closes every tab currently in the group (which also deletes the group,
+   * via closeTab's own now-empty cleanup). */
+  closeTabGroup(groupId: string): Promise<void>;
   setActiveTab(tabId: string | null): void;
   /** Splits `sessionId`'s pane, opening a fresh session to the same host
    * alongside it (row = side by side, column = stacked). */
@@ -234,6 +287,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   activeTabId: null,
   paneMeta: {},
+  tabGroups: [],
 
   activeView: "hosts",
   contextHostId: null,
@@ -368,7 +422,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       const activeTabId = s.activeTabId === tabId ? (tabs.at(-1)?.tabId ?? null) : s.activeTabId;
       const paneMeta = { ...s.paneMeta };
       for (const id of sessionIds) delete paneMeta[id];
-      return { tabs, activeTabId, paneMeta };
+      // A tab group that's lost its last remaining tab to this close no
+      // longer has anything to label — drop it too, rather than leaving a
+      // named color with nothing under it around forever.
+      const tabGroups = tab.groupId && !tabs.some((t) => t.groupId === tab.groupId)
+        ? s.tabGroups.filter((g) => g.id !== tab.groupId)
+        : s.tabGroups;
+      return { tabs, activeTabId, paneMeta, tabGroups };
     });
   },
 
@@ -397,6 +457,99 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs.splice(toIdx, 0, moved);
       return { tabs };
     });
+  },
+
+  createTabGroup(tabId, name) {
+    const id = crypto.randomUUID();
+    set((s) => {
+      const color = TAB_GROUP_COLORS[s.tabGroups.length % TAB_GROUP_COLORS.length];
+      return {
+        tabGroups: [...s.tabGroups, { id, name, color, collapsed: false }],
+        tabs: s.tabs.map((t) => (t.tabId === tabId ? { ...t, groupId: id } : t)),
+      };
+    });
+  },
+
+  addTabToGroup(tabId, groupId) {
+    set((s) => {
+      const tabs = [...s.tabs];
+      const fromIdx = tabs.findIndex((t) => t.tabId === tabId);
+      if (fromIdx === -1) return {};
+      const [moved] = tabs.splice(fromIdx, 1);
+      // Insert right after the group's current last member so the moved tab
+      // starts out contiguous with the rest of its new group — scanning from
+      // the end rather than taking the first match, since the group's run
+      // isn't necessarily at the front of the array.
+      let lastMemberIdx = -1;
+      for (let i = tabs.length - 1; i >= 0; i--) {
+        if (tabs[i].groupId === groupId) {
+          lastMemberIdx = i;
+          break;
+        }
+      }
+      const insertAt = lastMemberIdx === -1 ? tabs.length : lastMemberIdx + 1;
+      tabs.splice(insertAt, 0, { ...moved, groupId });
+      return { tabs };
+    });
+  },
+
+  removeTabFromGroup(tabId) {
+    set((s) => {
+      const tab = s.tabs.find((t) => t.tabId === tabId);
+      const groupId = tab?.groupId;
+      const tabs = s.tabs.map((t) => (t.tabId === tabId ? { ...t, groupId: undefined } : t));
+      const stillUsed = groupId && tabs.some((t) => t.groupId === groupId);
+      const tabGroups = stillUsed ? s.tabGroups : s.tabGroups.filter((g) => g.id !== groupId);
+      return { tabs, tabGroups };
+    });
+  },
+
+  renameTabGroup(groupId, name) {
+    set((s) => ({ tabGroups: s.tabGroups.map((g) => (g.id === groupId ? { ...g, name } : g)) }));
+  },
+
+  setTabGroupColor(groupId, color) {
+    set((s) => ({ tabGroups: s.tabGroups.map((g) => (g.id === groupId ? { ...g, color } : g)) }));
+  },
+
+  toggleTabGroupCollapsed(groupId) {
+    set((s) => {
+      const group = s.tabGroups.find((g) => g.id === groupId);
+      if (!group) return {};
+      const collapsing = !group.collapsed;
+      const tabGroups = s.tabGroups.map((g) => (g.id === groupId ? { ...g, collapsed: collapsing } : g));
+      if (!collapsing) return { tabGroups };
+      // Collapsing hides the group's tabs from the bar entirely — if the
+      // active tab was one of them, switch to the nearest tab outside the
+      // group (checking forward first, then back) so there's still a
+      // highlighted tab whose content matches what's actually shown, rather
+      // than leaving activeTabId pointing at one no longer visible.
+      const activeIdx = s.tabs.findIndex((t) => t.tabId === s.activeTabId);
+      if (activeIdx === -1 || s.tabs[activeIdx].groupId !== groupId) return { tabGroups };
+      const next = s.tabs.slice(activeIdx + 1).find((t) => t.groupId !== groupId);
+      let prev: TerminalTab | undefined;
+      for (let i = activeIdx - 1; i >= 0; i--) {
+        if (s.tabs[i].groupId !== groupId) {
+          prev = s.tabs[i];
+          break;
+        }
+      }
+      return { tabGroups, activeTabId: (next ?? prev)?.tabId ?? null };
+    });
+  },
+
+  ungroupTabs(groupId) {
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.groupId === groupId ? { ...t, groupId: undefined } : t)),
+      tabGroups: s.tabGroups.filter((g) => g.id !== groupId),
+    }));
+  },
+
+  async closeTabGroup(groupId) {
+    const memberIds = get()
+      .tabs.filter((t) => t.groupId === groupId)
+      .map((t) => t.tabId);
+    for (const tabId of memberIds) await get().closeTab(tabId);
   },
 
   setActiveTab(tabId) {

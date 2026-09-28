@@ -16,6 +16,11 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Multiple concurrent terminal sessions (tabbed) — duplicate a tab, drag to
   reorder, switch with `Ctrl/Cmd+1..9` or `Ctrl/Cmd+Tab`, and open multiple
   independent app windows (each with their own tabs)
+- Chrome-style tab groups — right-click a tab → New Tab Group… (or "Add to
+  ⟨name⟩" once one exists) to cluster tabs under a named, colored label;
+  click the label to collapse/expand the group, right-click it to rename,
+  recolor, ungroup (keeps the tabs, just removes the label), or close the
+  whole group at once
 - Split-pane terminals — right-click a terminal → Split Right/Split Down to
   divide a tab into independent panes (each its own session, nestable by
   splitting again), click a pane to focus it; drag the divider between two

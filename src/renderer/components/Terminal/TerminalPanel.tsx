@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
-import { useAppStore, type PaneNode } from "../../state/store";
+import { useAppStore, TAB_GROUP_COLORS, type PaneNode, type TabGroup, type TerminalTab } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { wharf } from "../../api/wharf";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
-import { IconBroadcast, IconClose, IconDuplicate, IconTerminal } from "../Icons/Icons";
+import { PromptDialog } from "../PromptDialog/PromptDialog";
+import { IconBroadcast, IconChevronDown, IconChevronUp, IconClose, IconDuplicate, IconTerminal } from "../Icons/Icons";
 import { EmptyState } from "../EmptyState/EmptyState";
 import "./TerminalPanel.css";
 
@@ -198,12 +199,33 @@ function PaneLeafView({ sessionId, visible, tabId }: { sessionId: string; visibl
 }
 
 export function TerminalPanel({ hidden }: Props) {
-  const { tabs, activeTabId, paneMeta, setActiveTab, closeTab, duplicateTab, reorderTab, setPaneThemeId, setPaneLogPath, openLocalShell } =
-    useAppStore();
+  const {
+    tabs,
+    tabGroups,
+    activeTabId,
+    paneMeta,
+    setActiveTab,
+    closeTab,
+    duplicateTab,
+    reorderTab,
+    setPaneThemeId,
+    setPaneLogPath,
+    openLocalShell,
+    createTabGroup,
+    addTabToGroup,
+    removeTabFromGroup,
+    renameTabGroup,
+    setTabGroupColor,
+    toggleTabGroupCollapsed,
+    ungroupTabs,
+    closeTabGroup,
+  } = useAppStore();
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [newGroupTabId, setNewGroupTabId] = useState<string | null>(null);
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
 
   async function closeOthers(tabId: string) {
     for (const tab of tabs) {
@@ -241,49 +263,119 @@ export function TerminalPanel({ hidden }: Props) {
     );
   }
 
+  function renderTabButton(tab: TerminalTab) {
+    const activeMeta = paneMeta[tab.activePaneId];
+    const group = tab.groupId ? tabGroups.find((g) => g.id === tab.groupId) : undefined;
+    return (
+      <TabButton
+        key={tab.tabId}
+        tabId={tab.tabId}
+        title={activeMeta?.title ?? "…"}
+        hostId={activeMeta?.hostId ?? null}
+        closed={activeMeta?.closed ?? false}
+        closeError={activeMeta?.closeError}
+        logPath={activeMeta?.logPath}
+        themeId={activeMeta?.themeId}
+        broadcasting={!!tab.broadcastInput}
+        isActive={tab.tabId === activeTabId}
+        draggingId={draggingId}
+        dropTargetId={dropTargetId}
+        tabCount={tabs.length}
+        globalTerminalThemeId={globalTerminalThemeId}
+        groupId={tab.groupId}
+        tabGroups={tabGroups}
+        onDragStart={() => setDraggingId(tab.tabId)}
+        onDragEnd={() => {
+          setDraggingId(null);
+          setDropTargetId(null);
+        }}
+        onDragOver={() => setDropTargetId(tab.tabId)}
+        onDrop={() => {
+          if (draggingId) reorderTab(draggingId, tab.tabId);
+          setDraggingId(null);
+          setDropTargetId(null);
+        }}
+        onClick={() => setActiveTab(tab.tabId)}
+        onDuplicate={() => duplicateTab(tab.tabId)}
+        onClose={() => closeTab(tab.tabId)}
+        onCloseOthers={() => closeOthers(tab.tabId)}
+        onCloseAll={closeAll}
+        onToggleLogging={() => activeMeta && toggleLogging(tab.activePaneId, activeMeta.logPath)}
+        onSetTheme={(id) => setPaneThemeId(tab.activePaneId, id)}
+        onNewGroup={() => setNewGroupTabId(tab.tabId)}
+        onAddToGroup={(groupId) => addTabToGroup(tab.tabId, groupId)}
+        onRemoveFromGroup={() => removeTabFromGroup(tab.tabId)}
+        openMenu={openMenu}
+      />
+    );
+  }
+
+  // Chrome/Edge-style tab groups: a "segment" is one maximal run of
+  // *consecutive* tabs sharing the same group (or no group at all). This is
+  // computed fresh from tab order on every render rather than stored
+  // separately — a group is only ever whatever's currently contiguous, so
+  // dragging a tab out of its group's run visually splits it into two
+  // same-colored clusters instead of needing special-cased drag handling to
+  // keep membership and position in sync.
+  const segments: { group: TabGroup | null; tabs: TerminalTab[] }[] = [];
+  for (const tab of tabs) {
+    const group = tab.groupId ? (tabGroups.find((g) => g.id === tab.groupId) ?? null) : null;
+    const last = segments[segments.length - 1];
+    if (last && last.group?.id === group?.id) last.tabs.push(tab);
+    else segments.push({ group, tabs: [tab] });
+  }
+
   return (
     <div className="terminal-panel" style={hidden ? { display: "none" } : undefined}>
       <div className="tab-bar">
-        {tabs.map((tab) => {
-          const activeMeta = paneMeta[tab.activePaneId];
-          return (
-            <TabButton
-              key={tab.tabId}
-              tabId={tab.tabId}
-              title={activeMeta?.title ?? "…"}
-              hostId={activeMeta?.hostId ?? null}
-              closed={activeMeta?.closed ?? false}
-              closeError={activeMeta?.closeError}
-              logPath={activeMeta?.logPath}
-              themeId={activeMeta?.themeId}
-              broadcasting={!!tab.broadcastInput}
-              isActive={tab.tabId === activeTabId}
-              draggingId={draggingId}
-              dropTargetId={dropTargetId}
-              tabCount={tabs.length}
-              globalTerminalThemeId={globalTerminalThemeId}
-              onDragStart={() => setDraggingId(tab.tabId)}
-              onDragEnd={() => {
-                setDraggingId(null);
-                setDropTargetId(null);
-              }}
-              onDragOver={() => setDropTargetId(tab.tabId)}
-              onDrop={() => {
-                if (draggingId) reorderTab(draggingId, tab.tabId);
-                setDraggingId(null);
-                setDropTargetId(null);
-              }}
-              onClick={() => setActiveTab(tab.tabId)}
-              onDuplicate={() => duplicateTab(tab.tabId)}
-              onClose={() => closeTab(tab.tabId)}
-              onCloseOthers={() => closeOthers(tab.tabId)}
-              onCloseAll={closeAll}
-              onToggleLogging={() => activeMeta && toggleLogging(tab.activePaneId, activeMeta.logPath)}
-              onSetTheme={(id) => setPaneThemeId(tab.activePaneId, id)}
-              openMenu={openMenu}
-            />
-          );
-        })}
+        {segments.map((seg, i) =>
+          seg.group ? (
+            <div className="tab-group" key={`group-${seg.group.id}-${i}`} style={{ "--tab-group-color": seg.group.color } as React.CSSProperties}>
+              <button
+                className="tab-group-label"
+                title={seg.group.collapsed ? "Expand group" : "Collapse group"}
+                onClick={() => toggleTabGroupCollapsed(seg.group!.id)}
+                onContextMenu={(e) =>
+                  openMenu(e, [
+                    { label: "Rename group…", onClick: () => setRenamingGroupId(seg.group!.id) },
+                    { separator: true },
+                    {
+                      custom: (close) => (
+                        <div className="term-theme-swatches">
+                          <div className="term-theme-swatches-label">Group color</div>
+                          <div className="term-theme-swatches-grid">
+                            {TAB_GROUP_COLORS.map((c) => (
+                              <button
+                                key={c}
+                                className={`term-theme-swatch-dot ${seg.group!.color === c ? "active" : ""}`}
+                                style={{ background: c }}
+                                title={c}
+                                onClick={() => {
+                                  setTabGroupColor(seg.group!.id, c);
+                                  close();
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    { separator: true },
+                    { label: "Ungroup", onClick: () => ungroupTabs(seg.group!.id) },
+                    { label: "Close group", danger: true, onClick: () => closeTabGroup(seg.group!.id) },
+                  ])
+                }
+              >
+                {seg.group.collapsed ? <IconChevronDown size={10} /> : <IconChevronUp size={10} />}
+                <span className="tab-group-name">{seg.group.name}</span>
+                {seg.group.collapsed && <span className="tab-group-count">{seg.tabs.length}</span>}
+              </button>
+              {!seg.group.collapsed && seg.tabs.map(renderTabButton)}
+            </div>
+          ) : (
+            seg.tabs.map(renderTabButton)
+          ),
+        )}
       </div>
       <div className="terminal-stack">
         {tabs.map((tab) => (
@@ -303,6 +395,32 @@ export function TerminalPanel({ hidden }: Props) {
         ))}
       </div>
       <ContextMenu menu={menu} onClose={closeMenu} />
+      {newGroupTabId && (
+        <PromptDialog
+          title="New tab group"
+          label="Name"
+          placeholder="e.g. Production"
+          confirmLabel="Create"
+          onCancel={() => setNewGroupTabId(null)}
+          onSubmit={(name) => {
+            createTabGroup(newGroupTabId, name);
+            setNewGroupTabId(null);
+          }}
+        />
+      )}
+      {renamingGroupId && (
+        <PromptDialog
+          title="Rename tab group"
+          label="Name"
+          defaultValue={tabGroups.find((g) => g.id === renamingGroupId)?.name}
+          confirmLabel="Rename"
+          onCancel={() => setRenamingGroupId(null)}
+          onSubmit={(name) => {
+            renameTabGroup(renamingGroupId, name);
+            setRenamingGroupId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -321,6 +439,8 @@ interface TabButtonProps {
   dropTargetId: string | null;
   tabCount: number;
   globalTerminalThemeId: string;
+  groupId?: string;
+  tabGroups: TabGroup[];
   onDragStart(): void;
   onDragEnd(): void;
   onDragOver(): void;
@@ -332,6 +452,9 @@ interface TabButtonProps {
   onCloseAll(): void;
   onToggleLogging(): void;
   onSetTheme(id: string): void;
+  onNewGroup(): void;
+  onAddToGroup(groupId: string): void;
+  onRemoveFromGroup(): void;
   openMenu: ReturnType<typeof useContextMenu>["open"];
 }
 
@@ -413,6 +536,13 @@ function TabButton(p: TabButtonProps) {
           { separator: true },
           { label: p.logPath ? "Stop Logging" : "Start Logging…", onClick: p.onToggleLogging },
           ...buildTerminalThemeMenuItems(p.themeId ?? p.globalTerminalThemeId, p.onSetTheme),
+          { separator: true },
+          ...(p.groupId
+            ? [{ label: "Remove from group", onClick: p.onRemoveFromGroup }]
+            : [
+                ...p.tabGroups.map((g) => ({ label: `Add to "${g.name}"`, onClick: () => p.onAddToGroup(g.id) })),
+                { label: "New Tab Group…", onClick: p.onNewGroup },
+              ]),
         ])
       }
       title={p.closeError}
