@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ipcMain } from "electron";
 import { IPC, type CommandHistoryEntry, type CommandHistoryInput } from "../../shared/types";
-import { addCommandHistoryEntry, clearCommandHistory, getCommandHistory } from "../services/store";
+import { addCommandHistoryEntry, clearCommandHistory, correctLastCommandHistoryEntry, getCommandHistory } from "../services/store";
 
 export function registerCommandHistoryIpc(): void {
   ipcMain.handle(IPC.commandHistory.add, (_event, input: CommandHistoryInput): void => {
@@ -15,5 +15,9 @@ export function registerCommandHistoryIpc(): void {
 
   ipcMain.handle(IPC.commandHistory.clear, (): void => {
     clearCommandHistory();
+  });
+
+  ipcMain.handle(IPC.commandHistory.correctLast, (_event, sessionId: string, command: string): void => {
+    correctLastCommandHistoryEntry(sessionId, command);
   });
 }

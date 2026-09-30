@@ -444,6 +444,7 @@ export const IPC = {
     add: "command-history:add",
     list: "command-history:list",
     clear: "command-history:clear",
+    correctLast: "command-history:correct-last",
   },
   ai: {
     suggest: "ai:suggest",

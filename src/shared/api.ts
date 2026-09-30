@@ -158,6 +158,11 @@ export interface WharfApi {
     add(input: CommandHistoryInput): Promise<void>;
     list(): Promise<CommandHistoryEntry[]>;
     clear(): Promise<void>;
+    /** Overwrites the most recent entry for `sessionId` with more accurate
+     * text once the shell's own OSC 133 integration reports the command it's
+     * actually about to run — see commandCapture.ts's doc comment. A no-op
+     * if no entry for this session exists (or it's aged out). */
+    correctLast(sessionId: string, command: string): Promise<void>;
   };
   ai: {
     /** Asks the active provider for up to 3 likely completions of the current line. Throws if that provider isn't configured. */

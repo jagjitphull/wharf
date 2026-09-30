@@ -25,7 +25,14 @@ import {
   type CompiledRule,
 } from "./keywordHighlight";
 import { createCommandCaptureState, feedCommandCapture } from "./commandCapture";
-import { createCommandBlocksState, handleOsc133, notePendingCommand, readBlockOutput, type CommandBlock } from "./commandBlocks";
+import {
+  createCommandBlocksState,
+  decodeOsc133CommandText,
+  handleOsc133,
+  notePendingCommand,
+  readBlockOutput,
+  type CommandBlock,
+} from "./commandBlocks";
 import { createGhostHistoryCache, findGhostSuggestion, pushToGhostHistoryCache, type GhostHistoryCache } from "./ghostSuggestion";
 import { BlocksPanel } from "./BlocksPanel";
 import "@xterm/xterm/css/xterm.css";
@@ -568,6 +575,17 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     // so blocks/exit codes are additive, never required for the terminal to
     // otherwise work normally.
     const oscDisposable = term.parser.registerOscHandler(133, (payload) => {
+      // A ";C;<base64>" payload also carries the shell's own authoritative
+      // text for the command it's about to run — arrives a beat after
+      // commandHistory.add() already recorded the keystroke-buffer's guess
+      // (see the onData handler below), so this corrects that entry in
+      // place rather than replacing the original synchronous write, which
+      // keeps history responsive even over a slow SSH round trip.
+      if (payload.startsWith("C")) {
+        const [, arg] = payload.split(";");
+        const shellCommandText = decodeOsc133CommandText(arg);
+        if (shellCommandText) void wharf.commandHistory.correctLast(sessionId, shellCommandText);
+      }
       const updated = handleOsc133(term, commandBlocksRef.current, payload);
       if (updated) setBlocks(updated);
       // "D" always closes whatever block "C" most recently opened (only one

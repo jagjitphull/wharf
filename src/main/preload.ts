@@ -114,6 +114,7 @@ const api: WharfApi = {
     add: (input) => ipcRenderer.invoke(IPC.commandHistory.add, input),
     list: () => ipcRenderer.invoke(IPC.commandHistory.list),
     clear: () => ipcRenderer.invoke(IPC.commandHistory.clear),
+    correctLast: (sessionId, command) => ipcRenderer.invoke(IPC.commandHistory.correctLast, sessionId, command),
   },
   ai: {
     suggest: (request) => ipcRenderer.invoke(IPC.ai.suggest, request),

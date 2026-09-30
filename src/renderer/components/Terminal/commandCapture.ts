@@ -9,8 +9,13 @@
  *  - Tab completion similarly expands text the shell fills in, not us.
  *  - A pasted multi-line block is treated as one command per embedded
  *    newline, same as if it had been typed.
- * Good enough for "what did I run, and roughly when" — an audit trail, not
- * a session recording.
+ * Good enough for "what did I run, and roughly when" on its own — an audit
+ * trail, not a session recording. For bash/zsh with Command Blocks enabled,
+ * though, this is only ever a same-tick placeholder: shellIntegration.ts's
+ * hooks report the shell's own authoritative command text a moment later
+ * (see decodeOsc133CommandText in commandBlocks.ts and Terminal.tsx's
+ * commandHistory.correctLast call), which is immune to exactly the two
+ * blind spots above and overwrites this guess once it arrives.
  */
 
 export interface CommandCaptureState {

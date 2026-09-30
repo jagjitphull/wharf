@@ -57,16 +57,36 @@ export function notePendingCommand(state: CommandBlocksState, command: string): 
 
 const MAX_BLOCKS = 200;
 
+/** Decodes the base64 command text shellIntegration.ts's hooks embed in a
+ * ";C;<base64>" OSC payload (see its doc comment) — authoritative, unlike
+ * the keystroke-buffer guess in commandCapture.ts, since it's the shell's
+ * own idea of the command it's about to run. Returns undefined for a bare
+ * ";C" (an unsupported shell, or this build of the hooks predates the
+ * text field) or anything that fails to decode, so callers can cleanly
+ * fall back to the keystroke-buffer text in either case. */
+export function decodeOsc133CommandText(arg: string | undefined): string | undefined {
+  if (!arg) return undefined;
+  try {
+    const binary = atob(arg);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const text = new TextDecoder().decode(bytes);
+    return text || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Feed one xterm OSC-133 payload (the string after "133;", e.g. "A", "B",
- * "C", "D;0") into the state machine. Returns a new blocks array only when
- * it actually changed (new/updated block), so callers can skip a re-render
- * on plain "A"/"B" cycles. */
+ * "C", "C;<base64>", "D;0") into the state machine. Returns a new blocks
+ * array only when it actually changed (new/updated block), so callers can
+ * skip a re-render on plain "A"/"B" cycles. */
 export function handleOsc133(term: XTerm, state: CommandBlocksState, payload: string): CommandBlock[] | null {
   const [code, arg] = payload.split(";");
 
   if (code === "C") {
     if (state.openBlockId) return null; // already inside a block — see the DEBUG-trap note in shellIntegration.ts
-    if (!state.pendingCommand && !state.sawFirstCommand) {
+    const shellCommandText = decodeOsc133CommandText(arg);
+    if (!shellCommandText && !state.pendingCommand && !state.sawFirstCommand) {
       // The shell's own startup (loading the integration script, the first
       // PROMPT_COMMAND/precmd cycle) can fire one ;C/;D pair before any real
       // command was ever typed — skip creating a block for it rather than
@@ -80,7 +100,9 @@ export function handleOsc133(term: XTerm, state: CommandBlocksState, payload: st
     state.sawFirstCommand = true;
     const block: CommandBlock = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      command: state.pendingCommand ?? "(unknown command)",
+      // The shell's own text wins when present — the keystroke-buffer guess
+      // is only ever a fallback for shells this build's hooks don't cover.
+      command: shellCommandText || state.pendingCommand || "(unknown command)",
       startMarker: term.registerMarker(0),
       endMarker: null,
       exitCode: null,

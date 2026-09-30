@@ -5,13 +5,19 @@ import { app } from "electron";
 /**
  * Optional shell integration: emits OSC 133 sequences (the same protocol
  * iTerm2/VS Code/WezTerm/Warp use) around every command a shell runs —
- * ;A prompt-start, ;B prompt-end/input-start, ;C command-start,
- * ;D;<exitcode> command-end — so the renderer can group each command with
- * its real output into a block and know its real exit code, rather than
- * guessing from keystrokes alone. Bash and zsh are supported; other shells
- * (fish, sh/dash, PowerShell, cmd.exe) are left alone entirely — a session
- * without integration still works exactly as before, just without blocks/
- * exit codes.
+ * ;A prompt-start, ;B prompt-end/input-start, ;C command-start (with the
+ * command text itself, base64-encoded, as a second field —
+ * ;C;<base64>), ;D;<exitcode> command-end — so the renderer can group
+ * each command with its real output into a block, know its real exit
+ * code, and record accurate command-history text, rather than guessing
+ * all three from keystrokes alone. The base64 text is the authoritative
+ * fix for commandCapture.ts's documented keystroke-buffer blind spots
+ * (tab completion, arrow-key history recall) — see
+ * correctLastCommandHistoryEntry() and commandBlocks.ts's handling of the
+ * ;C payload. Bash and zsh are supported; other shells (fish, sh/dash,
+ * PowerShell, cmd.exe) are left alone entirely — a session without
+ * integration still works exactly as before, just without blocks/exit
+ * codes/corrected history, falling back to the keystroke-buffer guess.
  *
  * The hook logic itself is identical whether it's loaded at shell startup
  * (local shell, where we control the spawn args) or eval'd into an
@@ -24,13 +30,22 @@ import { app } from "electron";
 // mechanism. DEBUG fires once per simple command (including extra times for
 // compound commands and the prompt's own $(...) substitution) — harmless,
 // since the "armed" guard only lets the first one after a prompt through.
+// $BASH_COMMAND at that point is bash's own idea of the command about to
+// run — accurate, but for a typed "cmd1 && cmd2" one-liner it's only
+// "cmd1" (DEBUG fires per simple command, and "armed" already disarms on
+// the first one): a real but narrower limitation than the keystroke
+// buffer's, which at least keeps the whole typed line intact for that case.
+// The base64 encoding (rather than sending $BASH_COMMAND's text raw) is
+// what makes this safe to embed in the OSC payload at all — it can contain
+// characters (;, control bytes, the BEL/ST that would otherwise terminate
+// the sequence early) the payload itself can't.
 const BASH_HOOKS = `
 __wharf_prompt_start() { printf '\\033]133;A\\007'; }
 __wharf_prompt_end() { printf '\\033]133;B\\007'; }
 __wharf_cmd_start() {
   if [ "$__wharf_armed" = "1" ]; then
     __wharf_armed=0
-    printf '\\033]133;C\\007'
+    printf '\\033]133;C;%s\\007' "$(printf '%s' "$BASH_COMMAND" | base64 | tr -d '\\n')"
   fi
 }
 __wharf_cmd_end() {
@@ -50,10 +65,12 @@ trap '__wharf_armed=1; __wharf_in_cmd=1; __wharf_cmd_start' DEBUG
 // zsh has native precmd/preexec hooks (add-zsh-hook), no DEBUG-trap hack
 // needed — precmd runs before each prompt (so it both closes the previous
 // command with its real $? and opens the next prompt), preexec runs once
-// right before a typed command actually executes.
+// right before a typed command actually executes, and receives that
+// command's full text (exactly as entered, unlike bash's per-simple-command
+// $BASH_COMMAND) as its first argument.
 const ZSH_HOOKS = `
 __wharf_prompt_start() { printf '\\033]133;A\\007'; }
-__wharf_preexec() { printf '\\033]133;C\\007'; }
+__wharf_preexec() { printf '\\033]133;C;%s\\007' "$(printf '%s' "$1" | base64 | tr -d '\\n')"; }
 __wharf_precmd() {
   local ec=$?
   printf '\\033]133;D;%s\\007' "$ec"

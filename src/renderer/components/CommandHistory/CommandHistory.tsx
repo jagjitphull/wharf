@@ -62,8 +62,9 @@ export function CommandHistory() {
         </button>
       </div>
       <p className="history-hint">
-        A best-effort log of commands typed into terminal sessions — reconstructed from keystrokes, so shell history
-        recall (↑/↓) and tab completion aren't captured exactly as run.
+        A log of commands typed into terminal sessions. For bash/zsh with Command Blocks enabled (Settings), the
+        shell itself reports the exact command, so tab completion and history recall (↑/↓) come through correctly —
+        otherwise it's reconstructed from raw keystrokes and can miss those.
       </p>
 
       <input

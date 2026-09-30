@@ -137,6 +137,28 @@ export function clearCommandHistory(): void {
   store.set("commandHistory", []);
 }
 
+/**
+ * Overwrites the most recent entry for `sessionId` with more accurate text
+ * — used when the shell's own OSC 133;C integration (see
+ * shellIntegration.ts) reports the command it's actually about to run,
+ * which arrives slightly after the keystroke-buffer guess that created the
+ * entry in the first place, but is authoritative (unlike the guess, it
+ * isn't fooled by tab completion or arrow-key history recall). A no-op if
+ * that entry has since aged out of the list (COMMAND_HISTORY_MAX) or no
+ * entry for this session exists yet.
+ */
+export function correctLastCommandHistoryEntry(sessionId: string, command: string): void {
+  const entries = store.get("commandHistory");
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].sessionId === sessionId) {
+      const next = [...entries];
+      next[i] = { ...next[i], command };
+      store.set("commandHistory", next);
+      return;
+    }
+  }
+}
+
 export function getAiProvider(): AiProvider {
   return store.get("aiProvider");
 }
