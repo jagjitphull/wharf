@@ -78,9 +78,12 @@ A personal SSH/SFTP terminal client, Termius-style.
   Inconsolata, Space Mono) are bundled directly rather than just named in
   CSS, so they render correctly regardless of what's installed on the host
   OS, alongside a few system-font options for anyone who prefers matching
-  their platform — a sidebar collapse toggle, and 14 built-in terminal
-  color themes (Solarized, Nord, Gruvbox, Dracula, Catppuccin, Rosé Pine,
-  and more) — settable globally or per-tab,
+  their platform — a sidebar collapse toggle, and 21 built-in terminal
+  color themes, roughly split between soothing low-contrast light palettes
+  (Solarized, Gruvbox, One, Catppuccin, Everforest, Ayu, GitHub, PaperColor)
+  and balanced dark ones spanning gentle-to-vibrant (Nord, Sepia, Dracula,
+  Tokyo Night, Monokai, Rosé Pine, plus the deliberately softer "dimmed"/
+  "mirage" dark variants of GitHub and Ayu) — settable globally or per-tab,
   independent of the app's own theme; Settings shows a live preview
 - Drag the sidebar's right edge to resize it (double-click to reset,
   drag it nearly shut to collapse — same as the explicit toggle)
