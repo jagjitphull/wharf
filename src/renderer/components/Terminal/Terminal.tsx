@@ -607,11 +607,17 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     });
     const offClosed = wharf.ssh.onClosed((event) => {
       if (event.sessionId === sessionId) {
+        // A ghost suggestion anchored to the line the user was on stays
+        // registered against its old marker/column otherwise — the write
+        // below doesn't go through the onData/recomputeGhostSuggestion path
+        // above, so nothing would ever clear it once the session's gone.
+        disposeGhostSuggestion();
         term.write(`\r\n\x1b[31m[session closed${event.error ? `: ${event.error}` : ""}]\x1b[0m\r\n`);
       }
     });
     const offReconnecting = wharf.ssh.onReconnecting((event) => {
       if (event.sessionId === sessionId) {
+        disposeGhostSuggestion();
         term.write(
           `\r\n\x1b[33m[connection lost — reconnecting… (attempt ${event.attempt}/${event.maxAttempts})]\x1b[0m\r\n`,
         );
@@ -624,6 +630,16 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     });
 
     const dataDisposable = term.onData((data) => {
+      // The suggestion currently showing (if any) was positioned against the
+      // cursor/buffer state from before this keystroke — recomputeGhostSuggestion()
+      // only re-runs once the shell's echo of this keystroke comes back (see
+      // its own doc comment), which for anything less than perfectly instant
+      // local echo leaves a window where the old decoration's text no longer
+      // matches what's actually being typed. Clearing it immediately here
+      // means it can only ever be stale by "briefly hidden while echo is in
+      // flight", never by "showing the wrong text/position" — the flicker is
+      // imperceptible locally and correct behavior over a laggier SSH link.
+      disposeGhostSuggestion();
       wharf.ssh.write(sessionId, data);
       // Broadcast Input (tab context menu / right-click a pane) — mirrors
       // whatever's typed here to every other pane in this same tab. Read
