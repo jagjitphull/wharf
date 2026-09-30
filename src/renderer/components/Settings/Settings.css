@@ -1,23 +1,23 @@
 .settings-layout {
   display: flex;
-  /* .settings-panel caps out at max-width:620px and .settings-preview-pane
-     is a fixed 340px, so on any window wider than ~960px (plus the
-     sidebar) there's leftover space flex-grow can't place on either child.
-     Left at the default flex-start, that entire remainder piles up as a
-     dead strip past the preview pane's right edge — centering splits it
-     evenly on both sides instead, which reads as an intentional margin
-     rather than a layout that ran out of content. */
-  justify-content: center;
   height: 100%;
   overflow: hidden;
 }
 
 .settings-panel {
+  /* No max-width: this column is meant to fill whatever space isn't taken
+     by the fixed-width preview pane, all the way to the window edge — a
+     capped width here previously left a dead strip of blank background past
+     the preview pane on any sufficiently wide window, which centering the
+     two columns as a block once tried to paper over symmetrically rather
+     than actually filling it. Every row inside already lays out as
+     label-left/control-right (.appearance-row's space-between) or a
+     responsive grid (.term-theme-grid's auto-fill), so the extra width is
+     real usable space, not just awkward stretching. */
   flex: 1;
   padding: 20px;
   overflow-y: auto;
   height: 100%;
-  max-width: 620px;
 }
 
 .settings-preview-pane {
