@@ -1,5 +1,13 @@
 .settings-layout {
   display: flex;
+  /* .settings-panel caps out at max-width:620px and .settings-preview-pane
+     is a fixed 340px, so on any window wider than ~960px (plus the
+     sidebar) there's leftover space flex-grow can't place on either child.
+     Left at the default flex-start, that entire remainder piles up as a
+     dead strip past the preview pane's right edge — centering splits it
+     evenly on both sides instead, which reads as an intentional margin
+     rather than a layout that ran out of content. */
+  justify-content: center;
   height: 100%;
   overflow: hidden;
 }
@@ -221,4 +229,18 @@
   color: var(--text);
   border-radius: 6px;
   font-size: 12.5px;
+}
+
+/* .shortcuts-groups (from KeyboardShortcuts.css, reused here rather than
+   duplicated) sets overflow-y:auto for the shortcuts *dialog*, whose own
+   height is capped — nested inside .settings-preview-pane's own scrolling
+   column with no height limit of its own, that same rule just clips the
+   list into an unwanted second scrollbar instead of flowing normally with
+   the rest of the pane. */
+.settings-preview-shortcuts {
+  overflow: visible;
+}
+
+.settings-preview-shortcuts .shortcut-row kbd {
+  min-width: 100px;
 }

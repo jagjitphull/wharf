@@ -6,17 +6,20 @@ import "./KeyboardShortcuts.css";
 const isMac = wharf.window.platform === "darwin";
 const MOD = isMac ? "Cmd" : "Ctrl";
 
-interface Shortcut {
+export interface Shortcut {
   keys: string;
   description: string;
 }
 
-interface Group {
+export interface Group {
   title: string;
   shortcuts: Shortcut[];
 }
 
-const GROUPS: Group[] = [
+/** Exported so Settings' preview pane can reuse a couple of these groups as
+ * a quick-reference card, rather than maintaining a second, driftable copy
+ * of the same shortcut list. */
+export const GROUPS: Group[] = [
   {
     title: "Global",
     shortcuts: [
