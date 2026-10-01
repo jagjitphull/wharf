@@ -27,7 +27,12 @@ A personal SSH/SFTP terminal client, Termius-style.
   panes to resize them, or hit the × in a pane's corner (or right-click →
   Close Pane) to close just that one and collapse the split back down
 - Quick Connect (`Ctrl/Cmd+K`) — jump straight to a host from anywhere;
-  the sidebar also has an inline filter box
+  the sidebar also has an inline filter box. Each row shows a live
+  online/offline dot (a raw TCP probe against that host's port, no SSH
+  handshake) so you can see what's actually reachable before connecting
+- Restore tabs on launch (Settings → Startup, on by default) — reopens
+  whatever hosts and local shells were open last time, reconnecting each
+  automatically
 - In-terminal find (`Ctrl/Cmd+F`), right-click copy/paste/select-all/clear
 - Snippets library — save frequent commands, insert into any terminal via
   right-click → Insert Snippet

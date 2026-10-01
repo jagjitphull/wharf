@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ipcMain } from "electron";
-import { IPC, type WorkspaceInput, type WorkspaceRecord } from "../../shared/types";
-import { getWorkspaces, setWorkspaces } from "../services/store";
+import { IPC, type WorkspaceInput, type WorkspaceRecord, type WorkspaceTab } from "../../shared/types";
+import { getLastSessionTabs, getWorkspaces, setLastSessionTabs, setWorkspaces } from "../services/store";
 
 export function registerWorkspacesIpc(): void {
   ipcMain.handle(IPC.workspaces.list, (): WorkspaceRecord[] => {
@@ -21,5 +21,13 @@ export function registerWorkspacesIpc(): void {
 
   ipcMain.handle(IPC.workspaces.remove, (_event, id: string): void => {
     setWorkspaces(getWorkspaces().filter((w) => w.id !== id));
+  });
+
+  ipcMain.handle(IPC.session.getLast, (): WorkspaceTab[] => {
+    return getLastSessionTabs();
+  });
+
+  ipcMain.handle(IPC.session.saveLast, (_event, tabs: WorkspaceTab[]): void => {
+    setLastSessionTabs(tabs);
   });
 }

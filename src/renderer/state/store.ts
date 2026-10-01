@@ -178,6 +178,12 @@ interface AppState {
    * as new tabs alongside whatever's already open (existing tabs/sessions
    * are left alone). */
   openWorkspace(workspaceId: string): Promise<void>;
+  /** Reopens whatever tabs were open when the app last quit (or last had its
+   * tabs change) — same mechanism as openWorkspace, against the
+   * automatically-kept-in-sync snapshot rather than a named workspace. A
+   * tab that fails to reconnect (e.g. auth failure while unattended) is
+   * skipped rather than aborting the rest — see its own doc comment. */
+  restoreLastSession(): Promise<void>;
   /** Reassigns a saved host to a different group (or null to ungroup it) —
    * used by the sidebar's drag-and-drop. Sends the host's existing fields
    * back unchanged aside from groupId; wharf.hosts.update keeps its saved
@@ -277,6 +283,34 @@ function paneNodeToWorkspaceNode(node: PaneNode, paneMeta: Record<string, PaneMe
   return { type: "split", direction: node.direction, children: node.children.map((c) => paneNodeToWorkspaceNode(c, paneMeta)) };
 }
 
+/** Shared by openWorkspace/restoreLastSession: (re)connects every tab of a
+ * saved layout in order and hands each one to `onTabConnected` as it comes
+ * up, so callers only differ in where the tabs come from and how a single
+ * tab's connect failure should be handled. With `isolateFailures` a failed
+ * tab is skipped (logged, not thrown) so the rest of an unattended restore
+ * still comes up; without it a failure propagates, same as before this was
+ * extracted (openWorkspace's own manual "Open" surfaces the error). */
+async function connectSavedTabs(
+  tabs: WorkspaceTab[],
+  hosts: HostRecord[],
+  onTabConnected: (tab: TerminalTab, metas: Record<string, PaneMeta>) => void,
+  isolateFailures: boolean,
+): Promise<void> {
+  const localShellOrdinal = { count: 0 };
+  for (const workspaceTab of tabs) {
+    try {
+      const metas: Record<string, PaneMeta> = {};
+      const layout = await connectWorkspaceNode(workspaceTab.layout, hosts, localShellOrdinal, metas);
+      const activePaneId = flattenPanes(layout)[0];
+      const tab: TerminalTab = { tabId: crypto.randomUUID(), layout, activePaneId };
+      onTabConnected(tab, metas);
+    } catch (err) {
+      if (!isolateFailures) throw err;
+      console.warn("Skipped restoring a tab from the last session:", err);
+    }
+  }
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   hosts: [],
   groups: [],
@@ -332,20 +366,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   async openWorkspace(workspaceId) {
     const workspace = get().workspaces.find((w) => w.id === workspaceId);
     if (!workspace) return;
-    const hosts = get().hosts;
-    const localShellOrdinal = { count: 0 };
-    for (const workspaceTab of workspace.tabs) {
-      const metas: Record<string, PaneMeta> = {};
-      const layout = await connectWorkspaceNode(workspaceTab.layout, hosts, localShellOrdinal, metas);
-      const activePaneId = flattenPanes(layout)[0];
-      const tab: TerminalTab = { tabId: crypto.randomUUID(), layout, activePaneId };
-      set((s) => ({
-        tabs: [...s.tabs, tab],
-        activeTabId: tab.tabId,
-        paneMeta: { ...s.paneMeta, ...metas },
-      }));
-    }
+    await connectSavedTabs(
+      workspace.tabs,
+      get().hosts,
+      (tab, metas) =>
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.tabId, paneMeta: { ...s.paneMeta, ...metas } })),
+      false,
+    );
     set({ activeView: "hosts" });
+  },
+
+  async restoreLastSession() {
+    const savedTabs = await wharf.session.getLast();
+    if (savedTabs.length === 0) return;
+    await connectSavedTabs(
+      savedTabs,
+      get().hosts,
+      (tab, metas) =>
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.tabId, paneMeta: { ...s.paneMeta, ...metas } })),
+      true,
+    );
   },
 
   async moveHostToGroup(hostId, groupId) {
@@ -616,6 +656,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ contextHostId: hostId });
   },
 }));
+
+// Keeps the main process's "last session" snapshot in sync with whatever
+// tabs are actually open, so restoreLastSession() always has an up-to-date
+// layout to reopen on the next launch — debounced since a workspace open or
+// a run of quick tab actions can touch `tabs` several times in a row, and
+// only the final state after they settle is worth persisting.
+let persistSessionTimer: ReturnType<typeof setTimeout> | null = null;
+useAppStore.subscribe((state, prevState) => {
+  if (state.tabs === prevState.tabs) return;
+  if (persistSessionTimer) clearTimeout(persistSessionTimer);
+  persistSessionTimer = setTimeout(() => {
+    const { tabs, paneMeta } = useAppStore.getState();
+    const workspaceTabs: WorkspaceTab[] = tabs.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta) }));
+    void wharf.session.saveLast(workspaceTabs);
+  }, 800);
+});
 
 // Registered once at module load: if a session dies on the backend (network
 // drop, remote closed the connection, auth failure mid-session) reflect

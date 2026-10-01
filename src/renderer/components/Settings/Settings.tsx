@@ -4,6 +4,7 @@ import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStor
 import { MAX_UI_ZOOM, MIN_UI_ZOOM, useUiPrefsStore } from "../../state/uiPrefsStore";
 import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
 import { useAppStore } from "../../state/store";
+import { useRestoreTabsPrefsStore } from "../../state/restoreTabsPrefsStore";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
 import { CommandBlocksSettings } from "./CommandBlocksSettings";
@@ -36,6 +37,7 @@ export function Settings() {
     useTerminalPrefsStore();
   const { uiZoom, increaseUiZoom, decreaseUiZoom } = useUiPrefsStore();
   const { loadAll } = useAppStore();
+  const { enabled: restoreTabsEnabled, setEnabled: setRestoreTabsEnabled } = useRestoreTabsPrefsStore();
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -208,6 +210,23 @@ export function Settings() {
 
         <h2>AI Autocomplete</h2>
         <AiAutocompleteSettings />
+
+        <h2>Startup</h2>
+        <div className="appearance-row">
+          <span className="appearance-label">Restore tabs on launch</span>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={restoreTabsEnabled}
+              onChange={(e) => setRestoreTabsEnabled(e.target.checked)}
+            />
+            <span className="toggle-switch-track" />
+          </label>
+        </div>
+        <p className="hint">
+          Reopens whatever hosts and local shells were open last time, reconnecting each automatically — only hosts
+          with a saved password/key (no interactive prompt needed) will come back cleanly, same as Reconnect on Drop.
+        </p>
 
         <h2>Backup</h2>
         <p className="hint">

@@ -14,6 +14,7 @@ import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useAppStore } from "./state/store";
 import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
 import { useUiPrefsStore } from "./state/uiPrefsStore";
+import { useRestoreTabsPrefsStore } from "./state/restoreTabsPrefsStore";
 import { ipcErrorMessage } from "./api/wharf";
 
 export default function App() {
@@ -23,7 +24,14 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
-    void loadAll();
+    void loadAll().then(() => {
+      // Needs hosts already loaded (above) so a saved tab referencing a host
+      // can look it up — restoreLastSession() itself no-ops if there's
+      // nothing saved, so this is always safe to call.
+      if (useRestoreTabsPrefsStore.getState().enabled) {
+        void useAppStore.getState().restoreLastSession();
+      }
+    });
   }, [loadAll]);
 
   useEffect(() => {

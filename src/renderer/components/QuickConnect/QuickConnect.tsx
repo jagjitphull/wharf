@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GroupRecord, HostRecord } from "@shared/types";
+import { wharf } from "../../api/wharf";
 import "./QuickConnect.css";
+
+type Reachability = "checking" | "online" | "offline";
+
+const REACHABILITY_LABEL: Record<Reachability, string> = {
+  checking: "Checking…",
+  online: "Online",
+  offline: "Offline / unreachable",
+};
 
 interface Props {
   hosts: HostRecord[];
@@ -25,12 +34,31 @@ function matches(host: HostRecord, query: string): boolean {
 export function QuickConnect({ hosts, groups, onClose, onConnect }: Props) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
+  const [reachability, setReachability] = useState<Record<string, Reachability>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // A raw TCP probe against each host's hostname:port — no SSH handshake,
+  // so it can never trigger a host-key prompt or an auth attempt, just
+  // "did something answer". Fires fresh every time the palette opens rather
+  // than caching, since the whole point is to reflect current status.
+  useEffect(() => {
+    let cancelled = false;
+    setReachability(Object.fromEntries(hosts.map((h) => [h.id, "checking" as const])));
+    for (const host of hosts) {
+      void wharf.hosts.checkReachable(host.hostname, host.port).then((reachable) => {
+        if (cancelled) return;
+        setReachability((prev) => ({ ...prev, [host.id]: reachable ? "online" : "offline" }));
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [hosts]);
 
   const results = useMemo(() => {
     const filtered = query.trim() ? hosts.filter((h) => matches(h, query)) : hosts;
@@ -92,6 +120,10 @@ export function QuickConnect({ hosts, groups, onClose, onConnect }: Props) {
               {groupName(groups, host.groupId) && (
                 <span className="quick-connect-group">{groupName(groups, host.groupId)}</span>
               )}
+              <span
+                className={`quick-connect-status ${reachability[host.id] ?? "checking"}`}
+                title={REACHABILITY_LABEL[reachability[host.id] ?? "checking"]}
+              />
             </button>
           ))}
           {results.length === 0 && <div className="quick-connect-empty">No matching hosts.</div>}

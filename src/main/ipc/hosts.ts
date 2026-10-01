@@ -6,6 +6,7 @@ import { deleteSecret, saveSecret, updateSecret } from "../services/secretStore"
 import { disconnectSessionsForHost } from "../services/sshManager";
 import { disconnectSessionsForHost as disconnectMoshSessionsForHost } from "../services/moshManager";
 import { closeSftpForHost } from "../services/sftpManager";
+import { checkReachable } from "../services/reachability";
 
 export function registerHostsIpc(): void {
   ipcMain.handle(IPC.hosts.list, (): HostRecord[] => {
@@ -80,5 +81,9 @@ export function registerHostsIpc(): void {
     disconnectSessionsForHost(id);
     disconnectMoshSessionsForHost(id);
     closeSftpForHost(id);
+  });
+
+  ipcMain.handle(IPC.hosts.checkReachable, (_event, hostname: string, port: number): Promise<boolean> => {
+    return checkReachable(hostname, port);
   });
 }

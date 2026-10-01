@@ -8,6 +8,7 @@ import type {
   SnippetRecord,
   TunnelRecord,
   WorkspaceRecord,
+  WorkspaceTab,
 } from "../../shared/types";
 
 export interface WindowBounds {
@@ -23,6 +24,11 @@ interface Schema {
   tunnels: TunnelRecord[];
   snippets: SnippetRecord[];
   workspaces: WorkspaceRecord[];
+  /** The tabs/panes open when the app last quit (or last had its tabs
+   * change) — same shape a saved workspace uses, but unnamed and kept in
+   * sync automatically rather than saved on request, so "restore tabs on
+   * launch" in Settings has something to reopen. */
+  lastSessionTabs: WorkspaceTab[];
   commandHistory: CommandHistoryEntry[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
@@ -43,6 +49,7 @@ const defaults: Schema = {
   tunnels: [],
   snippets: [],
   workspaces: [],
+  lastSessionTabs: [],
   commandHistory: [],
   secrets: {},
   aiProvider: "claude",
@@ -117,6 +124,14 @@ export function getWorkspaces(): WorkspaceRecord[] {
 
 export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
   store.set("workspaces", workspaces);
+}
+
+export function getLastSessionTabs(): WorkspaceTab[] {
+  return store.get("lastSessionTabs");
+}
+
+export function setLastSessionTabs(tabs: WorkspaceTab[]): void {
+  store.set("lastSessionTabs", tabs);
 }
 
 // Caps the persisted log so a long-lived install doesn't grow this file

@@ -347,6 +347,7 @@ export const IPC = {
     create: "hosts:create",
     update: "hosts:update",
     remove: "hosts:remove",
+    checkReachable: "hosts:check-reachable",
   },
   groups: {
     list: "groups:list",
@@ -434,6 +435,10 @@ export const IPC = {
     list: "workspaces:list",
     create: "workspaces:create",
     remove: "workspaces:remove",
+  },
+  session: {
+    getLast: "session:get-last",
+    saveLast: "session:save-last",
   },
   hostStats: {
     start: "host-stats:start",

@@ -19,6 +19,7 @@ import type {
   SnippetRecord,
   WorkspaceInput,
   WorkspaceRecord,
+  WorkspaceTab,
   HostStatsUpdateEvent,
   CommandHistoryEntry,
   CommandHistoryInput,
@@ -44,6 +45,8 @@ export interface WharfApi {
     create(input: HostInput): Promise<HostRecord>;
     update(id: string, input: HostInput): Promise<HostRecord>;
     remove(id: string): Promise<void>;
+    /** Raw TCP reachability probe against hostname:port — no SSH handshake, no auth, no host-key check. */
+    checkReachable(hostname: string, port: number): Promise<boolean>;
   };
   groups: {
     list(): Promise<GroupRecord[]>;
@@ -147,6 +150,10 @@ export interface WharfApi {
     list(): Promise<WorkspaceRecord[]>;
     create(input: WorkspaceInput): Promise<WorkspaceRecord>;
     remove(id: string): Promise<void>;
+  };
+  session: {
+    getLast(): Promise<WorkspaceTab[]>;
+    saveLast(tabs: WorkspaceTab[]): Promise<void>;
   };
   hostStats: {
     start(sessionId: string): void;

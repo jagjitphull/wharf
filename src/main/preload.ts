@@ -14,6 +14,7 @@ const api: WharfApi = {
     create: (input) => ipcRenderer.invoke(IPC.hosts.create, input),
     update: (id, input) => ipcRenderer.invoke(IPC.hosts.update, id, input),
     remove: (id) => ipcRenderer.invoke(IPC.hosts.remove, id),
+    checkReachable: (hostname, port) => ipcRenderer.invoke(IPC.hosts.checkReachable, hostname, port),
   },
   groups: {
     list: () => ipcRenderer.invoke(IPC.groups.list),
@@ -104,6 +105,10 @@ const api: WharfApi = {
     list: () => ipcRenderer.invoke(IPC.workspaces.list),
     create: (input) => ipcRenderer.invoke(IPC.workspaces.create, input),
     remove: (id) => ipcRenderer.invoke(IPC.workspaces.remove, id),
+  },
+  session: {
+    getLast: () => ipcRenderer.invoke(IPC.session.getLast),
+    saveLast: (tabs) => ipcRenderer.invoke(IPC.session.saveLast, tabs),
   },
   hostStats: {
     start: (sessionId) => ipcRenderer.send(IPC.hostStats.start, sessionId),
