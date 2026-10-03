@@ -686,6 +686,13 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     const refit = () => {
       if (el.offsetParent === null) return; // hidden tab, skip
       const wasAtBottom = isScrolledToBottom(el);
+      // A showing ghost suggestion was positioned (marker row + cursorX) for
+      // the pixel-per-cell grid before this resize — fit() can change that
+      // grid (and reflow which column onscreen content actually wraps to),
+      // so the decoration's old coordinates can land on top of unrelated
+      // real text instead of cleanly after the cursor. Safe to just drop it
+      // here: the next real pty echo recomputes it fresh at the right spot.
+      disposeGhostSuggestion();
       fit.fit();
       if (wasAtBottom) term.scrollToBottom();
       wharf.ssh.resize(sessionId, term.cols, term.rows);
@@ -764,6 +771,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     term.options.fontFamily = fontFamily;
     term.options.fontSize = fontSize;
     const wasAtBottom = containerRef.current ? isScrolledToBottom(containerRef.current) : true;
+    // Same reasoning as refit()'s own disposeGhostSuggestion() — a font/size
+    // change resizes the cell grid a showing suggestion was positioned for.
+    disposeGhostSuggestion();
     fitRef.current?.fit();
     if (wasAtBottom) term.scrollToBottom();
     wharf.ssh.resize(sessionId, term.cols, term.rows);
@@ -792,6 +802,12 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         // dimension that's actually different, then resize back — two real
         // resizes the renderer can't treat as no-ops, guaranteeing a full
         // repaint against the current theme/content.
+        // Same reasoning as refit()'s own disposeGhostSuggestion() — a
+        // showing suggestion's position can't be trusted across a resize,
+        // forced or real, and this pane may have kept receiving pty output
+        // (and recomputing against a hidden, un-painted decoration) the
+        // whole time it sat in a background tab.
+        disposeGhostSuggestion();
         const { cols, rows } = term;
         term.resize(cols + 1, rows);
         term.resize(cols, rows);
