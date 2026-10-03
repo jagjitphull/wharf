@@ -51,10 +51,21 @@ export function feedCommandCapture(state: CommandCaptureState, rawData: string):
     } else if (ch === "\x03" || ch === "\x15") {
       // Ctrl+C (interrupt) or Ctrl+U (kill line) — whatever was typed is abandoned, not run.
       state.buffer = "";
-    } else if (ch >= " " || ch === "\t") {
+    } else if (ch >= " ") {
       state.buffer += ch;
     }
-    // Other C0 control characters (bell, etc.) are silently ignored.
+    // Other C0 control characters are silently ignored — notably \t (Tab):
+    // appending it here used to be exactly the bug the doc comment above
+    // already warned about ("Tab completion ... expands text the shell
+    // fills in, not us") — a real Tab keypress sends this same raw byte to
+    // the pty, so the old code baked a literal tab into the buffer on every
+    // completion attempt. That permanently desynced this buffer from the
+    // real line (whatever the shell actually expanded it to), and every
+    // consumer downstream of it — the ghost-suggestion decoration's
+    // position/text and the AI popup's requestLine check in particular —
+    // kept computing against that wrong, tab-polluted text until the next
+    // Enter/Ctrl+C/Ctrl+U reset it, which is what showed up as misplaced,
+    // gapped-looking ghost text after tab-completing a path.
   }
 
   return completed;
