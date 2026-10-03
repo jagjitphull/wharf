@@ -1,0 +1,168 @@
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+
+.toggle-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition:
+    transform 0.15s,
+    background 0.15s;
+}
+
+.toggle-switch input:checked + .toggle-switch-track {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-switch-track::before {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+.keyword-rule-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 12px;
+  margin-top: 4px;
+}
+
+.keyword-rule-list.disabled {
+  opacity: 0.5;
+}
+
+.keyword-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.keyword-rule-row + .keyword-rule-row {
+  border-top: 1px solid var(--border);
+}
+
+.keyword-rule-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.keyword-rule-pattern {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-input);
+  padding: 1px 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keyword-rule-color {
+  width: 30px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+}
+
+.keyword-rule-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex: none;
+}
+
+.keyword-rule-remove:hover:not(:disabled) {
+  color: var(--danger-text);
+}
+
+.keyword-rule-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.keyword-rule-form {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.keyword-rule-form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.keyword-rule-form input[type="text"],
+.keyword-rule-form-row input:not([type="color"]),
+.keyword-rule-form > input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--text);
+  font-size: 12.5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.keyword-rule-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
