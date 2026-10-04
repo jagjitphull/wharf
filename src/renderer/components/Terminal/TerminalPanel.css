@@ -131,6 +131,20 @@
   background: var(--danger-text);
 }
 
+.tab-number {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  opacity: 0.65;
+  min-width: 11px;
+  text-align: center;
+}
+
+.tab.active .tab-number {
+  opacity: 0.85;
+}
+
 .tab-color-dot {
   width: 8px;
   height: 8px;

@@ -11,6 +11,9 @@ import { IconBroadcast, IconChevronDown, IconChevronUp, IconClose, IconDuplicate
 import { EmptyState } from "../EmptyState/EmptyState";
 import "./TerminalPanel.css";
 
+const isMac = wharf.window.platform === "darwin";
+const TAB_JUMP_MOD = isMac ? "Cmd" : "Ctrl";
+
 interface Props {
   /** Kept mounted but display:none rather than unmounted while another view
    * (Settings, SFTP, Tunnels) is active, so switching away and back doesn't
@@ -266,10 +269,15 @@ export function TerminalPanel({ hidden }: Props) {
   function renderTabButton(tab: TerminalTab) {
     const activeMeta = paneMeta[tab.activePaneId];
     const group = tab.groupId ? tabGroups.find((g) => g.id === tab.groupId) : undefined;
+    // Position in the flat tab order, 1-based — matches exactly what
+    // Ctrl/Cmd+1..9 (App.tsx) jumps to, grouping aside, so the number shown
+    // is always the number that actually gets you there.
+    const tabNumber = tabs.indexOf(tab) + 1;
     return (
       <TabButton
         key={tab.tabId}
         tabId={tab.tabId}
+        tabNumber={tabNumber}
         title={activeMeta?.title ?? "…"}
         hostId={activeMeta?.hostId ?? null}
         closed={activeMeta?.closed ?? false}
@@ -427,6 +435,7 @@ export function TerminalPanel({ hidden }: Props) {
 
 interface TabButtonProps {
   tabId: string;
+  tabNumber: number;
   title: string;
   hostId: string | null;
   closed: boolean;
@@ -547,6 +556,9 @@ function TabButton(p: TabButtonProps) {
       }
       title={p.closeError}
     >
+      <span className="tab-number" title={p.tabNumber <= 9 ? `${TAB_JUMP_MOD}+${p.tabNumber}` : undefined}>
+        {p.tabNumber}
+      </span>
       {hostColor && <span className="tab-color-dot" style={{ background: hostColor }} />}
       {p.logPath && <span className="tab-logging-dot" title={`Logging to ${p.logPath}`} />}
       {p.broadcasting && (
