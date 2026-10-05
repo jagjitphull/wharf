@@ -154,7 +154,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   history is shown dimmed right after the cursor; press `→` or `End` to
   accept it into the line, or keep typing to ignore it. Pure local history
   matching, no AI involved and nothing sent anywhere — instant and free.
-  Toggle it off in Settings → Inline Suggestions
+  At an empty prompt it also predicts the next command Warp-style — whatever
+  historically follows the command you just ran — for bash/zsh with Command
+  Blocks enabled. Toggle it off in Settings → Inline Suggestions
 - Clickable links — URLs printed to a terminal (`ls` output, logs, `git`
   remotes, anything) are clickable, opening in your default browser
 - Desktop notifications — get notified when a command that ran at least

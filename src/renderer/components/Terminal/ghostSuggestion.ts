@@ -4,6 +4,17 @@
  * after the cursor; Right Arrow or End accepts it. Pure history-prefix
  * matching, no AI involved (instant, free, works offline).
  *
+ * The same decoration also covers Warp's "next command" prediction: at an
+ * *empty* prompt (nothing typed yet), the most common command that's
+ * historically followed whatever you just ran is shown ghosted in full —
+ * same accept key, same free/local/offline matching, just keyed by the
+ * previous command instead of a typed prefix. See GhostTransitionMap below.
+ * This half needs a reliable "the shell is actually sitting at an
+ * interactive prompt right now, not mid-output" signal that only OSC 133
+ * shell integration provides (Terminal.tsx's atPromptRef) — prefix matching
+ * doesn't need that signal since it only ever runs once the user has
+ * already typed something, which is itself proof the shell was ready.
+ *
  * Rendered via xterm.js's decoration API (registerDecoration), the same
  * marker-anchored overlay mechanism keywordHighlight.ts already uses for
  * highlight rules — xterm handles the pixel positioning and scroll-following
@@ -48,4 +59,59 @@ export function findGhostSuggestion(buffer: string, cache: GhostHistoryCache): s
     if (command.length > buffer.length && command.startsWith(buffer)) return command;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// "Next command" prediction — what usually gets run right after this one.
+// ---------------------------------------------------------------------------
+
+/** previous command -> (next command -> how many times it's followed it). */
+export type GhostTransitionMap = Map<string, Map<string, number>>;
+
+function addTransition(map: GhostTransitionMap, from: string, to: string): void {
+  if (from === to) return; // re-running the same command isn't a "next step" worth predicting
+  let counts = map.get(from);
+  if (!counts) {
+    counts = new Map();
+    map.set(from, counts);
+  }
+  counts.set(to, (counts.get(to) ?? 0) + 1);
+}
+
+/** Builds the transition map from a chronological (oldest-first) command
+ * list — same list shape commandHistory's raw entries already come in. */
+export function createGhostTransitionMap(commandsOldestFirst: string[]): GhostTransitionMap {
+  const map: GhostTransitionMap = new Map();
+  for (let i = 0; i < commandsOldestFirst.length - 1; i++) {
+    addTransition(map, commandsOldestFirst[i], commandsOldestFirst[i + 1]);
+  }
+  return map;
+}
+
+/** Records one more real transition (mutates in place) as commands run live,
+ * same as pushToGhostHistoryCache does for the prefix-match cache. A null
+ * `from` (nothing's run yet this session) is a no-op — there's no prior
+ * command to key a transition off of. */
+export function recordGhostTransition(map: GhostTransitionMap, from: string | null, to: string): void {
+  if (from) addTransition(map, from, to);
+}
+
+/** The most common command historically run right after `lastCommand`, or
+ * null if there isn't one (including when `lastCommand` itself is null —
+ * nothing's run yet this session to predict from). Ties keep whichever was
+ * seen first, which is fine: this is a "probably useful" nudge, not a
+ * precise ranking. */
+export function findNextCommandSuggestion(lastCommand: string | null, map: GhostTransitionMap): string | null {
+  if (!lastCommand) return null;
+  const counts = map.get(lastCommand);
+  if (!counts) return null;
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [command, count] of counts) {
+    if (count > bestCount) {
+      best = command;
+      bestCount = count;
+    }
+  }
+  return best;
 }

@@ -33,7 +33,16 @@ import {
   readBlockOutput,
   type CommandBlock,
 } from "./commandBlocks";
-import { createGhostHistoryCache, findGhostSuggestion, pushToGhostHistoryCache, type GhostHistoryCache } from "./ghostSuggestion";
+import {
+  createGhostHistoryCache,
+  createGhostTransitionMap,
+  findGhostSuggestion,
+  findNextCommandSuggestion,
+  pushToGhostHistoryCache,
+  recordGhostTransition,
+  type GhostHistoryCache,
+  type GhostTransitionMap,
+} from "./ghostSuggestion";
 import { BlocksPanel } from "./BlocksPanel";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
@@ -130,6 +139,14 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const notifyOnLongCommandRef = useRef(notifyOnLongCommand);
   const visibleRef = useRef(visible);
   const historyCacheRef = useRef<GhostHistoryCache>([]);
+  // "Next command" prediction (see ghostSuggestion.ts) — transitionMapRef
+  // is built from this session's command history and updated as new
+  // commands run; lastRunCommandRef is what to look a prediction up for;
+  // atPromptRef is only true between an OSC 133 prompt-end (;B) and the next
+  // command-start (;C), the one reliable "not mid-output" signal available.
+  const transitionMapRef = useRef<GhostTransitionMap>(new Map());
+  const lastRunCommandRef = useRef<string | null>(null);
+  const atPromptRef = useRef(false);
   const ghostSuggestionRef = useRef<GhostSuggestionState | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -285,16 +302,17 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     ghostSuggestionRef.current = null;
   }
 
-  /** Re-evaluates the fish/zsh-autosuggestions-style ghost text against the
-   * current typed buffer and (re)renders it via an xterm decoration anchored
-   * to the cursor's current row/column — xterm handles the pixel positioning
-   * and scroll-following itself, and since a decoration is a DOM overlay
-   * rather than real buffer content, it can never race with or corrupt the
-   * shell's own echoed output. Called after every real write to the
-   * terminal (see the wharf.ssh.onData handler below) rather than on the
-   * user's own keystroke, since for a remote pty the cursor doesn't actually
-   * move until the shell's echo of that keystroke comes back — recomputing
-   * only once real content has landed keeps the suggestion's position always
+  /** Re-evaluates the ghost suggestion — prefix-matched against the current
+   * typed buffer, or (buffer empty, at a real prompt) a "next command"
+   * prediction — and (re)renders it via an xterm decoration anchored to the
+   * cursor's current row/column — xterm handles the pixel positioning and
+   * scroll-following itself, and since a decoration is a DOM overlay rather
+   * than real buffer content, it can never race with or corrupt the shell's
+   * own echoed output. Called after every real write to the terminal (see
+   * the wharf.ssh.onData handler below) rather than on the user's own
+   * keystroke, since for a remote pty the cursor doesn't actually move
+   * until the shell's echo of that keystroke comes back — recomputing only
+   * once real content has landed keeps the suggestion's position always
    * trustworthy, at the cost of it updating in the same lockstep as the
    * user's own typed characters already do over a laggy connection. */
   function recomputeGhostSuggestion() {
@@ -303,7 +321,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     if (!term) return;
     if (!ghostEnabledRef.current || aiPopupRef.current || nlPopupRef.current || searchOpenRef.current) return;
     const buffer = commandCaptureRef.current.buffer;
-    const match = buffer ? findGhostSuggestion(buffer, historyCacheRef.current) : null;
+    const match = buffer
+      ? findGhostSuggestion(buffer, historyCacheRef.current)
+      : atPromptRef.current
+        ? findNextCommandSuggestion(lastRunCommandRef.current, transitionMapRef.current)
+        : null;
     if (!match) return;
     const remainder = match.slice(buffer.length);
     const marker = term.registerMarker(0);
@@ -582,9 +604,15 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       // place rather than replacing the original synchronous write, which
       // keeps history responsive even over a slow SSH round trip.
       if (payload.startsWith("C")) {
+        atPromptRef.current = false;
         const [, arg] = payload.split(";");
         const shellCommandText = decodeOsc133CommandText(arg);
         if (shellCommandText) void wharf.commandHistory.correctLast(sessionId, shellCommandText);
+      } else if (payload === "B") {
+        // Prompt fully drawn, shell is ready for input right now — the one
+        // reliable "not mid-output" signal a "next command" ghost suggestion
+        // (see recomputeGhostSuggestion) needs before it's safe to show one.
+        atPromptRef.current = true;
       }
       const updated = handleOsc133(term, commandBlocksRef.current, payload);
       if (updated) setBlocks(updated);
@@ -670,17 +698,25 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         // Makes a just-run command suggestible immediately, without waiting
         // on a re-fetch of the full history list.
         pushToGhostHistoryCache(historyCacheRef.current, command);
+        // Same immediacy for "next command" prediction — this command now
+        // becomes a real data point for whatever follows it, and the thing
+        // to predict from once the shell's back at a prompt.
+        recordGhostTransition(transitionMapRef.current, lastRunCommandRef.current, command);
+        lastRunCommandRef.current = command;
       }
     });
 
-    // Seeds the ghost-suggestion history cache from this host's (or, for a
-    // local shell, this session's) past commands — scoped the same way the
-    // AI features' "recent commands" context already is, so a suggestion
-    // never surfaces something typed against an unrelated host.
+    // Seeds the ghost-suggestion history cache, the next-command transition
+    // map, and "what was last run" from this host's (or, for a local shell,
+    // this session's) past commands — scoped the same way the AI features'
+    // "recent commands" context already is, so a suggestion never surfaces
+    // something typed/run against an unrelated host.
     void wharf.commandHistory.list().then((entries) => {
       const meta = useAppStore.getState().paneMeta[sessionId];
       const scoped = entries.filter((e) => e.hostId === (meta?.hostId ?? null)).map((e) => e.command);
       historyCacheRef.current = createGhostHistoryCache(scoped);
+      transitionMapRef.current = createGhostTransitionMap(scoped);
+      lastRunCommandRef.current = scoped.length > 0 ? scoped[scoped.length - 1] : null;
     });
 
     const refit = () => {
