@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { IPC } from "../shared/types";
 import type { WharfApi } from "../shared/api";
 
@@ -136,6 +136,14 @@ const api: WharfApi = {
   commandBlocks: {
     getEnabled: () => ipcRenderer.invoke(IPC.commandBlocks.getEnabled),
     setEnabled: (enabled) => ipcRenderer.invoke(IPC.commandBlocks.setEnabled, enabled),
+  },
+  // No IPC round trip — webUtils.getPathForFile() is synchronous and safe to
+  // call directly from preload's privileged context. Electron 32 removed the
+  // old File.path field (https://www.electronjs.org/blog/electron-32-0),
+  // this is the replacement; a File object passed from the renderer across
+  // contextBridge works here (Electron special-cases File for exactly this).
+  webUtils: {
+    getPathForFile: (file) => webUtils.getPathForFile(file),
   },
 };
 

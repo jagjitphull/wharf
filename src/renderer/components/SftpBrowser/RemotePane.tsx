@@ -129,11 +129,12 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
       return;
     }
 
-    const files = Array.from(e.dataTransfer.files) as (File & { path?: string })[];
+    const files = Array.from(e.dataTransfer.files);
     for (const file of files) {
-      if (!file.path) continue;
+      const filePath = wharf.webUtils.getPathForFile(file);
+      if (!filePath) continue;
       try {
-        await wharf.sftp.uploadPath(host.id, file.path, path);
+        await wharf.sftp.uploadPath(host.id, filePath, path);
       } catch (err) {
         setError(ipcErrorMessage(err));
       }

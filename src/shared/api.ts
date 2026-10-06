@@ -191,4 +191,9 @@ export interface WharfApi {
     getEnabled(): Promise<boolean>;
     setEnabled(enabled: boolean): Promise<void>;
   };
+  webUtils: {
+    /** Replacement for the removed `File.path` (Electron 32+) — pass a File
+     * object straight from a drop event's `dataTransfer.files`. */
+    getPathForFile(file: File): string;
+  };
 }
