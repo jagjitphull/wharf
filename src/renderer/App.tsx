@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { SidebarResizeHandle } from "./components/Sidebar/SidebarResizeHandle";
@@ -23,8 +23,19 @@ export default function App() {
   const [quickConnectOpen, setQuickConnectOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
+  // Guards restoreLastSession() against React 18 StrictMode's dev-only
+  // double-invoke of mount effects: unlike loadAll()'s refreshX calls
+  // (each just overwrites its slice wholesale, so a second call is a
+  // harmless no-op), restoreLastSession() *appends* tabs every time it's
+  // called — run twice in the same mount, it opens every restored tab
+  // twice. The ref itself (not something async-derived) is what makes the
+  // guard correct regardless of which of the two overlapping loadAll()
+  // calls' .then() happens to resolve first.
+  const restoredRef = useRef(false);
   useEffect(() => {
     void loadAll().then(() => {
+      if (restoredRef.current) return;
+      restoredRef.current = true;
       // Needs hosts already loaded (above) so a saved tab referencing a host
       // can look it up — restoreLastSession() itself no-ops if there's
       // nothing saved, so this is always safe to call.
