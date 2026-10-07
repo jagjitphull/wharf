@@ -154,6 +154,10 @@ export interface WharfApi {
   session: {
     getLast(): Promise<WorkspaceTab[]>;
     saveLast(tabs: WorkspaceTab[]): Promise<void>;
+    /** Main is holding this window's close open waiting on a final persist —
+     * call persistLastSession (or equivalent), await saveLast, then flushed(). */
+    onFlushRequest(cb: () => void): () => void;
+    flushed(): void;
   };
   hostStats: {
     start(sessionId: string): void;

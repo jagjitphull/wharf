@@ -697,10 +697,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 // WorkspaceNode's own doc comment), so restoreLastSession() always has an
 // up-to-date layout *and* recent terminal content to bring back on the next
 // launch, the same way a browser's "restore previous session" does.
-function persistLastSession(): void {
+function persistLastSession(): Promise<void> {
   const { tabs, paneMeta } = useAppStore.getState();
   const workspaceTabs: WorkspaceTab[] = tabs.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta, true) }));
-  void wharf.session.saveLast(workspaceTabs);
+  return wharf.session.saveLast(workspaceTabs);
 }
 
 // Debounced since a workspace open or a run of quick tab actions can touch
@@ -718,6 +718,19 @@ useAppStore.subscribe((state, prevState) => {
 // has no reason to fire just because a command finished — so this keeps the
 // snapshot's terminal content from going stale for hours at a stretch.
 setInterval(persistLastSession, 30_000);
+
+// Main holds app quit open waiting on this: a real quit can land well
+// outside the debounce/interval cadence above, and whatever's on screen at
+// that exact moment is the one snapshot that actually matters for restore.
+// Skip the pending debounce (it would just redo the same save) but still
+// flush immediately so the save reflects right now, not up to 30s ago.
+wharf.session.onFlushRequest(() => {
+  if (persistSessionTimer) {
+    clearTimeout(persistSessionTimer);
+    persistSessionTimer = null;
+  }
+  void persistLastSession().finally(() => wharf.session.flushed());
+});
 
 // Registered once at module load: if a session dies on the backend (network
 // drop, remote closed the connection, auth failure mid-session) reflect

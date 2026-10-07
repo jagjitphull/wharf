@@ -454,6 +454,12 @@ export const IPC = {
   session: {
     getLast: "session:get-last",
     saveLast: "session:save-last",
+    /** Main -> renderer: "this window is closing — persist right now and
+     * ack" (see the window's "close" handler in main/index.ts). Not a
+     * request/response IPC pair since the renderer's flush itself goes
+     * through saveLast — this is just the "go" signal and its ack. */
+    flushRequest: "session:flush-request",
+    flushed: "session:flushed",
   },
   hostStats: {
     start: "host-stats:start",

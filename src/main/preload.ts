@@ -109,6 +109,8 @@ const api: WharfApi = {
   session: {
     getLast: () => ipcRenderer.invoke(IPC.session.getLast),
     saveLast: (tabs) => ipcRenderer.invoke(IPC.session.saveLast, tabs),
+    onFlushRequest: (cb) => on(IPC.session.flushRequest, cb as (...args: unknown[]) => void),
+    flushed: () => ipcRenderer.send(IPC.session.flushed),
   },
   hostStats: {
     start: (sessionId) => ipcRenderer.send(IPC.hostStats.start, sessionId),

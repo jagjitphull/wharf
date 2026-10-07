@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, Menu, ipcMain, nativeImage, shell } from "electron";
 import { IPC } from "../shared/types";
 import { registerHostsIpc } from "./ipc/hosts";
 import { registerGroupsIpc } from "./ipc/groups";
@@ -94,6 +94,45 @@ function createWindow(primary: boolean): BrowserWindow {
   win.on("close", () => {
     if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
     if (!win.isMinimized()) setWindowBounds(win.getNormalBounds());
+  });
+
+  // The periodic/debounced "last session" persist (state/store.ts) can be up
+  // to 30s stale — fine while the app keeps running, not fine for the single
+  // moment that actually matters most: whatever's on screen right as this
+  // window closes. This holds the close open just long enough for the
+  // renderer to run one final flush (each pane's current scrollback
+  // included), the same way a browser relies on a shutdown-time save, not
+  // only a periodic one.
+  //
+  // This has to live on the window's own "close" event, not app's
+  // "before-quit": closing the last window fires "window-all-closed" first,
+  // which turns into app.quit() — by the time "before-quit" would run, this
+  // window (and its webContents) is already destroyed, too late to ask the
+  // renderer to do anything. "close" is the one event that's still early
+  // enough for the webContents to be alive to receive the request and ack it.
+  let sessionFlushed = false;
+  win.on("close", (event) => {
+    if (sessionFlushed) return; // this is win.close() re-firing after the flush below completed
+    event.preventDefault();
+
+    let settled = false;
+    function onAck(ipcEvent: Electron.IpcMainEvent): void {
+      if (ipcEvent.sender !== win.webContents) return;
+      finish();
+    }
+    function finish(): void {
+      if (settled) return;
+      settled = true;
+      ipcMain.removeListener(IPC.session.flushed, onAck);
+      sessionFlushed = true;
+      win.close();
+    }
+
+    ipcMain.on(IPC.session.flushed, onAck);
+    // A renderer that's hung, crashed mid-flush, or (shouldn't happen) never
+    // had the listener registered can't block this window from closing forever.
+    setTimeout(finish, 1500);
+    win.webContents.send(IPC.session.flushRequest);
   });
 
   // Terminal sessions open arbitrary remote shells; don't let the app spawn
