@@ -1,0 +1,87 @@
+.history-panel {
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.history-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin: 6px 0 14px;
+  max-width: 640px;
+}
+
+.history-filter {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+  margin-bottom: 12px;
+  max-width: 360px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.history-row:hover {
+  background: var(--bg-hover);
+}
+
+.history-time {
+  color: var(--text-dim);
+  flex: none;
+  width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-host {
+  flex: none;
+  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.history-command {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+.history-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 16px 4px;
+}

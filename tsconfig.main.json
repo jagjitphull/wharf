@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    // DOM is included (not just ES2022) because preload.ts runs in a hybrid
+    // context with real access to browser globals like File — needed for
+    // webUtils.getPathForFile(file: File), Electron's replacement for the
+    // removed File.path (see shared/api.ts). Main-process code itself never
+    // touches DOM globals, so this doesn't mask anything there in practice.
+    "lib": ["ES2022", "DOM"],
+    "outDir": "dist-electron",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": ["src/main", "src/shared"]
+}

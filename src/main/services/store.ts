@@ -1,0 +1,218 @@
+import Store from "electron-store";
+import type {
+  AiProvider,
+  AiProviderConfig,
+  CommandHistoryEntry,
+  GroupRecord,
+  HostRecord,
+  SnippetRecord,
+  TunnelRecord,
+  WorkspaceRecord,
+  WorkspaceTab,
+} from "../../shared/types";
+
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface Schema {
+  hosts: HostRecord[];
+  groups: GroupRecord[];
+  tunnels: TunnelRecord[];
+  snippets: SnippetRecord[];
+  workspaces: WorkspaceRecord[];
+  /** The tabs/panes open when the app last quit (or last had its tabs
+   * change) — same shape a saved workspace uses, but unnamed and kept in
+   * sync automatically rather than saved on request, so "restore tabs on
+   * launch" in Settings has something to reopen. */
+  lastSessionTabs: WorkspaceTab[];
+  commandHistory: CommandHistoryEntry[];
+  /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
+  secrets: Record<string, string>;
+  /** Which AI autocomplete backend is active. */
+  aiProvider: AiProvider;
+  /** Per-cloud-provider API key id in `secrets` (same encrypted-at-rest storage as host passwords) — Ollama has no key, so it never appears here. */
+  aiApiKeySecretIds: Partial<Record<Exclude<AiProvider, "ollama">, string>>;
+  /** Per-provider settings beyond the key: an optional model override for the cloud providers, and Ollama's base URL + model. */
+  aiProviderConfig: Partial<Record<AiProvider, AiProviderConfig>>;
+  /** Whether new sessions get OSC-133 shell integration injected (bash/zsh only) — powers Command Blocks and real exit codes. Off disables it for every new session; existing ones are unaffected until reconnected. */
+  commandBlocksEnabled: boolean;
+  windowBounds: WindowBounds | null;
+}
+
+const defaults: Schema = {
+  hosts: [],
+  groups: [],
+  tunnels: [],
+  snippets: [],
+  workspaces: [],
+  lastSessionTabs: [],
+  commandHistory: [],
+  secrets: {},
+  aiProvider: "claude",
+  aiApiKeySecretIds: {},
+  aiProviderConfig: {},
+  commandBlocksEnabled: true,
+  windowBounds: null,
+};
+
+/**
+ * Single persisted JSON store (via electron-store, which writes to the OS
+ * user-data directory) for everything that isn't a raw secret. Deliberately
+ * avoids a native-module database (e.g. sqlite) to keep the starter easy to
+ * build/package across platforms; swap for a real DB if data volume grows.
+ */
+export const store = new Store<Schema>({
+  name: "wharf-data",
+  defaults,
+});
+
+// One-time migration from the pre-multi-provider single Claude key field
+// (`aiApiKeySecretId`, now removed from Schema) into the new per-provider
+// map, so upgrading doesn't silently drop an already-configured Claude key.
+// Reads/writes the legacy field via an untyped cast since it no longer
+// exists on Schema; safe because electron-store's underlying store is just
+// a plain JSON file, and `store.delete` on a since-removed key is a no-op
+// if it's already gone (e.g. on every later launch, once migrated).
+{
+  const legacy = (store as unknown as { get(key: string): unknown }).get("aiApiKeySecretId") as string | null | undefined;
+  if (legacy) {
+    const ids = store.get("aiApiKeySecretIds");
+    if (!ids.claude) store.set("aiApiKeySecretIds", { ...ids, claude: legacy });
+  }
+  (store as unknown as { delete(key: string): void }).delete("aiApiKeySecretId");
+}
+
+export function getHosts(): HostRecord[] {
+  return store.get("hosts");
+}
+
+export function setHosts(hosts: HostRecord[]): void {
+  store.set("hosts", hosts);
+}
+
+export function getGroups(): GroupRecord[] {
+  return store.get("groups");
+}
+
+export function setGroups(groups: GroupRecord[]): void {
+  store.set("groups", groups);
+}
+
+export function getTunnels(): TunnelRecord[] {
+  return store.get("tunnels");
+}
+
+export function setTunnels(tunnels: TunnelRecord[]): void {
+  store.set("tunnels", tunnels);
+}
+
+export function getSnippets(): SnippetRecord[] {
+  return store.get("snippets");
+}
+
+export function setSnippets(snippets: SnippetRecord[]): void {
+  store.set("snippets", snippets);
+}
+
+export function getWorkspaces(): WorkspaceRecord[] {
+  return store.get("workspaces");
+}
+
+export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
+  store.set("workspaces", workspaces);
+}
+
+export function getLastSessionTabs(): WorkspaceTab[] {
+  return store.get("lastSessionTabs");
+}
+
+export function setLastSessionTabs(tabs: WorkspaceTab[]): void {
+  store.set("lastSessionTabs", tabs);
+}
+
+// Caps the persisted log so a long-lived install doesn't grow this file
+// unboundedly — oldest entries are dropped first (FIFO) once past the cap.
+const COMMAND_HISTORY_MAX = 2000;
+
+export function getCommandHistory(): CommandHistoryEntry[] {
+  return store.get("commandHistory");
+}
+
+export function addCommandHistoryEntry(entry: CommandHistoryEntry): void {
+  const next = [...store.get("commandHistory"), entry];
+  if (next.length > COMMAND_HISTORY_MAX) next.splice(0, next.length - COMMAND_HISTORY_MAX);
+  store.set("commandHistory", next);
+}
+
+export function clearCommandHistory(): void {
+  store.set("commandHistory", []);
+}
+
+/**
+ * Overwrites the most recent entry for `sessionId` with more accurate text
+ * — used when the shell's own OSC 133;C integration (see
+ * shellIntegration.ts) reports the command it's actually about to run,
+ * which arrives slightly after the keystroke-buffer guess that created the
+ * entry in the first place, but is authoritative (unlike the guess, it
+ * isn't fooled by tab completion or arrow-key history recall). A no-op if
+ * that entry has since aged out of the list (COMMAND_HISTORY_MAX) or no
+ * entry for this session exists yet.
+ */
+export function correctLastCommandHistoryEntry(sessionId: string, command: string): void {
+  const entries = store.get("commandHistory");
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].sessionId === sessionId) {
+      const next = [...entries];
+      next[i] = { ...next[i], command };
+      store.set("commandHistory", next);
+      return;
+    }
+  }
+}
+
+export function getAiProvider(): AiProvider {
+  return store.get("aiProvider");
+}
+
+export function setAiProvider(provider: AiProvider): void {
+  store.set("aiProvider", provider);
+}
+
+export function getAiApiKeySecretId(provider: Exclude<AiProvider, "ollama">): string | null {
+  return store.get("aiApiKeySecretIds")[provider] ?? null;
+}
+
+export function setAiApiKeySecretId(provider: Exclude<AiProvider, "ollama">, secretId: string | null): void {
+  const ids = { ...store.get("aiApiKeySecretIds") };
+  if (secretId) ids[provider] = secretId;
+  else delete ids[provider];
+  store.set("aiApiKeySecretIds", ids);
+}
+
+export function getAiProviderConfig(provider: AiProvider): AiProviderConfig {
+  return store.get("aiProviderConfig")[provider] ?? {};
+}
+
+export function setAiProviderConfig(provider: AiProvider, config: AiProviderConfig): void {
+  store.set("aiProviderConfig", { ...store.get("aiProviderConfig"), [provider]: config });
+}
+
+export function getCommandBlocksEnabled(): boolean {
+  return store.get("commandBlocksEnabled");
+}
+
+export function setCommandBlocksEnabled(enabled: boolean): void {
+  store.set("commandBlocksEnabled", enabled);
+}
+
+export function getWindowBounds(): WindowBounds | null {
+  return store.get("windowBounds");
+}
+
+export function setWindowBounds(bounds: WindowBounds): void {
+  store.set("windowBounds", bounds);
+}
