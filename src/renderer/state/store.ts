@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { GroupRecord, HostInput, HostRecord, SnippetRecord, TunnelRecord, WorkspaceNode, WorkspaceRecord, WorkspaceTab } from "@shared/types";
-import { wharf } from "../api/wharf";
+import { ipcErrorMessage, wharf } from "../api/wharf";
 import { getScrollback } from "../components/Terminal/scrollbackRegistry";
 
 /**
@@ -49,11 +49,17 @@ export interface PaneMeta {
   reconnecting?: { attempt: number; maxAttempts: number };
   /** Serialized content from this pane's previous incarnation, restored by
    * restoreLastSession() — TerminalView writes it into the fresh terminal
-   * once on mount, then clears this field (see clearRestoredScrollback).
+   * once on mount, then clears this field (see clearRestoreInfo).
    * Never set outside that restore path. */
   restoredScrollback?: string;
   /** When restoredScrollback was captured — shown in the restore banner. */
   restoredScrollbackCapturedAt?: number;
+  /** Set by restoreLastSession() when this pane couldn't reconnect to its
+   * original host (deleted since, unreachable, auth failed, etc.) and fell
+   * back to a local shell instead — so the pane still comes back rather
+   * than the whole tab vanishing. TerminalView shows it as a one-time
+   * banner on mount, then clears it (see clearRestoreInfo). */
+  restoreNotice?: string;
 }
 
 export interface TerminalTab {
@@ -238,10 +244,11 @@ interface AppState {
   setPaneThemeId(sessionId: string, themeId: string | undefined): void;
   setPaneLogPath(sessionId: string, logPath: string | undefined): void;
   /** Called once by TerminalView right after writing a pane's restored
-   * scrollback (if any) into the fresh terminal — nothing re-reads this
-   * field afterward, but leaving it set would be a stale, confusing leftover
-   * in paneMeta for the rest of that pane's life. */
-  clearRestoredScrollback(sessionId: string): void;
+   * scrollback and/or restore-fallback notice (if any) into the fresh
+   * terminal — nothing re-reads these fields afterward, but leaving them set
+   * would be a stale, confusing leftover in paneMeta for the rest of that
+   * pane's life. */
+  clearRestoreInfo(sessionId: string): void;
   toggleBroadcastInput(tabId: string): void;
 
   setActiveView(view: ActiveView): void;
@@ -268,9 +275,12 @@ async function connectSession(
 /** Recursively (re)connects every leaf of a saved workspace tab, in order —
  * sequential rather than parallel so several hosts don't all auth at once,
  * which matters less for correctness than for not hammering several
- * connections open simultaneously. A leaf whose host was since deleted
- * falls back to a local shell rather than aborting the whole open, so one
- * stale reference doesn't cost you the rest of the layout. */
+ * connections open simultaneously. A leaf whose host was since deleted, or
+ * whose connect attempt fails outright (unreachable, auth failure, timeout,
+ * etc.), falls back to a local shell rather than aborting the whole open —
+ * one bad pane shouldn't cost you the rest of the layout, or the tab it's
+ * in. The fallback carries a one-time notice (see PaneMeta.restoreNotice)
+ * so it's visibly a fallback, not a silently wrong local shell. */
 async function connectWorkspaceNode(
   node: WorkspaceNode,
   hosts: HostRecord[],
@@ -279,11 +289,25 @@ async function connectWorkspaceNode(
 ): Promise<PaneNode> {
   if (node.type === "leaf") {
     const host = node.hostId ? (hosts.find((h) => h.id === node.hostId) ?? null) : null;
-    const ordinal = host ? 0 : localShellOrdinal.count++;
-    const { sessionId, meta } = await connectSession(host, undefined, ordinal);
-    metasOut[sessionId] = node.scrollback
-      ? { ...meta, restoredScrollback: node.scrollback, restoredScrollbackCapturedAt: node.scrollbackCapturedAt }
-      : meta;
+    let restoreNotice: string | undefined;
+    let connected: { sessionId: string; meta: PaneMeta };
+    if (host) {
+      try {
+        connected = await connectSession(host, undefined, 0);
+      } catch (err) {
+        restoreNotice = `Couldn't reconnect to "${host.name}" (${ipcErrorMessage(err)}) — opened a local shell instead.`;
+        connected = await connectSession(null, undefined, localShellOrdinal.count++);
+      }
+    } else {
+      if (node.hostId) restoreNotice = "The saved host for this pane no longer exists — opened a local shell instead.";
+      connected = await connectSession(null, undefined, localShellOrdinal.count++);
+    }
+    const { sessionId, meta } = connected;
+    metasOut[sessionId] = restoreNotice
+      ? { ...meta, restoreNotice }
+      : node.scrollback
+        ? { ...meta, restoredScrollback: node.scrollback, restoredScrollbackCapturedAt: node.scrollbackCapturedAt }
+        : meta;
     return { type: "leaf", sessionId };
   }
   const children: PaneNode[] = [];
@@ -313,10 +337,13 @@ function paneNodeToWorkspaceNode(node: PaneNode, paneMeta: Record<string, PaneMe
 /** Shared by openWorkspace/restoreLastSession: (re)connects every tab of a
  * saved layout in order and hands each one to `onTabConnected` as it comes
  * up, so callers only differ in where the tabs come from and how a single
- * tab's connect failure should be handled. With `isolateFailures` a failed
- * tab is skipped (logged, not thrown) so the rest of an unattended restore
- * still comes up; without it a failure propagates, same as before this was
- * extracted (openWorkspace's own manual "Open" surfaces the error). */
+ * tab's connect failure should be handled. Per-pane connect failures are
+ * already isolated inside connectWorkspaceNode (fallback to a local shell),
+ * so a whole tab only fails here in the unlikely case that even its local
+ * shell fallback fails. With `isolateFailures` such a tab is skipped
+ * (logged, not thrown) so the rest of an unattended restore still comes up;
+ * without it a failure propagates, same as before this was extracted
+ * (openWorkspace's own manual "Open" surfaces the error). */
 async function connectSavedTabs(
   tabs: WorkspaceTab[],
   hosts: HostRecord[],
@@ -675,11 +702,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  clearRestoredScrollback(sessionId) {
+  clearRestoreInfo(sessionId) {
     set((s) => {
       const meta = s.paneMeta[sessionId];
-      if (!meta?.restoredScrollback) return {};
-      return { paneMeta: { ...s.paneMeta, [sessionId]: { ...meta, restoredScrollback: undefined } } };
+      if (!meta?.restoredScrollback && !meta?.restoreNotice) return {};
+      return {
+        paneMeta: {
+          ...s.paneMeta,
+          [sessionId]: { ...meta, restoredScrollback: undefined, restoredScrollbackCapturedAt: undefined, restoreNotice: undefined },
+        },
+      };
     });
   },
 

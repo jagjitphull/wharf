@@ -533,7 +533,15 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       term.write(
         `\x1b[2m\r\n── Previous session${when ? ` from ${new Date(when).toLocaleString()}` : ""} — resumed below ──\x1b[0m\r\n\r\n`,
       );
-      useAppStore.getState().clearRestoredScrollback(sessionId);
+    }
+    // This pane's original host couldn't be reconnected on restore and fell
+    // back to a local shell (see connectWorkspaceNode) — surfaced here
+    // rather than silently, so a changed pane is never a mysterious one.
+    if (restoredMeta?.restoreNotice) {
+      term.write(`\x1b[33m[${restoredMeta.restoreNotice}]\x1b[0m\r\n\r\n`);
+    }
+    if (restoredMeta?.restoredScrollback || restoredMeta?.restoreNotice) {
+      useAppStore.getState().clearRestoreInfo(sessionId);
     }
 
     // Intercept Ctrl/Cmd+F (open find bar) and Escape (close it) before
