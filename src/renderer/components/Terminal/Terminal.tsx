@@ -3,6 +3,7 @@ import { Terminal as XTerm, type IDecoration, type IMarker } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SerializeAddon } from "@xterm/addon-serialize";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
@@ -44,8 +45,16 @@ import {
   type GhostTransitionMap,
 } from "./ghostSuggestion";
 import { BlocksPanel } from "./BlocksPanel";
+import { registerScrollbackSource } from "./scrollbackRegistry";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
+
+/** Cap on how much of a pane's scrollback gets captured into the "last
+ * session" snapshot (see scrollbackRegistry.ts / state/store.ts) — a
+ * reminder of recent context on restart, not a full transcript, so this
+ * stays small regardless of how long a session's actually been scrolled
+ * back for. */
+const RESTORED_SCROLLBACK_MAX_LINES = 300;
 
 interface Props {
   sessionId: string;
@@ -502,6 +511,31 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     fit.fit();
     wharf.ssh.resize(sessionId, term.cols, term.rows);
 
+    // Feeds this pane's live content into the "last session" snapshot (see
+    // state/store.ts's persistLastSession) — capped so a long scrollback
+    // doesn't bloat every periodic save, just enough to be a useful
+    // reminder of recent context, not a full transcript.
+    const serialize = new SerializeAddon();
+    term.loadAddon(serialize);
+    const unregisterScrollbackSource = registerScrollbackSource(sessionId, () =>
+      serialize.serialize({ scrollback: RESTORED_SCROLLBACK_MAX_LINES }),
+    );
+
+    // Replays what was on screen right before this pane's previous
+    // incarnation closed (see WorkspaceNode's own doc comment on
+    // `scrollback`) — restoreLastSession() set this on paneMeta when it
+    // reconnected this session; cleared immediately after so nothing ever
+    // re-reads or reapplies it from here on.
+    const restoredMeta = useAppStore.getState().paneMeta[sessionId];
+    if (restoredMeta?.restoredScrollback) {
+      term.write(restoredMeta.restoredScrollback);
+      const when = restoredMeta.restoredScrollbackCapturedAt;
+      term.write(
+        `\x1b[2m\r\n── Previous session${when ? ` from ${new Date(when).toLocaleString()}` : ""} — resumed below ──\x1b[0m\r\n\r\n`,
+      );
+      useAppStore.getState().clearRestoredScrollback(sessionId);
+    }
+
     // Intercept Ctrl/Cmd+F (open find bar) and Escape (close it) before
     // xterm forwards the keystroke to the remote shell. Reads searchOpenRef
     // rather than the `searchOpen` state directly since this handler is
@@ -761,6 +795,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       offMaximizedChange();
       disposeAllDecorations(highlightStateRef.current);
       disposeGhostSuggestion();
+      unregisterScrollbackSource();
       term.dispose();
       termRef.current = null;
       searchAddonRef.current = null;

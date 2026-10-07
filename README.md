@@ -32,7 +32,10 @@ A personal SSH/SFTP terminal client, Termius-style.
   handshake) so you can see what's actually reachable before connecting
 - Restore tabs on launch (Settings → Startup, on by default) — reopens
   whatever hosts and local shells were open last time, reconnecting each
-  automatically
+  automatically. Each pane also replays its recent scrollback above a
+  "Previous session…" divider, Warp/browser-tab-restore style, so a restart
+  feels like resuming rather than a blank prompt — a periodically-refreshed
+  snapshot (capped per pane), not a full transcript
 - In-terminal find (`Ctrl/Cmd+F`), right-click copy/paste/select-all/clear
 - Snippets library — save frequent commands, insert into any terminal via
   right-click → Insert Snippet

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { GroupRecord, HostInput, HostRecord, SnippetRecord, TunnelRecord, WorkspaceNode, WorkspaceRecord, WorkspaceTab } from "@shared/types";
 import { wharf } from "../api/wharf";
+import { getScrollback } from "../components/Terminal/scrollbackRegistry";
 
 /**
  * A tab's content is a binary tree of panes rather than a single session,
@@ -46,6 +47,13 @@ export interface PaneMeta {
    * progress; cleared on success or on giving up (the latter also sets
    * `closed`). */
   reconnecting?: { attempt: number; maxAttempts: number };
+  /** Serialized content from this pane's previous incarnation, restored by
+   * restoreLastSession() — TerminalView writes it into the fresh terminal
+   * once on mount, then clears this field (see clearRestoredScrollback).
+   * Never set outside that restore path. */
+  restoredScrollback?: string;
+  /** When restoredScrollback was captured — shown in the restore banner. */
+  restoredScrollbackCapturedAt?: number;
 }
 
 export interface TerminalTab {
@@ -229,6 +237,11 @@ interface AppState {
   setActivePane(tabId: string, sessionId: string): void;
   setPaneThemeId(sessionId: string, themeId: string | undefined): void;
   setPaneLogPath(sessionId: string, logPath: string | undefined): void;
+  /** Called once by TerminalView right after writing a pane's restored
+   * scrollback (if any) into the fresh terminal — nothing re-reads this
+   * field afterward, but leaving it set would be a stale, confusing leftover
+   * in paneMeta for the rest of that pane's life. */
+  clearRestoredScrollback(sessionId: string): void;
   toggleBroadcastInput(tabId: string): void;
 
   setActiveView(view: ActiveView): void;
@@ -268,7 +281,9 @@ async function connectWorkspaceNode(
     const host = node.hostId ? (hosts.find((h) => h.id === node.hostId) ?? null) : null;
     const ordinal = host ? 0 : localShellOrdinal.count++;
     const { sessionId, meta } = await connectSession(host, undefined, ordinal);
-    metasOut[sessionId] = meta;
+    metasOut[sessionId] = node.scrollback
+      ? { ...meta, restoredScrollback: node.scrollback, restoredScrollbackCapturedAt: node.scrollbackCapturedAt }
+      : meta;
     return { type: "leaf", sessionId };
   }
   const children: PaneNode[] = [];
@@ -278,9 +293,21 @@ async function connectWorkspaceNode(
   return { type: "split", id: crypto.randomUUID(), direction: node.direction, children };
 }
 
-function paneNodeToWorkspaceNode(node: PaneNode, paneMeta: Record<string, PaneMeta>): WorkspaceNode {
-  if (node.type === "leaf") return { type: "leaf", hostId: paneMeta[node.sessionId]?.hostId ?? null };
-  return { type: "split", direction: node.direction, children: node.children.map((c) => paneNodeToWorkspaceNode(c, paneMeta)) };
+/** `includeScrollback` is only ever true for the automatic last-session
+ * snapshot (see the module-level persist subscription below) — a named,
+ * explicitly-saved Workspace never carries it (see WorkspaceNode's own doc
+ * comment on `scrollback` for why). */
+function paneNodeToWorkspaceNode(node: PaneNode, paneMeta: Record<string, PaneMeta>, includeScrollback = false): WorkspaceNode {
+  if (node.type === "leaf") {
+    const hostId = paneMeta[node.sessionId]?.hostId ?? null;
+    const scrollback = includeScrollback ? getScrollback(node.sessionId) : undefined;
+    return scrollback ? { type: "leaf", hostId, scrollback, scrollbackCapturedAt: Date.now() } : { type: "leaf", hostId };
+  }
+  return {
+    type: "split",
+    direction: node.direction,
+    children: node.children.map((c) => paneNodeToWorkspaceNode(c, paneMeta, includeScrollback)),
+  };
 }
 
 /** Shared by openWorkspace/restoreLastSession: (re)connects every tab of a
@@ -648,6 +675,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  clearRestoredScrollback(sessionId) {
+    set((s) => {
+      const meta = s.paneMeta[sessionId];
+      if (!meta?.restoredScrollback) return {};
+      return { paneMeta: { ...s.paneMeta, [sessionId]: { ...meta, restoredScrollback: undefined } } };
+    });
+  },
+
   setActiveView(view) {
     set({ activeView: view });
   },
@@ -658,20 +693,31 @@ export const useAppStore = create<AppState>((set, get) => ({
 }));
 
 // Keeps the main process's "last session" snapshot in sync with whatever
-// tabs are actually open, so restoreLastSession() always has an up-to-date
-// layout to reopen on the next launch — debounced since a workspace open or
-// a run of quick tab actions can touch `tabs` several times in a row, and
-// only the final state after they settle is worth persisting.
+// tabs are actually open (including each pane's current scrollback — see
+// WorkspaceNode's own doc comment), so restoreLastSession() always has an
+// up-to-date layout *and* recent terminal content to bring back on the next
+// launch, the same way a browser's "restore previous session" does.
+function persistLastSession(): void {
+  const { tabs, paneMeta } = useAppStore.getState();
+  const workspaceTabs: WorkspaceTab[] = tabs.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta, true) }));
+  void wharf.session.saveLast(workspaceTabs);
+}
+
+// Debounced since a workspace open or a run of quick tab actions can touch
+// `tabs` several times in a row, and only the final state after they settle
+// is worth persisting.
 let persistSessionTimer: ReturnType<typeof setTimeout> | null = null;
 useAppStore.subscribe((state, prevState) => {
   if (state.tabs === prevState.tabs) return;
   if (persistSessionTimer) clearTimeout(persistSessionTimer);
-  persistSessionTimer = setTimeout(() => {
-    const { tabs, paneMeta } = useAppStore.getState();
-    const workspaceTabs: WorkspaceTab[] = tabs.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta) }));
-    void wharf.session.saveLast(workspaceTabs);
-  }, 800);
+  persistSessionTimer = setTimeout(persistLastSession, 800);
 });
+
+// A long-running pane's scrollback otherwise only refreshes when the tab
+// *structure* changes (open/close/split) — the debounced subscription above
+// has no reason to fire just because a command finished — so this keeps the
+// snapshot's terminal content from going stale for hours at a stretch.
+setInterval(persistLastSession, 30_000);
 
 // Registered once at module load: if a session dies on the backend (network
 // drop, remote closed the connection, auth failure mid-session) reflect

@@ -226,6 +226,9 @@ export function Settings() {
         <p className="hint">
           Reopens whatever hosts and local shells were open last time, reconnecting each automatically — only hosts
           with a saved password/key (no interactive prompt needed) will come back cleanly, same as Reconnect on Drop.
+          Each pane also replays its recent scrollback above a "Previous session…" divider, Warp-style, so a restart
+          feels like resuming rather than a blank prompt — a snapshot refreshed periodically while the app runs, not a
+          full transcript.
         </p>
 
         <h2>Backup</h2>

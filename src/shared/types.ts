@@ -92,7 +92,22 @@ export interface SnippetInput {
 // ---------------------------------------------------------------------------
 
 export type WorkspaceNode =
-  | { type: "leaf"; hostId: string | null }
+  | {
+      type: "leaf";
+      hostId: string | null;
+      /** Serialized terminal content (ANSI-formatted, via xterm's
+       * SerializeAddon) captured right before this pane last closed —
+       * replayed into the fresh terminal on restore so a restart feels like
+       * resuming, not a blank prompt. Only ever populated for the automatic
+       * "last session" snapshot (see restoreLastSession in state/store.ts),
+       * never for a named, explicitly-saved Workspace — reopening one of
+       * those is meant to start clean every time, not replay however the
+       * pane looked the one time it was saved. */
+      scrollback?: string;
+      /** When `scrollback` was captured (Date.now()) — shown in the restore
+       * banner ("Previous session from ..."), same spirit as Warp's. */
+      scrollbackCapturedAt?: number;
+    }
   | { type: "split"; direction: "row" | "column"; children: WorkspaceNode[] };
 
 export interface WorkspaceTab {
