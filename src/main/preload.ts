@@ -90,6 +90,7 @@ const api: WharfApi = {
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke(IPC.shell.openExternal, url),
+    openLogsFolder: () => ipcRenderer.invoke(IPC.shell.openLogsFolder),
   },
   backup: {
     export: () => ipcRenderer.invoke(IPC.backup.export),

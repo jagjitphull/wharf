@@ -439,6 +439,7 @@ export const IPC = {
   },
   shell: {
     openExternal: "shell:open-external",
+    openLogsFolder: "shell:open-logs-folder",
   },
   backup: {
     export: "backup:export",

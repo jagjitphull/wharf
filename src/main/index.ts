@@ -1,5 +1,6 @@
 import path from "node:path";
 import { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } from "electron";
+import log from "electron-log/main";
 import { IPC } from "../shared/types";
 import { registerHostsIpc } from "./ipc/hosts";
 import { registerGroupsIpc } from "./ipc/groups";
@@ -26,6 +27,14 @@ import { getWindowBounds, setWindowBounds } from "./services/store";
 const isDev = process.env.NODE_ENV === "development";
 const isMac = process.platform === "darwin";
 
+// Persists console output (main process, and — via the preload it injects —
+// the renderer's console.* too) to a rotating log file (~/.config/Wharf/logs
+// on Linux) so a crash a user hits remotely leaves something to ask for,
+// instead of nothing beyond whatever scrolled past in a terminal that's
+// long gone. initialize() defers its own setup to app.whenReady()
+// internally, so calling it this early is safe.
+log.initialize();
+
 // Registered as early as possible (before app.whenReady()) so nothing
 // thrown during startup's own setup can slip past unlogged either.
 //
@@ -36,7 +45,7 @@ const isMac = process.platform === "darwin";
 // this logs the real cause first, since the default crash output is often
 // swallowed by whatever launched the app, then exits deliberately.
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught exception in main process:", error);
+  log.error("Uncaught exception in main process:", error);
   app.exit(1);
 });
 
@@ -45,7 +54,7 @@ process.on("uncaughtException", (error) => {
 // uncaughtException above) this only makes sure it's actually visible
 // instead of vanishing, rather than tearing down the whole app for it.
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection in main process:", reason);
+  log.error("Unhandled promise rejection in main process:", reason);
 });
 
 const DEFAULT_WIDTH = 1280;
@@ -178,7 +187,7 @@ function createWindow(primary: boolean): BrowserWindow {
   const MAX_CRASH_RELOADS = 3;
   win.webContents.on("render-process-gone", (_event, details) => {
     if (details.reason === "clean-exit" || win.isDestroyed()) return;
-    console.error(`Renderer process gone for window ${win.id}: reason=${details.reason} exitCode=${details.exitCode}`);
+    log.error(`Renderer process gone for window ${win.id}: reason=${details.reason} exitCode=${details.exitCode}`);
 
     crashReloadCount += 1;
     if (crashReloadCount > MAX_CRASH_RELOADS) {

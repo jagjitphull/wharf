@@ -135,6 +135,10 @@ export interface WharfApi {
   };
   shell: {
     openExternal(url: string): Promise<void>;
+    /** Opens the OS file manager on the folder holding Wharf's persistent
+     * log file (electron-log's default location) — so a user hitting a
+     * crash or bug has a discoverable way to find and share it. */
+    openLogsFolder(): Promise<void>;
   };
   backup: {
     /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */

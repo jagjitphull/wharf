@@ -185,6 +185,13 @@ A personal SSH/SFTP terminal client, Termius-style.
   lightweight `exec` on its existing connection (never the interactive
   shell itself); Linux remotes only, and any field a remote doesn't support
   is just left out rather than shown as an error
+- Crash recovery and logging — an unhandled renderer error shows a reload
+  screen instead of a blank window, a crashed renderer reloads itself
+  automatically (capped after repeated crashes in a row), and both main-
+  and renderer-process activity/errors are persisted to a rotating log
+  file (via [`electron-log`](https://github.com/megahertz/electron-log)) —
+  "Open logs folder" in Settings → About gives you a quick way to find and
+  share it if something goes wrong
 
 ## Keyboard shortcuts
 

@@ -1,4 +1,4 @@
-import { ipcMain, shell } from "electron";
+import { app, ipcMain, shell } from "electron";
 import { IPC } from "../../shared/types";
 
 export function registerShellIpc(): void {
@@ -8,5 +8,9 @@ export function registerShellIpc(): void {
     // string from terminal output straight to the OS shell.
     if (!/^https?:\/\//i.test(url)) return;
     void shell.openExternal(url);
+  });
+
+  ipcMain.handle(IPC.shell.openLogsFolder, async (): Promise<void> => {
+    await shell.openPath(app.getPath("logs"));
   });
 }

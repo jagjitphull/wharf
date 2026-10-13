@@ -240,6 +240,14 @@ export function Settings() {
           Wharf — a personal SSH/SFTP client. Save hosts and groups, connect via password, private key, or SSH agent, chain through jump
           hosts, and set up local/remote port forwarding.
         </p>
+        <p className="hint">
+          Wharf keeps a log file of app activity and errors — useful to find if something goes wrong and you need to report it.
+        </p>
+        <div className="backup-actions">
+          <button className="btn ghost small" onClick={() => void wharf.shell.openLogsFolder()}>
+            Open logs folder
+          </button>
+        </div>
       </div>
 
       <div className="settings-preview-pane">
