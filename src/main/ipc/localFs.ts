@@ -50,9 +50,7 @@ export function registerLocalFsIpc(): void {
         continue; // permission denied, broken symlink target, etc. — skip this entry
       }
     }
-    return entries.sort((a, b) =>
-      a.type === b.type ? a.name.localeCompare(b.name) : a.type === "directory" ? -1 : 1,
-    );
+    return entries.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "directory" ? -1 : 1));
   });
 
   ipcMain.handle(IPC.localFs.mkdir, async (_event, dirPath: string): Promise<void> => {

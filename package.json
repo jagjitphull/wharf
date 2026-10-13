@@ -24,6 +24,9 @@
     "package": "npm run build && electron-builder --publish never",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
     "test": "vitest run",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",
     "postinstall": "node scripts/verify-pty.js"
   },
   "dependencies": {
@@ -52,7 +55,12 @@
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.21.3",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "prettier": "^3.9.10",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.71.2",
     "vite": "^5.4.2",
     "vitest": "^3.2.7",
     "wait-on": "^7.2.0"

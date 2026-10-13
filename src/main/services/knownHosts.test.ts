@@ -120,10 +120,7 @@ describe("checkHostKey", () => {
 
   it("treats a key as revoked even if a separate line also trusts the exact same key", () => {
     const key = keyBlob("ssh-ed25519", "a");
-    writeKnownHosts([
-      `example.com ssh-ed25519 ${key.toString("base64")}`,
-      `@revoked example.com ssh-ed25519 ${key.toString("base64")}`,
-    ]);
+    writeKnownHosts([`example.com ssh-ed25519 ${key.toString("base64")}`, `@revoked example.com ssh-ed25519 ${key.toString("base64")}`]);
     expect(mod.checkHostKey("example.com", 22, key)).toBe("revoked");
   });
 });

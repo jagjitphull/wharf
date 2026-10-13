@@ -116,7 +116,7 @@ export function prepareLocalShellIntegration(shellPath: string): LocalIntegratio
     const rcPath = join(dir, ".zshrc");
     const rc = [
       'ORIG_ZDOTDIR="${WHARF_ORIG_ZDOTDIR:-$HOME}"',
-      "ZDOTDIR=\"$ORIG_ZDOTDIR\"",
+      'ZDOTDIR="$ORIG_ZDOTDIR"',
       '[ -f "$ORIG_ZDOTDIR/.zshrc" ] && source "$ORIG_ZDOTDIR/.zshrc"',
       "",
       ZSH_HOOKS,

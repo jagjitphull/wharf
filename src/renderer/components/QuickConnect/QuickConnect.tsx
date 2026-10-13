@@ -117,9 +117,7 @@ export function QuickConnect({ hosts, groups, onClose, onConnect }: Props) {
               <span className="quick-connect-sub">
                 {host.username}@{host.hostname}:{host.port}
               </span>
-              {groupName(groups, host.groupId) && (
-                <span className="quick-connect-group">{groupName(groups, host.groupId)}</span>
-              )}
+              {groupName(groups, host.groupId) && <span className="quick-connect-group">{groupName(groups, host.groupId)}</span>}
               <span
                 className={`quick-connect-status ${reachability[host.id] ?? "checking"}`}
                 title={REACHABILITY_LABEL[reachability[host.id] ?? "checking"]}

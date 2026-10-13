@@ -25,10 +25,7 @@ export function SshConfigImportDialog({ onClose, onImported }: Props) {
       .catch((err) => setError(ipcErrorMessage(err)));
   }, []);
 
-  const allSelected = useMemo(
-    () => !!candidates?.length && candidates.every((c) => selected.has(c.alias)),
-    [candidates, selected],
-  );
+  const allSelected = useMemo(() => !!candidates?.length && candidates.every((c) => selected.has(c.alias)), [candidates, selected]);
 
   function toggle(alias: string) {
     setSelected((prev) => {
@@ -73,7 +70,9 @@ export function SshConfigImportDialog({ onClose, onImported }: Props) {
             <div className="ssh-config-list-header">
               <label className="ssh-config-row select-all">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-                <span>{selected.size} of {candidates.length} selected</span>
+                <span>
+                  {selected.size} of {candidates.length} selected
+                </span>
               </label>
             </div>
             <div className="ssh-config-list">
@@ -96,9 +95,8 @@ export function SshConfigImportDialog({ onClose, onImported }: Props) {
               ))}
             </div>
             <p className="hint">
-              Parsing is approximate (Include and Host-* defaults are supported; Match blocks aren't) — review
-              before importing. Passwords aren't stored in SSH config files, so imported hosts use key or agent
-              auth; add a password afterward via Edit if needed.
+              Parsing is approximate (Include and Host-* defaults are supported; Match blocks aren't) — review before importing. Passwords
+              aren't stored in SSH config files, so imported hosts use key or agent auth; add a password afterward via Edit if needed.
             </p>
           </>
         )}

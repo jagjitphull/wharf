@@ -43,10 +43,7 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
   }, [editing, filling, onClose]);
 
   const visible = snippets.filter(
-    (s) =>
-      !filter.trim() ||
-      s.name.toLowerCase().includes(filter.toLowerCase()) ||
-      s.command.toLowerCase().includes(filter.toLowerCase()),
+    (s) => !filter.trim() || s.name.toLowerCase().includes(filter.toLowerCase()) || s.command.toLowerCase().includes(filter.toLowerCase()),
   );
 
   function startNew() {
@@ -144,8 +141,8 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
               />
             </label>
             <p className="hint">
-              Add <code>{"{{name}}"}</code> placeholders to turn this into a Workflow — you'll be prompted to fill
-              them in each time you insert it, e.g. <code>docker logs -f {"{{container}}"}</code>.
+              Add <code>{"{{name}}"}</code> placeholders to turn this into a Workflow — you'll be prompted to fill them in each time you
+              insert it, e.g. <code>docker logs -f {"{{container}}"}</code>.
             </p>
             {error && <div className="snippet-error">{error}</div>}
             <div className="snippet-form-actions">
@@ -160,12 +157,7 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
         ) : (
           <>
             <div className="snippet-picker-header">
-              <input
-                ref={inputRef}
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filter snippets…"
-              />
+              <input ref={inputRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter snippets…" />
               <button className="btn primary small" onClick={startNew}>
                 <IconPlus size={12} /> New
               </button>
@@ -207,9 +199,7 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
                   </div>
                 );
               })}
-              {visible.length === 0 && (
-                <div className="snippet-empty">{snippets.length === 0 ? "No snippets yet." : "No matches."}</div>
-              )}
+              {visible.length === 0 && <div className="snippet-empty">{snippets.length === 0 ? "No snippets yet." : "No matches."}</div>}
             </div>
             <div className="snippet-picker-hint">Click a snippet to insert it into the terminal · Esc to close</div>
           </>

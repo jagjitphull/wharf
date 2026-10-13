@@ -14,7 +14,11 @@ export interface AiProviderAdapter {
   /** Up to 3 likely completions of the current line, raw (no validation here). */
   suggest(apiKey: string | null, config: AiProviderConfig, request: AiSuggestRequest): Promise<string[]>;
   /** Why a failed command likely failed, and a corrected command if there's a confident one. */
-  explainFailure(apiKey: string | null, config: AiProviderConfig, request: AiExplainFailureRequest): Promise<{ explanation: string; suggestedFix?: string }>;
+  explainFailure(
+    apiKey: string | null,
+    config: AiProviderConfig,
+    request: AiExplainFailureRequest,
+  ): Promise<{ explanation: string; suggestedFix?: string }>;
   /** One real shell command generated from a plain-English description, raw (no validation here). */
   generateCommand(apiKey: string | null, config: AiProviderConfig, request: AiGenerateCommandRequest): Promise<string>;
 }

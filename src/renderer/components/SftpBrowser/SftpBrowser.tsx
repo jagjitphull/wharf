@@ -108,7 +108,12 @@ export function SftpBrowser() {
           />
         ) : (
           localPath !== null && (
-            <LocalPane path={localPath} onPathChange={setLocalPath} onTransferToRemote={transferToPrimary} onTransferFromRemote={transferToSecond} />
+            <LocalPane
+              path={localPath}
+              onPathChange={setLocalPath}
+              onTransferToRemote={transferToPrimary}
+              onTransferFromRemote={transferToSecond}
+            />
           )
         )}
       </div>

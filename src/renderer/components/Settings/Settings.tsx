@@ -86,11 +86,7 @@ export function Settings() {
           <span className="appearance-label">Theme</span>
           <div className="mode-switch">
             {MODES.map((m) => (
-              <button
-                key={m.mode}
-                className={`mode-btn ${mode === m.mode ? "active" : ""}`}
-                onClick={() => setMode(m.mode)}
-              >
+              <button key={m.mode} className={`mode-btn ${mode === m.mode ? "active" : ""}`} onClick={() => setMode(m.mode)}>
                 {m.label}
               </button>
             ))}
@@ -125,8 +121,8 @@ export function Settings() {
           </div>
         </div>
         <p className="hint">
-          Scales the app's own text and controls — sidebar, tabs, this settings screen. Dialogs and menus stay at a
-          fixed comfortable size, and terminal font size (below) is separate on purpose.
+          Scales the app's own text and controls — sidebar, tabs, this settings screen. Dialogs and menus stay at a fixed comfortable size,
+          and terminal font size (below) is separate on purpose.
         </p>
 
         <h2>Terminal</h2>
@@ -156,8 +152,7 @@ export function Settings() {
         </div>
 
         <p className="hint">
-          <code>Ctrl/Cmd +</code>/<code>−</code> to resize on the fly, <code>Ctrl/Cmd 0</code> to reset · applies to
-          every open terminal.
+          <code>Ctrl/Cmd +</code>/<code>−</code> to resize on the fly, <code>Ctrl/Cmd 0</code> to reset · applies to every open terminal.
         </p>
 
         <div className="appearance-row column">
@@ -179,11 +174,9 @@ export function Settings() {
                 >
                   {swatch ? (
                     <span className="term-theme-dots">
-                      {[swatch.red, swatch.green, swatch.yellow, swatch.blue, swatch.magenta, swatch.cyan].map(
-                        (c, i) => (
-                          <span key={i} className="term-theme-dot" style={{ background: c }} />
-                        ),
-                      )}
+                      {[swatch.red, swatch.green, swatch.yellow, swatch.blue, swatch.magenta, swatch.cyan].map((c, i) => (
+                        <span key={i} className="term-theme-dot" style={{ background: c }} />
+                      ))}
                     </span>
                   ) : (
                     <span className="term-theme-dots term-theme-dots-app">Aa</span>
@@ -215,26 +208,21 @@ export function Settings() {
         <div className="appearance-row">
           <span className="appearance-label">Restore tabs on launch</span>
           <label className="toggle-switch">
-            <input
-              type="checkbox"
-              checked={restoreTabsEnabled}
-              onChange={(e) => setRestoreTabsEnabled(e.target.checked)}
-            />
+            <input type="checkbox" checked={restoreTabsEnabled} onChange={(e) => setRestoreTabsEnabled(e.target.checked)} />
             <span className="toggle-switch-track" />
           </label>
         </div>
         <p className="hint">
-          Reopens whatever hosts and local shells were open last time, reconnecting each automatically — only hosts
-          with a saved password/key (no interactive prompt needed) will come back cleanly, same as Reconnect on Drop.
-          Each pane also replays its recent scrollback above a "Previous session…" divider, Warp-style, so a restart
-          feels like resuming rather than a blank prompt — a snapshot refreshed periodically while the app runs, not a
-          full transcript.
+          Reopens whatever hosts and local shells were open last time, reconnecting each automatically — only hosts with a saved
+          password/key (no interactive prompt needed) will come back cleanly, same as Reconnect on Drop. Each pane also replays its recent
+          scrollback above a "Previous session…" divider, Warp-style, so a restart feels like resuming rather than a blank prompt — a
+          snapshot refreshed periodically while the app runs, not a full transcript.
         </p>
 
         <h2>Backup</h2>
         <p className="hint">
-          Export your hosts and groups to a JSON file, or import one back in. For security, passwords and key
-          passphrases are never included — re-enter them via Edit after importing.
+          Export your hosts and groups to a JSON file, or import one back in. For security, passwords and key passphrases are never included
+          — re-enter them via Edit after importing.
         </p>
         <div className="backup-actions">
           <button className="btn ghost small" onClick={handleExport} disabled={busy}>
@@ -249,8 +237,8 @@ export function Settings() {
 
         <h2>About</h2>
         <p className="hint">
-          Wharf — a personal SSH/SFTP client. Save hosts and groups, connect via password, private key, or SSH agent,
-          chain through jump hosts, and set up local/remote port forwarding.
+          Wharf — a personal SSH/SFTP client. Save hosts and groups, connect via password, private key, or SSH agent, chain through jump
+          hosts, and set up local/remote port forwarding.
         </p>
       </div>
 

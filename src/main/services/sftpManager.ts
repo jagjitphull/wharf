@@ -151,9 +151,7 @@ export async function unlink(hostId: string, remotePath: string): Promise<void> 
 
 export async function rename(hostId: string, oldPath: string, newPath: string): Promise<void> {
   const sftp = await getSftp(hostId);
-  await new Promise<void>((resolve, reject) =>
-    sftp.rename(oldPath, newPath, (err) => (err ? reject(err) : resolve())),
-  );
+  await new Promise<void>((resolve, reject) => sftp.rename(oldPath, newPath, (err) => (err ? reject(err) : resolve())));
 }
 
 export async function upload(hostId: string, localPath: string, remotePath: string): Promise<string> {
@@ -201,12 +199,7 @@ export async function upload(hostId: string, localPath: string, remotePath: stri
  * round trip), so this is both faster and doesn't need scratch space for
  * a large file. Progress is reported against the destination host, same
  * "upload" convention as a local->remote transfer already uses. */
-export async function transferBetweenHosts(
-  sourceHostId: string,
-  sourcePath: string,
-  destHostId: string,
-  destDir: string,
-): Promise<string> {
+export async function transferBetweenHosts(sourceHostId: string, sourcePath: string, destHostId: string, destDir: string): Promise<string> {
   const sourceSftp = await getSftp(sourceHostId);
   const destSftp = await getSftp(destHostId);
   const transferId = randomUUID();

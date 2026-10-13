@@ -190,27 +190,27 @@ A personal SSH/SFTP terminal client, Termius-style.
 
 The full list is also available in-app: click the **?** icon in the title bar, or press `Ctrl/Cmd+/` (works even while a terminal has focus).
 
-| Shortcut | Action |
-| --- | --- |
-| `Ctrl/Cmd+K` | Quick Connect — jump to a host from anywhere |
-| `Ctrl/Cmd+B` | Show/hide the sidebar |
-| `Ctrl/Cmd+1` … `Ctrl/Cmd+9` | Switch to tab 1 through 9 |
-| `Ctrl/Cmd+Tab` | Next tab |
-| `Ctrl/Cmd+Shift+Tab` | Previous tab |
-| `Ctrl/Cmd+/` | Show the keyboard shortcuts reference |
-| `Ctrl/Cmd+F` | Find in the terminal |
-| `Esc` | Close find, or dismiss the AI suggestions popup |
-| `Ctrl/Cmd+Space` | Ask the AI for autocomplete suggestions |
-| `Ctrl/Cmd+Shift+Space` | Ask the AI to generate a command from a plain-English description |
-| `Tab` / `Enter` | Accept the top AI suggestion |
-| `1` … `9` | Accept AI suggestion N (while the popup is open) |
-| `→` / `End` | Accept the dimmed inline suggestion showing after the cursor, if any |
-| `Ctrl/Cmd+=` / `Ctrl/Cmd+-` | Increase / decrease terminal font size |
-| `Ctrl/Cmd+0` | Reset terminal font size |
-| Right-click (terminal) | Copy/paste/select all/clear, split pane, insert snippet, theme, logging |
-| `Ctrl/Cmd+S` (file editor) | Save the file |
-| `Esc` (file editor) | Close (asks first if there are unsaved changes) |
-| `↑` / `↓` (pickers) | Move the selection in Quick Connect, snippets, etc. |
+| Shortcut                    | Action                                                                  |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `Ctrl/Cmd+K`                | Quick Connect — jump to a host from anywhere                            |
+| `Ctrl/Cmd+B`                | Show/hide the sidebar                                                   |
+| `Ctrl/Cmd+1` … `Ctrl/Cmd+9` | Switch to tab 1 through 9                                               |
+| `Ctrl/Cmd+Tab`              | Next tab                                                                |
+| `Ctrl/Cmd+Shift+Tab`        | Previous tab                                                            |
+| `Ctrl/Cmd+/`                | Show the keyboard shortcuts reference                                   |
+| `Ctrl/Cmd+F`                | Find in the terminal                                                    |
+| `Esc`                       | Close find, or dismiss the AI suggestions popup                         |
+| `Ctrl/Cmd+Space`            | Ask the AI for autocomplete suggestions                                 |
+| `Ctrl/Cmd+Shift+Space`      | Ask the AI to generate a command from a plain-English description       |
+| `Tab` / `Enter`             | Accept the top AI suggestion                                            |
+| `1` … `9`                   | Accept AI suggestion N (while the popup is open)                        |
+| `→` / `End`                 | Accept the dimmed inline suggestion showing after the cursor, if any    |
+| `Ctrl/Cmd+=` / `Ctrl/Cmd+-` | Increase / decrease terminal font size                                  |
+| `Ctrl/Cmd+0`                | Reset terminal font size                                                |
+| Right-click (terminal)      | Copy/paste/select all/clear, split pane, insert snippet, theme, logging |
+| `Ctrl/Cmd+S` (file editor)  | Save the file                                                           |
+| `Esc` (file editor)         | Close (asks first if there are unsaved changes)                         |
+| `↑` / `↓` (pickers)         | Move the selection in Quick Connect, snippets, etc.                     |
 
 All of these work the same whether focus is on the sidebar or inside a terminal — a handful of these key combinations (e.g. `Ctrl+3` through `Ctrl+8`, `Ctrl+K`) are also real terminal control characters that `xterm.js` would otherwise send straight to the shell, so Wharf explicitly intercepts them before that happens.
 
@@ -314,9 +314,8 @@ src/
   right away whether it actually loads under Electron's own runtime and
   fails the install loudly if not, rather than silently shipping a broken
   Local Shell/Mosh discovered later at runtime. A failure almost always
-  means missing build tools — install them (`sudo apt install
-  build-essential python3` on Debian/Ubuntu, `sudo dnf groupinstall
-  "Development Tools" && sudo dnf install python3` on Fedora/RHEL) and
+  means missing build tools — install them (`sudo apt install build-essential python3` on Debian/Ubuntu,
+  `sudo dnf groupinstall "Development Tools" && sudo dnf install python3` on Fedora/RHEL) and
   reinstall (`rm -rf node_modules/node-pty && npm install`). If you're
   working on SSH/SFTP only and don't need Local Shell or Mosh right now,
   skip the check with `WHARF_SKIP_PTY_CHECK=1 npm install`. If it does fail

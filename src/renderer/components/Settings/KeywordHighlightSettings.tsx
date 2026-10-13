@@ -3,20 +3,10 @@ import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { IconClose } from "../Icons/Icons";
 import "./KeywordHighlightSettings.css";
 
-const NEW_RULE_COLOR_PRESETS = [
-  "#f2545b",
-  "#e8d44d",
-  "#4fd88a",
-  "#54d6e8",
-  "#b18cf0",
-  "#f16fe0",
-  "#e08a3c",
-  "#8a92a3",
-];
+const NEW_RULE_COLOR_PRESETS = ["#f2545b", "#e8d44d", "#4fd88a", "#54d6e8", "#b18cf0", "#f16fe0", "#e08a3c", "#8a92a3"];
 
 export function KeywordHighlightSettings() {
-  const { enabled, rules, setEnabled, toggleRule, setRuleColor, addCustomRule, updateCustomRule, removeRule } =
-    useKeywordHighlightStore();
+  const { enabled, rules, setEnabled, toggleRule, setRuleColor, addCustomRule, removeRule } = useKeywordHighlightStore();
   const [addingRule, setAddingRule] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newPattern, setNewPattern] = useState("");
@@ -117,17 +107,8 @@ export function KeywordHighlightSettings() {
       ) : (
         <div className="keyword-rule-form">
           <div className="keyword-rule-form-row">
-            <input
-              placeholder="Label (e.g. Timeout)"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-            />
-            <input
-              type="color"
-              className="keyword-rule-color"
-              value={newColor}
-              onChange={(e) => setNewColor(e.target.value)}
-            />
+            <input placeholder="Label (e.g. Timeout)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+            <input type="color" className="keyword-rule-color" value={newColor} onChange={(e) => setNewColor(e.target.value)} />
           </div>
           <input
             placeholder="Pattern (regex, e.g. \btimeout\b)"
@@ -149,12 +130,7 @@ export function KeywordHighlightSettings() {
             >
               Cancel
             </button>
-            <button
-              type="button"
-              className="btn primary small"
-              disabled={!newLabel.trim() || !newPattern.trim()}
-              onClick={handleAddRule}
-            >
+            <button type="button" className="btn primary small" disabled={!newLabel.trim() || !newPattern.trim()} onClick={handleAddRule}>
               Add rule
             </button>
           </div>

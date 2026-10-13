@@ -128,7 +128,12 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
         <div className="dialog-row">
           <label className="grow">
             Hostname / IP
-            <input required value={form.hostname} onChange={(e) => setForm({ ...form, hostname: e.target.value })} placeholder="203.0.113.10" />
+            <input
+              required
+              value={form.hostname}
+              onChange={(e) => setForm({ ...form, hostname: e.target.value })}
+              placeholder="203.0.113.10"
+            />
           </label>
           <label className="narrow">
             Port
@@ -189,10 +194,7 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
 
         <label>
           Group
-          <select
-            value={form.groupId ?? ""}
-            onChange={(e) => setForm({ ...form, groupId: e.target.value || null })}
-          >
+          <select value={form.groupId ?? ""} onChange={(e) => setForm({ ...form, groupId: e.target.value || null })}>
             <option value="">(none)</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -204,10 +206,7 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
 
         <label>
           Auth method
-          <select
-            value={form.authMethod}
-            onChange={(e) => setForm({ ...form, authMethod: e.target.value as AuthMethod })}
-          >
+          <select value={form.authMethod} onChange={(e) => setForm({ ...form, authMethod: e.target.value as AuthMethod })}>
             <option value="password">Password</option>
             <option value="privateKey">Private key</option>
             <option value="agent">SSH agent</option>
@@ -251,10 +250,7 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
 
         <label>
           Jump host
-          <select
-            value={form.jumpHostId ?? ""}
-            onChange={(e) => setForm({ ...form, jumpHostId: e.target.value || null })}
-          >
+          <select value={form.jumpHostId ?? ""} onChange={(e) => setForm({ ...form, jumpHostId: e.target.value || null })}>
             <option value="">(direct connection)</option>
             {jumpHostCandidates.map((h) => (
               <option key={h.id} value={h.id}>
@@ -265,18 +261,13 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
         </label>
 
         <label className="host-mosh-row">
-          <input
-            type="checkbox"
-            checked={form.mosh ?? false}
-            onChange={(e) => setForm({ ...form, mosh: e.target.checked })}
-          />
+          <input type="checkbox" checked={form.mosh ?? false} onChange={(e) => setForm({ ...form, mosh: e.target.checked })} />
           <span>
             Connect via Mosh
             <small>
-              Requires <code>mosh</code> installed on this machine and <code>mosh-server</code> on the remote host.
-              Auth still goes through SSH — a saved password/passphrase is auto-filled the same as a regular
-              connection, but host-key confirmation (for a never-before-seen host) shows up live in the terminal
-              instead of Wharf's own dialog.
+              Requires <code>mosh</code> installed on this machine and <code>mosh-server</code> on the remote host. Auth still goes through
+              SSH — a saved password/passphrase is auto-filled the same as a regular connection, but host-key confirmation (for a
+              never-before-seen host) shows up live in the terminal instead of Wharf's own dialog.
             </small>
           </span>
         </label>

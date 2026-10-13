@@ -20,9 +20,7 @@ import { ipcErrorMessage } from "./api/wharf";
 // exports and these don't need to be the exception.
 const SftpBrowser = lazy(() => import("./components/SftpBrowser/SftpBrowser").then((m) => ({ default: m.SftpBrowser })));
 const Tunnels = lazy(() => import("./components/Tunnels/Tunnels").then((m) => ({ default: m.Tunnels })));
-const CommandHistory = lazy(() =>
-  import("./components/CommandHistory/CommandHistory").then((m) => ({ default: m.CommandHistory })),
-);
+const CommandHistory = lazy(() => import("./components/CommandHistory/CommandHistory").then((m) => ({ default: m.CommandHistory })));
 const Workspaces = lazy(() => import("./components/Workspaces/Workspaces").then((m) => ({ default: m.Workspaces })));
 const Settings = lazy(() => import("./components/Settings/Settings").then((m) => ({ default: m.Settings })));
 const QuickConnect = lazy(() => import("./components/QuickConnect/QuickConnect").then((m) => ({ default: m.QuickConnect })));
@@ -172,12 +170,7 @@ export default function App() {
           both can in principle be open at once. */}
       {quickConnectOpen && (
         <Suspense fallback={null}>
-          <QuickConnect
-            hosts={hosts}
-            groups={groups}
-            onClose={() => setQuickConnectOpen(false)}
-            onConnect={handleQuickConnect}
-          />
+          <QuickConnect hosts={hosts} groups={groups} onClose={() => setQuickConnectOpen(false)} onConnect={handleQuickConnect} />
         </Suspense>
       )}
 
@@ -195,7 +188,9 @@ export default function App() {
  * needs a fallback, and a blank panel would read as a broken view switch. */
 function ViewLoadingFallback() {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-dim)", fontSize: 13 }}>
+    <div
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-dim)", fontSize: 13 }}
+    >
       Loading…
     </div>
   );

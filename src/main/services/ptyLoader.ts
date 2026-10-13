@@ -12,7 +12,7 @@
  */
 export function loadPty(): typeof import("node-pty") {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- deliberately lazy (see doc comment above)
     return require("node-pty");
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

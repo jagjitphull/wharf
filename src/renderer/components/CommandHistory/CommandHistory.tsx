@@ -36,9 +36,7 @@ export function CommandHistory() {
     // that's the least useful order to read an audit trail in.
     const ordered = [...entries].reverse();
     if (!normalizedFilter) return ordered;
-    return ordered.filter(
-      (e) => e.command.toLowerCase().includes(normalizedFilter) || e.hostName.toLowerCase().includes(normalizedFilter),
-    );
+    return ordered.filter((e) => e.command.toLowerCase().includes(normalizedFilter) || e.hostName.toLowerCase().includes(normalizedFilter));
   }, [entries, normalizedFilter]);
 
   async function clearAll() {
@@ -62,9 +60,9 @@ export function CommandHistory() {
         </button>
       </div>
       <p className="history-hint">
-        A log of commands typed into terminal sessions. For bash/zsh with Command Blocks enabled (Settings), the
-        shell itself reports the exact command, so tab completion and history recall (↑/↓) come through correctly —
-        otherwise it's reconstructed from raw keystrokes and can miss those.
+        A log of commands typed into terminal sessions. For bash/zsh with Command Blocks enabled (Settings), the shell itself reports the
+        exact command, so tab completion and history recall (↑/↓) come through correctly — otherwise it's reconstructed from raw keystrokes
+        and can miss those.
       </p>
 
       <input

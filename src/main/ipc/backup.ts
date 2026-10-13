@@ -1,13 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dialog, ipcMain } from "electron";
-import {
-  IPC,
-  type AuthMethod,
-  type BackupImportResult,
-  type GroupRecord,
-  type HostRecord,
-} from "../../shared/types";
+import { IPC, type AuthMethod, type BackupImportResult, type GroupRecord, type HostRecord } from "../../shared/types";
 import { getGroups, getHosts, setGroups, setHosts } from "../services/store";
 
 /**

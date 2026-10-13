@@ -7,16 +7,7 @@ import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import {
-  IconChevronDown,
-  IconFolder,
-  IconFolderOpen,
-  IconPencil,
-  IconPlay,
-  IconPlus,
-  IconTerminal,
-  IconTrash,
-} from "../Icons/Icons";
+import { IconChevronDown, IconFolder, IconFolderOpen, IconPencil, IconPlay, IconPlus, IconTerminal, IconTrash } from "../Icons/Icons";
 import "./Sidebar.css";
 
 /** Sentinel ID for the root "Hosts" tree node's own collapse state, stored
@@ -38,17 +29,8 @@ function hostMatchesFilter(host: HostRecord, filter: string): boolean {
 const UNGROUPED = "__ungrouped__";
 
 export function Sidebar({ onOpenQuickConnect }: Props) {
-  const {
-    hosts,
-    groups,
-    setActiveView,
-    contextHostId,
-    setContextHostId,
-    openTerminal,
-    openLocalShell,
-    loadAll,
-    moveHostToGroup,
-  } = useAppStore();
+  const { hosts, groups, setActiveView, contextHostId, setContextHostId, openTerminal, openLocalShell, loadAll, moveHostToGroup } =
+    useAppStore();
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
   const [groupDialog, setGroupDialog] = useState<{ group: GroupRecord | null } | null>(null);
   const [sshConfigImportOpen, setSshConfigImportOpen] = useState(false);
@@ -226,11 +208,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
               ])
             }
           >
-            <button
-              className="group-disclosure"
-              onClick={() => toggleGroupCollapsed(group.id)}
-              title={expanded ? "Collapse" : "Expand"}
-            >
+            <button className="group-disclosure" onClick={() => toggleGroupCollapsed(group.id)} title={expanded ? "Collapse" : "Expand"}>
               <span className={`group-chevron ${expanded ? "expanded" : ""}`}>
                 <IconChevronDown size={11} />
               </span>
@@ -261,11 +239,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
   return (
     <aside className="sidebar" style={{ width: sidebarWidth }}>
       <div className="sidebar-search">
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter hosts…"
-        />
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter hosts…" />
         <button className="quick-connect-hint-btn" title="Quick Connect" onClick={onOpenQuickConnect}>
           ⌘K
         </button>
@@ -278,11 +252,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
         <button className="btn ghost small" onClick={() => setGroupDialog({ group: null })}>
           <IconPlus size={12} /> Group
         </button>
-        <button
-          className="btn ghost small"
-          title="Import from ~/.ssh/config"
-          onClick={() => setSshConfigImportOpen(true)}
-        >
+        <button className="btn ghost small" title="Import from ~/.ssh/config" onClick={() => setSshConfigImportOpen(true)}>
           Import…
         </button>
         <button className="btn ghost small" title="Open a local shell (no SSH)" onClick={startLocalShell}>

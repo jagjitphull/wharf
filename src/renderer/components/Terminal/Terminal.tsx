@@ -7,7 +7,7 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
-import { getTerminalThemePreset, resolveXtermTheme } from "../../state/terminalThemes";
+import { resolveXtermTheme } from "../../state/terminalThemes";
 import { flattenPanes, useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { useAiPrefsStore } from "../../state/aiPrefsStore";
@@ -688,9 +688,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     const offReconnecting = wharf.ssh.onReconnecting((event) => {
       if (event.sessionId === sessionId) {
         disposeGhostSuggestion();
-        term.write(
-          `\r\n\x1b[33m[connection lost — reconnecting… (attempt ${event.attempt}/${event.maxAttempts})]\x1b[0m\r\n`,
-        );
+        term.write(`\r\n\x1b[33m[connection lost — reconnecting… (attempt ${event.attempt}/${event.maxAttempts})]\x1b[0m\r\n`);
       }
     });
     const offReconnected = wharf.ssh.onReconnected((event) => {
@@ -801,6 +799,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       oscDisposable.dispose();
       resizeObserver.disconnect();
       offMaximizedChange();
+      // highlightStateRef's object identity never changes after the
+      // useRef(createHighlightState()) call above — only its Map's entries
+      // do — so reading .current here in cleanup isn't the stale-ref
+      // hazard the lint rule is generally right to flag.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       disposeAllDecorations(highlightStateRef.current);
       disposeGhostSuggestion();
       unregisterScrollbackSource();
@@ -965,12 +968,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       {/* xterm.js takes direct DOM ownership of this element via term.open() —
           it must have no React-rendered children, or reconciliation and
           xterm's own DOM writes will fight each other. */}
-      <div
-        ref={containerRef}
-        className="terminal-pane"
-        style={{ display: visible ? "block" : "none" }}
-        onContextMenu={handleContextMenu}
-      />
+      <div ref={containerRef} className="terminal-pane" style={{ display: visible ? "block" : "none" }} onContextMenu={handleContextMenu} />
       {visible && (
         <ContextMenu
           menu={menu}
@@ -1040,9 +1038,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
           </div>
           {aiPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}
           {aiPopup.status === "error" && <div className="ai-suggest-status ai-suggest-error">{aiPopup.error}</div>}
-          {aiPopup.status === "ready" && aiPopup.suggestions.length === 0 && (
-            <div className="ai-suggest-status">No suggestions.</div>
-          )}
+          {aiPopup.status === "ready" && aiPopup.suggestions.length === 0 && <div className="ai-suggest-status">No suggestions.</div>}
           {aiPopup.status === "ready" &&
             aiPopup.suggestions.map((s, i) => (
               <button key={i} className="ai-suggest-row" onClick={() => acceptAiSuggestion(s)}>

@@ -23,11 +23,10 @@ export function CommandBlocksSettings() {
         </label>
       </div>
       <p className="hint">
-        Groups each command with its own output for easy copy/re-run/bookmark, and knows a command's real exit code
-        (powering the AI's "Explain &amp; Fix" action on failed commands) — via a small, standard shell-integration
-        script (the same OSC 133 protocol iTerm2/VS Code/Warp use) sent to bash or zsh sessions when they connect.
-        Sessions running any other shell, or opened before you change this, aren't affected either way. Turning this
-        off skips sending it to new sessions.
+        Groups each command with its own output for easy copy/re-run/bookmark, and knows a command's real exit code (powering the AI's
+        "Explain &amp; Fix" action on failed commands) — via a small, standard shell-integration script (the same OSC 133 protocol iTerm2/VS
+        Code/Warp use) sent to bash or zsh sessions when they connect. Sessions running any other shell, or opened before you change this,
+        aren't affected either way. Turning this off skips sending it to new sessions.
       </p>
     </div>
   );

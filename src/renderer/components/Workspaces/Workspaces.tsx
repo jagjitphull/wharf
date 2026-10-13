@@ -100,8 +100,8 @@ export function Workspaces() {
         />
       )}
       <p className="hint">
-        A saved set of tabs (and their splits) — each pane remembers which host it connects to, not a live session,
-        so opening one always reconnects fresh.
+        A saved set of tabs (and their splits) — each pane remembers which host it connects to, not a live session, so opening one always
+        reconnects fresh.
       </p>
       {error && <div className="dialog-error">{error}</div>}
       <div className="workspaces-list">

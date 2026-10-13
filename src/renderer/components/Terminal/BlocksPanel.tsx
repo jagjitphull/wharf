@@ -27,7 +27,17 @@ interface Props {
   explainBusyId: string | null;
 }
 
-export function BlocksPanel({ blocks, onClose, onJumpTo, onCopyCommand, onCopyOutput, onRerun, onToggleBookmark, onExplain, explainBusyId }: Props) {
+export function BlocksPanel({
+  blocks,
+  onClose,
+  onJumpTo,
+  onCopyCommand,
+  onCopyOutput,
+  onRerun,
+  onToggleBookmark,
+  onExplain,
+  explainBusyId,
+}: Props) {
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const listRef = useRef<HTMLDivElement>(null);
   const blockCountRef = useRef(0);
@@ -55,9 +65,7 @@ export function BlocksPanel({ blocks, onClose, onJumpTo, onCopyCommand, onCopyOu
       { label: "Copy output", onClick: () => onCopyOutput(block) },
       { label: "Re-run", onClick: () => onRerun(block) },
       { label: block.bookmarked ? "Remove bookmark" : "Bookmark", onClick: () => onToggleBookmark(block) },
-      ...(block.exitCode !== null && block.exitCode !== 0
-        ? [{ label: "Explain & Fix…", onClick: () => onExplain(block) }]
-        : []),
+      ...(block.exitCode !== null && block.exitCode !== 0 ? [{ label: "Explain & Fix…", onClick: () => onExplain(block) }] : []),
     ]);
   }
 
@@ -72,13 +80,16 @@ export function BlocksPanel({ blocks, onClose, onJumpTo, onCopyCommand, onCopyOu
       <div className="blocks-panel-list" ref={listRef}>
         {blocks.length === 0 && (
           <div className="blocks-panel-empty">
-            No blocks yet — run a command. If nothing appears, this shell may not support Command Blocks (bash/zsh
-            only), or it's turned off in Settings.
+            No blocks yet — run a command. If nothing appears, this shell may not support Command Blocks (bash/zsh only), or it's turned off
+            in Settings.
           </div>
         )}
         {blocks.map((block) => (
           <div key={block.id} className="blocks-panel-row" onClick={() => onJumpTo(block)}>
-            <span className={`blocks-panel-status ${statusClass(block)}`} title={block.exitCode === null ? "running" : `exit code ${block.exitCode}`} />
+            <span
+              className={`blocks-panel-status ${statusClass(block)}`}
+              title={block.exitCode === null ? "running" : `exit code ${block.exitCode}`}
+            />
             <span className="blocks-panel-command" title={block.command}>
               {block.command}
             </span>

@@ -156,10 +156,9 @@ export function AiAutocompleteSettings() {
       </div>
 
       <p className="hint">
-        Press <code>Ctrl/Cmd+Space</code> in any terminal to ask the active provider below for up to 3 completions of
-        the command you're typing — grounded in your recent commands from this session. Nothing is sent unless you
-        trigger it; each request sends only the current line, your recent command history, the host name, and your
-        OS.
+        Press <code>Ctrl/Cmd+Space</code> in any terminal to ask the active provider below for up to 3 completions of the command you're
+        typing — grounded in your recent commands from this session. Nothing is sent unless you trigger it; each request sends only the
+        current line, your recent command history, the host name, and your OS.
       </p>
 
       <div className="appearance-row">
@@ -183,8 +182,7 @@ export function AiAutocompleteSettings() {
           {meta.keyUrl ? (
             <>
               <span className="appearance-label">
-                {meta.label} API key{" "}
-                {configured === true && <span className="ai-key-status ai-key-status-ok">configured</span>}
+                {meta.label} API key {configured === true && <span className="ai-key-status ai-key-status-ok">configured</span>}
                 {configured === false && <span className="ai-key-status">not configured</span>}
               </span>
               <div className="ai-key-row">
@@ -206,8 +204,8 @@ export function AiAutocompleteSettings() {
                 )}
               </div>
               <p className="hint">
-                Stored encrypted at rest the same way host passwords are — never leaves this device except in
-                requests you trigger, sent directly to {meta.label.replace(/\s*\(.*\)/, "")}'s API.{" "}
+                Stored encrypted at rest the same way host passwords are — never leaves this device except in requests you trigger, sent
+                directly to {meta.label.replace(/\s*\(.*\)/, "")}'s API.{" "}
                 <a href={meta.keyUrl} target="_blank" rel="noreferrer">
                   Get an API key
                 </a>
@@ -257,8 +255,7 @@ export function AiAutocompleteSettings() {
                 </button>
               </div>
               <p className="hint">
-                Base URL defaults to the standard local port if left blank. Model is required —{" "}
-                {meta.modelHint.replace("Required — ", "")}
+                Base URL defaults to the standard local port if left blank. Model is required — {meta.modelHint.replace("Required — ", "")}
               </p>
             </>
           )}

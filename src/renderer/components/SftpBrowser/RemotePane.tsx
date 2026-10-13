@@ -62,7 +62,11 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
       setTransfers((prev) => ({ ...prev, [event.transferId]: event }));
       if (event.done) {
         setTimeout(
-          () => setTransfers((prev) => { const { [event.transferId]: _drop, ...rest } = prev; return rest; }),
+          () =>
+            setTransfers((prev) => {
+              const { [event.transferId]: _drop, ...rest } = prev;
+              return rest;
+            }),
           2500,
         );
         if (!event.error) void refresh();
@@ -72,6 +76,7 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
     // otherwise captures a stale `path`/`refresh`, so a transfer completing
     // after the user has navigated elsewhere would re-list the *old*
     // directory instead of the one currently open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [host.id, path]);
 
   async function refresh() {
@@ -307,7 +312,9 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
               className="sftp-row"
               key={entry.path}
               draggable
-              onDragStart={(e) => setTransferData(e, { source: "remote", hostId: host.id, path: entry.path, isDir: entry.type === "directory" })}
+              onDragStart={(e) =>
+                setTransferData(e, { source: "remote", hostId: host.id, path: entry.path, isDir: entry.type === "directory" })
+              }
               onDoubleClick={() => (inSearchMode ? revealResult(entry) : openEntry(entry))}
               onContextMenu={(e) =>
                 openMenu(e, [
@@ -360,14 +367,7 @@ export function RemotePane({ host, path, onPathChange, otherPaneLabel, onTransfe
         )}
       </div>
       <ContextMenu menu={menu} onClose={closeMenu} />
-      {editingPath && (
-        <FileEditorDialog
-          hostId={host.id}
-          remotePath={editingPath}
-          onClose={() => setEditingPath(null)}
-          onSaved={refresh}
-        />
-      )}
+      {editingPath && <FileEditorDialog hostId={host.id} remotePath={editingPath} onClose={() => setEditingPath(null)} onSaved={refresh} />}
       {newFolderOpen && (
         <PromptDialog
           title="New folder"

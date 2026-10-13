@@ -75,7 +75,6 @@ function PaneTree({
     );
   }
 
-  const childCount = node.children.length;
   const sizes = node.sizes ?? node.children.map(() => 1);
 
   return (
@@ -88,11 +87,7 @@ function PaneTree({
         // itself instead (see the CSS), which nothing paints over.
         const isActiveBranch = child.type === "leaf" && child.sessionId === activePaneId;
         return (
-          <div
-            className={`pane-split-child ${isActiveBranch ? "active" : ""}`}
-            style={{ flex: `${sizes[i]} 1 0%` }}
-            key={i}
-          >
+          <div className={`pane-split-child ${isActiveBranch ? "active" : ""}`} style={{ flex: `${sizes[i]} 1 0%` }} key={i}>
             <PaneTree node={child} tabVisible={tabVisible} activePaneId={activePaneId} tabId={tabId} multiPane={multiPane} />
           </div>
         );
@@ -190,15 +185,7 @@ function PaneSplitRow({
 function PaneLeafView({ sessionId, visible, tabId }: { sessionId: string; visible: boolean; tabId: string }) {
   const meta = useAppStore((s) => s.paneMeta[sessionId]);
   if (!meta) return null;
-  return (
-    <TerminalView
-      sessionId={sessionId}
-      visible={visible}
-      themeOverrideId={meta.themeId}
-      logPath={meta.logPath}
-      tabId={tabId}
-    />
-  );
+  return <TerminalView sessionId={sessionId} visible={visible} themeOverrideId={meta.themeId} logPath={meta.logPath} tabId={tabId} />;
 }
 
 export function TerminalPanel({ hidden }: Props) {
@@ -268,7 +255,6 @@ export function TerminalPanel({ hidden }: Props) {
 
   function renderTabButton(tab: TerminalTab) {
     const activeMeta = paneMeta[tab.activePaneId];
-    const group = tab.groupId ? tabGroups.find((g) => g.id === tab.groupId) : undefined;
     // Position in the flat tab order, 1-based — matches exactly what
     // Ctrl/Cmd+1..9 (App.tsx) jumps to, grouping aside, so the number shown
     // is always the number that actually gets you there.
@@ -338,7 +324,11 @@ export function TerminalPanel({ hidden }: Props) {
       <div className="tab-bar">
         {segments.map((seg, i) =>
           seg.group ? (
-            <div className="tab-group" key={`group-${seg.group.id}-${i}`} style={{ "--tab-group-color": seg.group.color } as React.CSSProperties}>
+            <div
+              className="tab-group"
+              key={`group-${seg.group.id}-${i}`}
+              style={{ "--tab-group-color": seg.group.color } as React.CSSProperties}
+            >
               <button
                 className="tab-group-label"
                 title={seg.group.collapsed ? "Expand group" : "Collapse group"}
@@ -504,36 +494,34 @@ function TabButton(p: TabButtonProps) {
       // every inactive tab's line — host-colored or not — is thin and faint, so
       // it still hints at which host a tab belongs to without competing for
       // attention with whichever tab is actually active.
-      style={{
-        boxShadow: p.isActive
-          ? `inset 0 3px 0 ${hostColor ?? "var(--accent)"}`
-          : hostColor
-            ? `inset 0 1px 0 ${hostColor}55`
-            : undefined,
-        // A tab's own color theme tints its background too (not just the
-        // small tab-theme-dot), so tabs on different themes are
-        // distinguishable at a glance without hovering or opening each one.
-        // This can't just set `background` directly: an inline style always
-        // wins over a stylesheet rule regardless of specificity or pseudo-
-        // classes, which would permanently defeat .tab:hover and .tab.active's
-        // own CSS rules the moment a theme was set. Setting only these custom
-        // properties instead lets TerminalPanel.css's rules for each state
-        // (rest/hover/active) consume whichever one applies via var(), same
-        // as any other background they'd otherwise fall back to. Most of
-        // these presets are deliberately dark, muted palettes (see
-        // terminalThemes.ts), so a subtle tint gets swallowed entirely by the
-        // app's own near-black chrome — needs a strong mix for a theme's
-        // actual hue (Dracula's purple, Nord's blue-gray, Solarized's teal,
-        // ...) to read as a distinct tab color rather than just a
-        // barely-different shade of black.
-        ...(themeBg
-          ? {
-              "--tab-theme-bg": `color-mix(in srgb, var(--bg-panel) 70%, ${themeBg} 30%)`,
-              "--tab-theme-hover-bg": `color-mix(in srgb, var(--bg-hover) 55%, ${themeBg} 45%)`,
-              "--tab-theme-active-bg": `color-mix(in srgb, var(--bg) 45%, ${themeBg} 55%)`,
-            }
-          : {}),
-      } as React.CSSProperties}
+      style={
+        {
+          boxShadow: p.isActive ? `inset 0 3px 0 ${hostColor ?? "var(--accent)"}` : hostColor ? `inset 0 1px 0 ${hostColor}55` : undefined,
+          // A tab's own color theme tints its background too (not just the
+          // small tab-theme-dot), so tabs on different themes are
+          // distinguishable at a glance without hovering or opening each one.
+          // This can't just set `background` directly: an inline style always
+          // wins over a stylesheet rule regardless of specificity or pseudo-
+          // classes, which would permanently defeat .tab:hover and .tab.active's
+          // own CSS rules the moment a theme was set. Setting only these custom
+          // properties instead lets TerminalPanel.css's rules for each state
+          // (rest/hover/active) consume whichever one applies via var(), same
+          // as any other background they'd otherwise fall back to. Most of
+          // these presets are deliberately dark, muted palettes (see
+          // terminalThemes.ts), so a subtle tint gets swallowed entirely by the
+          // app's own near-black chrome — needs a strong mix for a theme's
+          // actual hue (Dracula's purple, Nord's blue-gray, Solarized's teal,
+          // ...) to read as a distinct tab color rather than just a
+          // barely-different shade of black.
+          ...(themeBg
+            ? {
+                "--tab-theme-bg": `color-mix(in srgb, var(--bg-panel) 70%, ${themeBg} 30%)`,
+                "--tab-theme-hover-bg": `color-mix(in srgb, var(--bg-hover) 55%, ${themeBg} 45%)`,
+                "--tab-theme-active-bg": `color-mix(in srgb, var(--bg) 45%, ${themeBg} 55%)`,
+              }
+            : {}),
+        } as React.CSSProperties
+      }
       onClick={p.onClick}
       onContextMenu={(e) =>
         p.openMenu(e, [

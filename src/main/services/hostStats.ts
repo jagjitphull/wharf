@@ -58,9 +58,7 @@ function parseStats(raw: string): HostStatsSnapshot {
   const [loadPart = "", memPart = "", diskPart = ""] = raw.split("|").map((s) => s.trim());
 
   const loadMatch = loadPart.match(/^([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
-  const loadAvg: HostStatsSnapshot["loadAvg"] = loadMatch
-    ? [Number(loadMatch[1]), Number(loadMatch[2]), Number(loadMatch[3])]
-    : null;
+  const loadAvg: HostStatsSnapshot["loadAvg"] = loadMatch ? [Number(loadMatch[1]), Number(loadMatch[2]), Number(loadMatch[3])] : null;
 
   const memMatch = memPart.match(/^(\d+)\s+(\d+)/);
   const memTotalMb = memMatch ? Number(memMatch[1]) : null;

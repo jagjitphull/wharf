@@ -45,6 +45,12 @@ export function StatusBar() {
     if (!activeMeta || activeMeta.closed) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
+    // Deliberately not depending on activeMeta itself: it's a new object
+    // reference on unrelated paneMeta updates (e.g. another pane's state
+    // changing), which would restart this interval far more often than the
+    // two things that actually matter to it — which pane is active, and
+    // whether this one just closed — already cover.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.activePaneId, activeMeta?.closed]);
 
   // Polls at most one session at a time — whichever pane currently has
@@ -78,9 +84,7 @@ export function StatusBar() {
 
   return (
     <div className="status-bar">
-      <span
-        className={`status-dot ${activeMeta.closed ? "closed" : activeMeta.reconnecting ? "reconnecting" : "connected"}`}
-      />
+      <span className={`status-dot ${activeMeta.closed ? "closed" : activeMeta.reconnecting ? "reconnecting" : "connected"}`} />
       <span className="status-text">
         {activeMeta.closed
           ? "Disconnected"

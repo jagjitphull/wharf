@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SftpEntry, SftpTransferProgress } from "@shared/types";
+import type { SftpEntry } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { IconChevronUp, IconFile, IconFolder, IconPencil, IconPlus, IconRefresh, IconTrash, IconUpload } from "../Icons/Icons";
@@ -41,6 +41,7 @@ export function LocalPane({ path, onPathChange, onTransferToRemote, onTransferFr
     // Re-subscribes on every path change — see the identical note in
     // RemotePane.tsx (a stale closure would otherwise re-list wherever
     // the pane was pointed at mount, not the current directory).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
   async function refresh() {

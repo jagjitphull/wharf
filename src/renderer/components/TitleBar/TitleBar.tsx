@@ -42,10 +42,7 @@ export function TitleBar({ onOpenShortcuts }: Props) {
   );
 
   return (
-    <div
-      className={`title-bar ${isMac ? "mac" : ""}`}
-      onDoubleClick={() => wharf.window.toggleMaximize()}
-    >
+    <div className={`title-bar ${isMac ? "mac" : ""}`} onDoubleClick={() => wharf.window.toggleMaximize()}>
       <div className="title-bar-left">
         <button
           className="title-bar-icon-btn"
@@ -94,12 +91,7 @@ export function TitleBar({ onOpenShortcuts }: Props) {
             </svg>
           ) : (
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M13.5 9.5A6 6 0 1 1 6.5 2.5a5 5 0 0 0 7 7z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinejoin="round"
-              />
+              <path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a5 5 0 0 0 7 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
             </svg>
           )}
         </button>
@@ -156,11 +148,7 @@ export function TitleBar({ onOpenShortcuts }: Props) {
               </svg>
             </span>
           </button>
-          <button
-            className="win-btn"
-            title={maximized ? "Restore" : "Maximize"}
-            onClick={() => wharf.window.toggleMaximize()}
-          >
+          <button className="win-btn" title={maximized ? "Restore" : "Maximize"} onClick={() => wharf.window.toggleMaximize()}>
             <span className="win-btn-dot win-btn-maximize">
               {maximized ? (
                 <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">

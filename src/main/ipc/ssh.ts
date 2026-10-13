@@ -17,14 +17,11 @@ function defaultLogPath(name: string): string {
 }
 
 export function registerSshIpc(): void {
-  ipcMain.handle(
-    IPC.ssh.connect,
-    async (_event, hostId: string, cols: number, rows: number): Promise<SessionStartResult> => {
-      const host = getHosts().find((h) => h.id === hostId);
-      const sessionId = host?.mosh ? moshManager.connect(hostId, cols, rows) : await sshManager.connect(hostId, cols, rows);
-      return { sessionId };
-    },
-  );
+  ipcMain.handle(IPC.ssh.connect, async (_event, hostId: string, cols: number, rows: number): Promise<SessionStartResult> => {
+    const host = getHosts().find((h) => h.id === hostId);
+    const sessionId = host?.mosh ? moshManager.connect(hostId, cols, rows) : await sshManager.connect(hostId, cols, rows);
+    return { sessionId };
+  });
 
   // High-frequency, fire-and-forget: keystrokes and resize events use `send`/`on`
   // rather than `invoke`/`handle` to avoid the overhead of a reply round-trip.
@@ -74,11 +71,8 @@ export function registerSshIpc(): void {
     moshManager.stopLogging(sessionId);
   });
 
-  ipcMain.handle(
-    IPC.localShell.connect,
-    async (_event, cols: number, rows: number): Promise<SessionStartResult> => {
-      const sessionId = localShellManager.connect(cols, rows);
-      return { sessionId };
-    },
-  );
+  ipcMain.handle(IPC.localShell.connect, async (_event, cols: number, rows: number): Promise<SessionStartResult> => {
+    const sessionId = localShellManager.connect(cols, rows);
+    return { sessionId };
+  });
 }

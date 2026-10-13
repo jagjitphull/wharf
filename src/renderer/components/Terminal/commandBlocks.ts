@@ -130,7 +130,11 @@ export function handleOsc133(term: XTerm, state: CommandBlocksState, payload: st
     state.openBlockId = null;
     if (idx === -1) return null;
     const exitCode = arg !== undefined && arg !== "" ? Number(arg) : null;
-    const updated: CommandBlock = { ...state.blocks[idx], endMarker: term.registerMarker(0), exitCode: Number.isNaN(exitCode) ? null : exitCode };
+    const updated: CommandBlock = {
+      ...state.blocks[idx],
+      endMarker: term.registerMarker(0),
+      exitCode: Number.isNaN(exitCode) ? null : exitCode,
+    };
     state.blocks = [...state.blocks.slice(0, idx), updated, ...state.blocks.slice(idx + 1)];
     return state.blocks;
   }

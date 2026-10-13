@@ -1,5 +1,14 @@
 import { create } from "zustand";
-import type { GroupRecord, HostInput, HostRecord, SnippetRecord, TunnelRecord, WorkspaceNode, WorkspaceRecord, WorkspaceTab } from "@shared/types";
+import type {
+  GroupRecord,
+  HostInput,
+  HostRecord,
+  SnippetRecord,
+  TunnelRecord,
+  WorkspaceNode,
+  WorkspaceRecord,
+  WorkspaceTab,
+} from "@shared/types";
 import { ipcErrorMessage, wharf } from "../api/wharf";
 import { getScrollback } from "../components/Terminal/scrollbackRegistry";
 
@@ -423,8 +432,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await connectSavedTabs(
       workspace.tabs,
       get().hosts,
-      (tab, metas) =>
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.tabId, paneMeta: { ...s.paneMeta, ...metas } })),
+      (tab, metas) => set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.tabId, paneMeta: { ...s.paneMeta, ...metas } })),
       false,
     );
     set({ activeView: "hosts" });
@@ -436,8 +444,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await connectSavedTabs(
       savedTabs,
       get().hosts,
-      (tab, metas) =>
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.tabId, paneMeta: { ...s.paneMeta, ...metas } })),
+      (tab, metas) => set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.tabId, paneMeta: { ...s.paneMeta, ...metas } })),
       true,
     );
   },
@@ -519,9 +526,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // A tab group that's lost its last remaining tab to this close no
       // longer has anything to label — drop it too, rather than leaving a
       // named color with nothing under it around forever.
-      const tabGroups = tab.groupId && !tabs.some((t) => t.groupId === tab.groupId)
-        ? s.tabGroups.filter((g) => g.id !== tab.groupId)
-        : s.tabGroups;
+      const tabGroups =
+        tab.groupId && !tabs.some((t) => t.groupId === tab.groupId) ? s.tabGroups.filter((g) => g.id !== tab.groupId) : s.tabGroups;
       return { tabs, activeTabId, paneMeta, tabGroups };
     });
   },
@@ -660,9 +666,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { sessionId: newSessionId, meta: newMeta } = await connectSession(host, meta.themeId, existingLocalShells);
     set((s) => ({
       tabs: s.tabs.map((t) =>
-        t.tabId === tabId
-          ? { ...t, layout: splitNode(t.layout, sessionId, newSessionId, direction), activePaneId: newSessionId }
-          : t,
+        t.tabId === tabId ? { ...t, layout: splitNode(t.layout, sessionId, newSessionId, direction), activePaneId: newSessionId } : t,
       ),
       paneMeta: { ...s.paneMeta, [newSessionId]: newMeta },
     }));

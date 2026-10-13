@@ -7,14 +7,7 @@ import type {
   AiSuggestRequest,
 } from "../../shared/types";
 import { deleteSecret, readSecret, saveSecret, updateSecret } from "./secretStore";
-import {
-  getAiApiKeySecretId,
-  getAiProvider,
-  getAiProviderConfig,
-  setAiApiKeySecretId,
-  setAiProvider,
-  setAiProviderConfig,
-} from "./store";
+import { getAiApiKeySecretId, getAiProvider, getAiProviderConfig, setAiApiKeySecretId, setAiProvider, setAiProviderConfig } from "./store";
 import type { AiProviderAdapter } from "./aiProviders/types";
 
 /**

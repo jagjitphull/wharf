@@ -13,9 +13,8 @@ export function NotificationSettings() {
         </label>
       </div>
       <p className="hint">
-        A desktop notification when a command running at least {LONG_COMMAND_THRESHOLD_MS / 1000}s finishes on a
-        pane you're not currently looking at — click it to jump straight back to that tab. Needs Command Blocks
-        (above) to know when a command actually finishes.
+        A desktop notification when a command running at least {LONG_COMMAND_THRESHOLD_MS / 1000}s finishes on a pane you're not currently
+        looking at — click it to jump straight back to that tab. Needs Command Blocks (above) to know when a command actually finishes.
       </p>
     </div>
   );
