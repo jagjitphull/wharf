@@ -22,7 +22,7 @@ import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
-import { getWindowBounds, setWindowBounds } from "./services/store";
+import { getWindowBounds, recoveredFromCorruptDataFile, setWindowBounds } from "./services/store";
 
 // Every window shares one electron-store-backed data file (hosts, groups,
 // tunnels, etc.) with no cross-process locking — two instances writing to it
@@ -294,6 +294,16 @@ app.whenReady().then(() => {
 
   installAppMenu();
   createWindow(true);
+
+  if (recoveredFromCorruptDataFile) {
+    log.error(`Data file was corrupt, reset to defaults — original backed up to ${recoveredFromCorruptDataFile}`);
+    dialog.showErrorBox(
+      "Wharf's saved data was reset",
+      "Wharf's hosts/groups/settings file couldn't be read (it was corrupted) and has been reset to defaults. " +
+        `The unreadable original was kept at:\n\n${recoveredFromCorruptDataFile}\n\n` +
+        "A text editor may be able to recover parts of it.",
+    );
+  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(true);

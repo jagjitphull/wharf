@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, renameSync } from "node:fs";
+import path from "node:path";
+import { app } from "electron";
 import Store from "electron-store";
 import type {
   AiProvider,
@@ -58,6 +61,32 @@ const defaults: Schema = {
   commandBlocksEnabled: true,
   windowBounds: null,
 };
+
+// electron-store (via `conf`) throws a raw SyntaxError out of its
+// constructor if the on-disk JSON is corrupt (e.g. a crash or a full disk
+// mid-write) — uncaught this crashes the whole app, on every single launch
+// from then on, with a cryptic native dialog and no way for an ordinary user
+// to recover. Move the bad file aside *before* constructing Store (rather
+// than relying on `conf`'s own clearInvalidConfig, which would just discard
+// it) so a corrupted file costs the user a reset to defaults, never a bricked
+// app or quietly-vanished hosts/secrets with no trace left to recover from.
+const dataFilePath = path.join(app.getPath("userData"), "wharf-data.json");
+
+/** Set when the data file above had to be reset because it was corrupt —
+ * holds the backup path it was moved to. index.ts surfaces this to the user
+ * once a window exists (a dialog this early, before whenReady, isn't
+ * guaranteed to show). */
+export let recoveredFromCorruptDataFile: string | null = null;
+
+if (existsSync(dataFilePath)) {
+  try {
+    JSON.parse(readFileSync(dataFilePath, "utf8"));
+  } catch {
+    const backupPath = `${dataFilePath}.corrupted-${Date.now()}`;
+    renameSync(dataFilePath, backupPath);
+    recoveredFromCorruptDataFile = backupPath;
+  }
+}
 
 /**
  * Single persisted JSON store (via electron-store, which writes to the OS
