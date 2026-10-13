@@ -1,21 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { SidebarResizeHandle } from "./components/Sidebar/SidebarResizeHandle";
 import { TerminalPanel } from "./components/Terminal/TerminalPanel";
-import { SftpBrowser } from "./components/SftpBrowser/SftpBrowser";
-import { Tunnels } from "./components/Tunnels/Tunnels";
-import { CommandHistory } from "./components/CommandHistory/CommandHistory";
-import { Workspaces } from "./components/Workspaces/Workspaces";
-import { Settings } from "./components/Settings/Settings";
-import { QuickConnect } from "./components/QuickConnect/QuickConnect";
-import { KeyboardShortcuts } from "./components/KeyboardShortcuts/KeyboardShortcuts";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useAppStore } from "./state/store";
 import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
 import { useUiPrefsStore } from "./state/uiPrefsStore";
 import { useRestoreTabsPrefsStore } from "./state/restoreTabsPrefsStore";
 import { ipcErrorMessage } from "./api/wharf";
+
+// Lazy: each is its own chunk, fetched only the first time its view/modal
+// is actually opened, rather than all bundled into the one chunk the whole
+// app has to load before it can show anything. TerminalPanel (the view
+// almost every session actually uses first) stays a static import above —
+// no reason to add a loading flash to the one thing that should feel
+// instant. .then(...) adapts each module's named export to the default
+// export lazy() requires, since nothing else in this codebase uses default
+// exports and these don't need to be the exception.
+const SftpBrowser = lazy(() => import("./components/SftpBrowser/SftpBrowser").then((m) => ({ default: m.SftpBrowser })));
+const Tunnels = lazy(() => import("./components/Tunnels/Tunnels").then((m) => ({ default: m.Tunnels })));
+const CommandHistory = lazy(() =>
+  import("./components/CommandHistory/CommandHistory").then((m) => ({ default: m.CommandHistory })),
+);
+const Workspaces = lazy(() => import("./components/Workspaces/Workspaces").then((m) => ({ default: m.Workspaces })));
+const Settings = lazy(() => import("./components/Settings/Settings").then((m) => ({ default: m.Settings })));
+const QuickConnect = lazy(() => import("./components/QuickConnect/QuickConnect").then((m) => ({ default: m.QuickConnect })));
+const KeyboardShortcuts = lazy(() =>
+  import("./components/KeyboardShortcuts/KeyboardShortcuts").then((m) => ({ default: m.KeyboardShortcuts })),
+);
 
 export default function App() {
   const { activeView, hosts, groups, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
@@ -138,27 +151,52 @@ export default function App() {
         <main className="app-main">
           {/* Always mounted (display:none rather than unmounted) — switching
               to Settings/SFTP/Tunnels and back must not tear down and
-              recreate every open terminal, which would destroy scrollback. */}
+              recreate every open terminal, which would destroy scrollback.
+              Kept outside the Suspense below on purpose: a lazy view's
+              chunk loading must never hide an already-open terminal. */}
           <TerminalPanel hidden={activeView !== "hosts"} />
-          {activeView === "sftp" && <SftpBrowser />}
-          {activeView === "tunnels" && <Tunnels />}
-          {activeView === "history" && <CommandHistory />}
-          {activeView === "workspaces" && <Workspaces />}
-          {activeView === "settings" && <Settings />}
+          <Suspense fallback={<ViewLoadingFallback />}>
+            {activeView === "sftp" && <SftpBrowser />}
+            {activeView === "tunnels" && <Tunnels />}
+            {activeView === "history" && <CommandHistory />}
+            {activeView === "workspaces" && <Workspaces />}
+            {activeView === "settings" && <Settings />}
+          </Suspense>
         </main>
       </div>
       <StatusBar />
 
+      {/* Independent fallback={null}: these pop in, each on its own
+          chunk — a one-frame delay before a modal appears isn't worth a
+          visible loading state, and each needs its own boundary since
+          both can in principle be open at once. */}
       {quickConnectOpen && (
-        <QuickConnect
-          hosts={hosts}
-          groups={groups}
-          onClose={() => setQuickConnectOpen(false)}
-          onConnect={handleQuickConnect}
-        />
+        <Suspense fallback={null}>
+          <QuickConnect
+            hosts={hosts}
+            groups={groups}
+            onClose={() => setQuickConnectOpen(false)}
+            onConnect={handleQuickConnect}
+          />
+        </Suspense>
       )}
 
-      {shortcutsOpen && <KeyboardShortcuts onClose={() => setShortcutsOpen(false)} />}
+      {shortcutsOpen && (
+        <Suspense fallback={null}>
+          <KeyboardShortcuts onClose={() => setShortcutsOpen(false)} />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+/** Shown only while a lazy view's chunk is actually being fetched — on
+ * local disk that's well under a frame in practice, but Suspense still
+ * needs a fallback, and a blank panel would read as a broken view switch. */
+function ViewLoadingFallback() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-dim)", fontSize: 13 }}>
+      Loading…
     </div>
   );
 }
