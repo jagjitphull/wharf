@@ -307,14 +307,20 @@ src/
   it matches the host), but not the full OpenSSH known_hosts spec — no
   CIDR ranges or `@cert-authority` (CA-signed host certificates).
 - Local shell tabs use [`node-pty`](https://github.com/microsoft/node-pty),
-  a native addon that must be compiled against Electron's own Node ABI (not
-  your system Node's). `npm install` does this automatically via
-  `postinstall` (`npm run rebuild-native`, which shells out to
-  `electron-rebuild`); if that step fails — no network access, no build
-  toolchain — Local Shell tabs fail with a clear error instead of crashing
-  the app, and everything else keeps working. Re-run
-  `npm run rebuild-native` after fixing whatever blocked it, or after
-  upgrading Electron.
+  a native addon that has to compile during `npm install` (it has no
+  prebuilt binary for Linux). `postinstall` (`scripts/verify-pty.js`) checks
+  right away whether it actually loads under Electron's own runtime and
+  fails the install loudly if not, rather than silently shipping a broken
+  Local Shell/Mosh discovered later at runtime. A failure almost always
+  means missing build tools — install them (`sudo apt install
+  build-essential python3` on Debian/Ubuntu, `sudo dnf groupinstall
+  "Development Tools" && sudo dnf install python3` on Fedora/RHEL) and
+  reinstall (`rm -rf node_modules/node-pty && npm install`). If you're
+  working on SSH/SFTP only and don't need Local Shell or Mosh right now,
+  skip the check with `WHARF_SKIP_PTY_CHECK=1 npm install`. If it does fail
+  at runtime anyway (e.g. after the check was skipped), Local Shell/Mosh
+  tabs show a clear error instead of crashing the app, and everything else
+  keeps working.
 - AI autocomplete requires your own API key for whichever cloud provider
   you pick (Claude, OpenAI, or Gemini) plus outbound network access to
   that provider's API — Ollama is the exception, running fully local
