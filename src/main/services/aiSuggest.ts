@@ -15,10 +15,6 @@ import {
   setAiProvider,
   setAiProviderConfig,
 } from "./store";
-import claudeAdapter from "./aiProviders/claude";
-import openaiAdapter from "./aiProviders/openai";
-import geminiAdapter from "./aiProviders/gemini";
-import ollamaAdapter from "./aiProviders/ollama";
 import type { AiProviderAdapter } from "./aiProviders/types";
 
 /**
@@ -31,14 +27,41 @@ import type { AiProviderAdapter } from "./aiProviders/types";
  * key at all.
  */
 
-const ADAPTERS: Record<AiProvider, AiProviderAdapter> = {
-  claude: claudeAdapter,
-  openai: openaiAdapter,
-  gemini: geminiAdapter,
-  ollama: ollamaAdapter,
-};
-
 const CLOUD_PROVIDERS: Exclude<AiProvider, "ollama">[] = ["claude", "openai", "gemini"];
+
+// Each cloud provider's adapter module pulls in that provider's own SDK
+// (@anthropic-ai/sdk, openai, @google/genai — the latter also drags in
+// rxjs) — heavy, and a given install only ever uses the one provider
+// actually configured in Settings. A static import of every adapter would
+// load all three SDKs at app startup regardless of which one (if any) is
+// in use. Importing dynamically, only for the provider actually being
+// called, means the other two never get loaded at all — and caching the
+// resolved adapter means that cost is paid at most once per provider per
+// run, not on every suggest() call (autocomplete fires on every keystroke).
+const adapterCache = new Map<AiProvider, AiProviderAdapter>();
+
+async function loadAdapter(provider: AiProvider): Promise<AiProviderAdapter> {
+  const cached = adapterCache.get(provider);
+  if (cached) return cached;
+
+  let adapter: AiProviderAdapter;
+  switch (provider) {
+    case "claude":
+      adapter = (await import("./aiProviders/claude")).default;
+      break;
+    case "openai":
+      adapter = (await import("./aiProviders/openai")).default;
+      break;
+    case "gemini":
+      adapter = (await import("./aiProviders/gemini")).default;
+      break;
+    case "ollama":
+      adapter = (await import("./aiProviders/ollama")).default;
+      break;
+  }
+  adapterCache.set(provider, adapter);
+  return adapter;
+}
 
 function isCloudProvider(provider: AiProvider): provider is Exclude<AiProvider, "ollama"> {
   return (CLOUD_PROVIDERS as AiProvider[]).includes(provider);
@@ -85,19 +108,22 @@ export async function suggest(request: AiSuggestRequest): Promise<string[]> {
   const provider = getAiProvider();
   const apiKey = isCloudProvider(provider) ? readSecret(getAiApiKeySecretId(provider)) : null;
   const config = getAiProviderConfig(provider);
-  return ADAPTERS[provider].suggest(apiKey, config, request);
+  const adapter = await loadAdapter(provider);
+  return adapter.suggest(apiKey, config, request);
 }
 
 export async function explainFailure(request: AiExplainFailureRequest): Promise<AiExplainFailureResult> {
   const provider = getAiProvider();
   const apiKey = isCloudProvider(provider) ? readSecret(getAiApiKeySecretId(provider)) : null;
   const config = getAiProviderConfig(provider);
-  return ADAPTERS[provider].explainFailure(apiKey, config, request);
+  const adapter = await loadAdapter(provider);
+  return adapter.explainFailure(apiKey, config, request);
 }
 
 export async function generateCommand(request: AiGenerateCommandRequest): Promise<string> {
   const provider = getAiProvider();
   const apiKey = isCloudProvider(provider) ? readSecret(getAiApiKeySecretId(provider)) : null;
   const config = getAiProviderConfig(provider);
-  return ADAPTERS[provider].generateCommand(apiKey, config, request);
+  const adapter = await loadAdapter(provider);
+  return adapter.generateCommand(apiKey, config, request);
 }
