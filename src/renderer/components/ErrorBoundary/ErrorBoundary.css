@@ -1,0 +1,60 @@
+.crash-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg);
+  padding: 24px;
+  /* This replaces the whole app, including the custom title bar — without
+   * its own drag region the window becomes unmovable while crashed. */
+  -webkit-app-region: drag;
+}
+
+.crash-card {
+  max-width: 560px;
+  width: 100%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px;
+  -webkit-app-region: no-drag;
+}
+
+.crash-card h1 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.crash-card p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.crash-hint {
+  margin-bottom: 16px !important;
+}
+
+.crash-details {
+  margin: 0 0 20px;
+  padding: 12px;
+  max-height: 200px;
+  overflow: auto;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--danger-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crash-actions {
+  display: flex;
+  gap: 8px;
+}

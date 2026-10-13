@@ -126,6 +126,8 @@ export interface WharfApi {
     isMaximized(): Promise<boolean>;
     newWindow(): void;
     onMaximizedChange(cb: (maximized: boolean) => void): Unsubscribe;
+    /** Main-process-initiated reload — see the IPC channel's own doc comment. */
+    reload(): void;
   };
   clipboard: {
     writeText(text: string): void;

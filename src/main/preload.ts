@@ -83,6 +83,7 @@ const api: WharfApi = {
     isMaximized: () => ipcRenderer.invoke(IPC.window.isMaximized),
     newWindow: () => ipcRenderer.send(IPC.window.newWindow),
     onMaximizedChange: (cb) => on(IPC.window.onMaximizedChange, cb as (...args: unknown[]) => void),
+    reload: () => ipcRenderer.send(IPC.window.reload),
   },
   clipboard: {
     writeText: (text) => ipcRenderer.send(IPC.clipboard.writeText, text),

@@ -428,6 +428,10 @@ export const IPC = {
     isMaximized: "window:is-maximized",
     newWindow: "window:new",
     onMaximizedChange: "window:maximized-changed",
+    /** Main-process-initiated reload, so a packaged build's will-navigate
+     * guard (main/index.ts) doesn't block it the way it would an in-page
+     * location.reload() — see ErrorBoundary's use of this. */
+    reload: "window:reload",
   },
   clipboard: {
     writeText: "clipboard:write-text",

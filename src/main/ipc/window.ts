@@ -30,4 +30,13 @@ export function registerWindowIpc(createWindow: () => void): void {
   ipcMain.on(IPC.window.newWindow, () => {
     createWindow();
   });
+
+  // Not just a convenience over the renderer calling location.reload()
+  // itself: in a packaged build, main/index.ts's will-navigate guard blocks
+  // any in-page navigation (including a same-page reload) to stop the
+  // renderer being pointed at an attacker-controlled URL — reload has to
+  // come from here, main-process-initiated, to not be caught by that guard.
+  ipcMain.on(IPC.window.reload, (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.webContents.reload();
+  });
 }

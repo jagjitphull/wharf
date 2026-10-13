@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, Menu, ipcMain, nativeImage, shell } from "electron";
+import { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } from "electron";
 import { IPC } from "../shared/types";
 import { registerHostsIpc } from "./ipc/hosts";
 import { registerGroupsIpc } from "./ipc/groups";
@@ -25,6 +25,28 @@ import { getWindowBounds, setWindowBounds } from "./services/store";
 
 const isDev = process.env.NODE_ENV === "development";
 const isMac = process.platform === "darwin";
+
+// Registered as early as possible (before app.whenReady()) so nothing
+// thrown during startup's own setup can slip past unlogged either.
+//
+// An uncaughtException here means something in the main process threw
+// outside any of its own try/catch — session state at that point is
+// unverified, so rather than limp along in an unknown state (Electron's
+// own default behavior without a handler installed is to exit anyway),
+// this logs the real cause first, since the default crash output is often
+// swallowed by whatever launched the app, then exits deliberately.
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception in main process:", error);
+  app.exit(1);
+});
+
+// A rejected promise with no .catch — an IPC handler's async body, a
+// one-off probe — is noisy but rarely fatal on its own, so (unlike
+// uncaughtException above) this only makes sure it's actually visible
+// instead of vanishing, rather than tearing down the whole app for it.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection in main process:", reason);
+});
 
 const DEFAULT_WIDTH = 1280;
 const DEFAULT_HEIGHT = 800;
@@ -143,6 +165,35 @@ function createWindow(primary: boolean): BrowserWindow {
   });
   win.webContents.on("will-navigate", (event, url) => {
     if (!isDev || !url.startsWith("http://localhost:5173")) event.preventDefault();
+  });
+
+  // Unlike a main-process crash, a renderer crash (OOM, a GPU-process
+  // SIGTRAP taking its renderer down with it, Electron's own crashes) isn't
+  // fatal to the app — but without this, the window is just left showing
+  // its last frame forever, frozen and unresponsive, with nothing telling
+  // the user what happened. Reload the same window instead; a crash loop
+  // (reload itself failing repeatedly) gets capped rather than retried
+  // forever, with a dialog so it's at least not a silent freeze.
+  let crashReloadCount = 0;
+  const MAX_CRASH_RELOADS = 3;
+  win.webContents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit" || win.isDestroyed()) return;
+    console.error(`Renderer process gone for window ${win.id}: reason=${details.reason} exitCode=${details.exitCode}`);
+
+    crashReloadCount += 1;
+    if (crashReloadCount > MAX_CRASH_RELOADS) {
+      dialog.showErrorBox(
+        "Wharf keeps crashing",
+        `Wharf's window has crashed ${crashReloadCount} times in a row (reason: ${details.reason}) and won't be ` +
+          "reloaded automatically again. Please restart Wharf. If this keeps happening, it's worth reporting.",
+      );
+      return;
+    }
+    if (isDev) {
+      void win.loadURL("http://localhost:5173");
+    } else {
+      void win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+    }
   });
 
   win.on("maximize", () => win.webContents.send(IPC.window.onMaximizedChange, true));
