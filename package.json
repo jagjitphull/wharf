@@ -23,6 +23,7 @@
     "start": "electron .",
     "package": "npm run build && electron-builder --publish never",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "test": "vitest run",
     "postinstall": "node scripts/verify-pty.js"
   },
   "dependencies": {
@@ -53,6 +54,7 @@
     "esbuild": "^0.21.3",
     "typescript": "^5.5.4",
     "vite": "^5.4.2",
+    "vitest": "^3.2.7",
     "wait-on": "^7.2.0"
   }
 }

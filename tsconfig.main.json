@@ -21,5 +21,9 @@
     "sourceMap": true,
     "declaration": false
   },
-  "include": ["src/main", "src/shared"]
+  "include": ["src/main", "src/shared"],
+  // *.test.ts files are run directly by vitest (see vitest.config.ts) —
+  // compiling them here too would ship test code (and a dev-only `vitest`
+  // import) inside dist-electron, which electron-builder then packages.
+  "exclude": ["src/main/**/*.test.ts"]
 }
