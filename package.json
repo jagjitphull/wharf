@@ -1,6 +1,7 @@
 {
   "name": "wharf",
   "productName": "Wharf",
+  "desktopName": "wharf.desktop",
   "version": "0.1.0",
   "description": "A personal SSH/SFTP terminal client.",
   "author": "Wharf",
@@ -8,6 +9,9 @@
   "private": true,
   "main": "dist-electron/main/index.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -k -n VITE,ELECTRON -c blue,green \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite",

@@ -1,5 +1,7 @@
 # Wharf
 
+[![CI](https://github.com/jagjitphull/wharf/actions/workflows/ci.yml/badge.svg)](https://github.com/jagjitphull/wharf/actions/workflows/ci.yml)
+
 A personal SSH/SFTP terminal client, Termius-style.
 
 - **Desktop app:** Electron + React + TypeScript

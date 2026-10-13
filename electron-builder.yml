@@ -41,3 +41,9 @@ linux:
   # detect the size and fell back to an invalid "hicolor/0x0/apps" bucket
   # that GTK icon theme lookups don't recognize.
   icon: resources/icons
+  # Keeps the generated .desktop file's name in sync with `desktopName`
+  # (package.json) — that's what Electron itself uses as app_id/WM_CLASS at
+  # runtime, so without this a window can't be linked back to its launcher
+  # entry (wrong taskbar grouping/icon, "pin to taskbar" not working).
+  syncDesktopName: true
+  synopsis: A personal SSH/SFTP terminal client
