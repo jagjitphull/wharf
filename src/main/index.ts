@@ -143,18 +143,33 @@ function createWindow(primary: boolean): BrowserWindow {
   // window, and once more on close so the very last adjustment sticks.
   // getNormalBounds() (not getBounds()) so a maximized window doesn't
   // overwrite the saved "restored" size with the full-screen one.
+  //
+  // Both call sites below run outside any ipcMain.handle, so nothing
+  // catches a thrown write failure (a full disk, a read-only filesystem,
+  // permissions) before it reaches our uncaughtException handler — which
+  // exits the whole app. Losing the remembered window position is a far
+  // smaller problem than crashing every open terminal/SSH session over it,
+  // so this is deliberately swallowed-and-logged rather than left to
+  // propagate.
+  function trySaveWindowBounds(bounds: WindowBounds): void {
+    try {
+      setWindowBounds(bounds);
+    } catch (err) {
+      log.error("Failed to save window bounds:", err);
+    }
+  }
   let saveBoundsTimer: NodeJS.Timeout | null = null;
   function scheduleSaveBounds() {
     if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
     saveBoundsTimer = setTimeout(() => {
-      if (!win.isDestroyed() && !win.isMinimized()) setWindowBounds(win.getNormalBounds());
+      if (!win.isDestroyed() && !win.isMinimized()) trySaveWindowBounds(win.getNormalBounds());
     }, 400);
   }
   win.on("resize", scheduleSaveBounds);
   win.on("move", scheduleSaveBounds);
   win.on("close", () => {
     if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
-    if (!win.isMinimized()) setWindowBounds(win.getNormalBounds());
+    if (!win.isMinimized()) trySaveWindowBounds(win.getNormalBounds());
   });
 
   // The periodic/debounced "last session" persist (state/store.ts) can be up
