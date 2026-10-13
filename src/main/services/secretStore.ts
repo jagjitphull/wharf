@@ -1,5 +1,6 @@
 import { safeStorage } from "electron";
 import { randomUUID } from "node:crypto";
+import log from "electron-log/main";
 import { store } from "./store";
 
 /**
@@ -55,7 +56,21 @@ function decrypt(stored: string): string {
   }
   if (stored.startsWith("enc:")) {
     const buf = Buffer.from(stored.slice("enc:".length), "base64");
-    return safeStorage.decryptString(buf);
+    try {
+      return safeStorage.decryptString(buf);
+    } catch (err) {
+      // safeStorage.decryptString throws a raw, OS-internal message (e.g.
+      // "Decryption is not available") that's meaningless to a user — this
+      // happens for real when the OS keychain entry it was encrypted under
+      // is gone (a different machine/user account, or the Linux secret
+      // service got reset), not just on literal data corruption. Surface
+      // something they can actually act on instead, and keep the original
+      // for diagnosis in the log file.
+      log.error("Failed to decrypt a stored secret:", err);
+      throw new Error(
+        "Couldn't decrypt the saved password/passphrase (the OS keychain entry is missing or unreadable) — re-enter it by editing the host.",
+      );
+    }
   }
   // Legacy/unexpected format.
   return "";
