@@ -24,6 +24,17 @@ import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
 import { getWindowBounds, setWindowBounds } from "./services/store";
 
+// Every window shares one electron-store-backed data file (hosts, groups,
+// tunnels, etc.) with no cross-process locking — two instances writing to it
+// concurrently (e.g. double-clicking the launcher, or an AppImage run twice)
+// would race and could silently drop whichever write lost. Refusing to start
+// a second process keeps that file single-writer; the user still gets a
+// window, since this just focuses whichever one is already running.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
 const isDev = process.env.NODE_ENV === "development";
 const isMac = process.platform === "darwin";
 
@@ -286,6 +297,18 @@ app.whenReady().then(() => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(true);
+  });
+
+  // Fired in this (the first) instance when the OS launches the app again
+  // while it's already running — requestSingleInstanceLock() above already
+  // stopped that second process from doing anything, so all that's left is
+  // to surface the already-running instance instead of leaving the user
+  // thinking nothing happened.
+  app.on("second-instance", () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
   });
 });
 
