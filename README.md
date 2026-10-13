@@ -262,6 +262,11 @@ chmod +x release/Wharf-0.1.0.AppImage
 ./release/Wharf-0.1.0.AppImage
 ```
 
+If it fails to start with a `SUID sandbox helper binary` error, your kernel restricts
+unprivileged user namespaces (the default on some newer distros) and the AppImage has no install
+step to fix that itself the way the `.deb` package does — run it with `--no-sandbox` instead:
+`./release/Wharf-0.1.0.AppImage --no-sandbox`.
+
 ## Project structure
 
 ```
