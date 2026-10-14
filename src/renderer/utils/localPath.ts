@@ -25,6 +25,7 @@ export function localParent(p: string): string {
   const idx = trimmed.lastIndexOf(sep);
   if (sep === "\\") {
     // "C:\Users" -> "C:\", "C:\" -> "C:\" (already at a drive root)
+    if (isLocalRoot(p)) return p;
     if (idx <= 2) return trimmed.slice(0, 3);
     return trimmed.slice(0, idx);
   }

@@ -29,13 +29,12 @@ const MAX_HISTORY_CACHE = 500;
 export type GhostHistoryCache = string[];
 
 export function createGhostHistoryCache(commands: string[]): GhostHistoryCache {
-  const cache: GhostHistoryCache = [];
   // `commands` is assumed oldest-first (as CommandHistoryEntry[] naturally
-  // is) — walk it newest-first so the first occurrence of a repeated
-  // command is its most recent run.
-  for (let i = commands.length - 1; i >= 0; i--) {
-    pushToGhostHistoryCache(cache, commands[i]);
-  }
+  // is). Replaying it in that order through the same push used for live
+  // commands leaves the newest at the front, a repeated command at its most
+  // recent run, and — when over the cap — the oldest ones dropped.
+  const cache: GhostHistoryCache = [];
+  for (const command of commands) pushToGhostHistoryCache(cache, command);
   return cache;
 }
 

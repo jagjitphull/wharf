@@ -269,6 +269,11 @@ Only Electron's windows, the saved-host and secret stores and the interactive ho
 stubbed. Test files and the test server are excluded from the packaged app, but `npm run typecheck`
 still type-checks them.
 
+The renderer's plain-TypeScript logic is tested too, on Node with a small fake of xterm.js's
+terminal (`src/renderer/testing/fakeXterm.ts`): Command Blocks' OSC 133 state machine, keyword
+highlighting, keystroke capture, inline history/next-command suggestions, the local-path helpers and
+the SFTP drag payload. The React components themselves have no automated tests yet.
+
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
 full Linux `npm run package` on every pull request and every push to `main`, and uploads the
 `.AppImage` and `.deb` as build artifacts.
@@ -381,6 +386,7 @@ src/
       aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
       *.test.ts               vitest tests, next to the module they cover
   renderer/               React UI (Vite)
+    testing/               fakeXterm.ts, a test-only stand-in for xterm.js's Terminal
     components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
                             Tunnels, Settings, QuickConnect, ContextMenu, SnippetPicker,
                             ErrorBoundary, StatusBar, Icons, ...
