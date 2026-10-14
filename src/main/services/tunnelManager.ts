@@ -1,6 +1,6 @@
 import net from "node:net";
 import { randomUUID } from "node:crypto";
-import { Client } from "ssh2";
+import type { AcceptConnection, Client, ClientChannel, TcpConnectionDetails } from "ssh2";
 import { BrowserWindow } from "electron";
 import { IPC, type TunnelInput, type TunnelRecord, type TunnelStatus } from "../../shared/types";
 import { getTunnels, setTunnels } from "./store";
@@ -10,6 +10,9 @@ interface RunningTunnel {
   hostId: string;
   client: Client;
   server?: net.Server;
+  /** Undoes what start() registered on the (possibly shared) SSH connection,
+   * so a stopped tunnel doesn't keep reacting to it. */
+  detach: () => void;
 }
 
 // Local/remote/dynamic (SOCKS5) SSH port forwarding.
@@ -144,8 +147,11 @@ export async function start(tunnelId: string): Promise<void> {
     const { client } = await acquireClient(tunnel.hostId);
     acquired = true;
 
+    let server: net.Server | undefined;
+    let detachRemote: (() => void) | undefined;
+
     if (tunnel.type === "local") {
-      const server = net.createServer((socket) => {
+      server = net.createServer((socket) => {
         client.forwardOut(tunnel.srcHost, tunnel.srcPort, tunnel.dstHost ?? "127.0.0.1", tunnel.dstPort ?? 0, (err, stream) => {
           if (err) {
             socket.destroy();
@@ -156,45 +162,72 @@ export async function start(tunnelId: string): Promise<void> {
           socket.on("error", () => stream.end());
         });
       });
-      await new Promise<void>((resolve, reject) => {
-        server.on("error", reject);
-        server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
-      });
-      running.set(tunnelId, { hostId: tunnel.hostId, client, server });
     } else if (tunnel.type === "dynamic") {
-      const server = net.createServer((socket) => pipeSocksConnection(socket, client));
+      server = net.createServer((socket) => pipeSocksConnection(socket, client));
+    }
+
+    if (server) {
+      const listening = server;
       await new Promise<void>((resolve, reject) => {
-        server.on("error", reject);
-        server.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
+        listening.on("error", reject);
+        listening.listen(tunnel.srcPort, tunnel.srcHost, () => resolve());
       });
-      running.set(tunnelId, { hostId: tunnel.hostId, client, server });
     } else {
       // remote: ask the SSH server to listen on srcHost:srcPort and forward
       // incoming connections back to us, which we relay to dstHost:dstPort.
-      await new Promise<void>((resolve, reject) => {
-        client.forwardIn(tunnel.srcHost, tunnel.srcPort, (err) => (err ? reject(err) : resolve()));
+      const boundPort = await new Promise<number>((resolve, reject) => {
+        client.forwardIn(tunnel.srcHost, tunnel.srcPort, (err, port) => (err ? reject(err) : resolve(port || tunnel.srcPort)));
       });
-      client.on("tcp connection", (_info, accept) => {
+      const onTcpConnection = (info: TcpConnectionDetails, accept: AcceptConnection<ClientChannel>) => {
+        // This connection may be shared with other remote tunnels, and every
+        // one of them hears about every forwarded connection — only handle
+        // the ones that arrived on this tunnel's own port (accepting the same
+        // channel twice would break both).
+        if (info.destPort !== boundPort) return;
         const stream = accept();
         const socket = net.connect(tunnel.dstPort ?? 0, tunnel.dstHost ?? "127.0.0.1", () => {
           socket.pipe(stream).pipe(socket);
         });
         socket.on("error", () => stream.end());
         stream.on("error", () => socket.destroy());
-      });
-      running.set(tunnelId, { hostId: tunnel.hostId, client });
+      };
+      client.on("tcp connection", onTcpConnection);
+      detachRemote = () => {
+        client.removeListener("tcp connection", onTcpConnection);
+        try {
+          client.unforwardIn(tunnel.srcHost, boundPort, () => {});
+        } catch {
+          // the connection is already gone; its remote listener went with it
+        }
+      };
     }
-
-    broadcastState(tunnelId, "running");
 
     // Fires once the connection is actually torn down — which, since it's
     // shared, only happens once every session/SFTP-browse/other tunnel
     // using it has also let go. Until then this tunnel just keeps running
     // on the still-live shared connection, same as everyone else on it.
-    client.on("close", () => {
+    const onClose = () => {
+      const entry = running.get(tunnelId);
+      // Already stopped, or since restarted on a newer connection: not ours to tear down.
+      if (!entry || entry.client !== client) return;
+      // Without this the local port stays bound after the drop and starting
+      // the tunnel again fails with EADDRINUSE.
+      entry.server?.close();
       running.delete(tunnelId);
       broadcastState(tunnelId, "stopped");
+    };
+    client.on("close", onClose);
+
+    running.set(tunnelId, {
+      hostId: tunnel.hostId,
+      client,
+      server,
+      detach: () => {
+        client.removeListener("close", onClose);
+        detachRemote?.();
+      },
     });
+    broadcastState(tunnelId, "running");
   } catch (err) {
     if (acquired) releaseClient(tunnel.hostId);
     const message = err instanceof Error ? err.message : String(err);
@@ -207,6 +240,7 @@ export function stop(tunnelId: string): void {
   const entry = running.get(tunnelId);
   if (!entry) return;
   entry.server?.close();
+  entry.detach();
   running.delete(tunnelId);
   // Releases our reference; the underlying connection itself is only
   // actually closed once every other sharer (a terminal session, an SFTP

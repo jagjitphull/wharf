@@ -1,0 +1,8 @@
+{
+  // Type-checks the test files and test helpers that tsconfig.main.json
+  // leaves out of the build. Never emits anything.
+  "extends": "./tsconfig.main.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "src", "types": ["node"] },
+  "include": ["src/main", "src/shared"],
+  "exclude": []
+}

@@ -22,7 +22,7 @@
     "build": "npm run build:renderer && npm run build:main && npm run build:preload",
     "start": "electron .",
     "package": "npm run build && electron-builder --publish never",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",

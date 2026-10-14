@@ -255,10 +255,19 @@ Unit tests live next to the code they cover (`*.test.ts`) and run on plain Node 
 They currently cover the security- and data-sensitive modules: `knownHosts.ts` (host-key
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
 (`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
-real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside) and
+real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside),
 `windowBounds.ts` (is a saved window position still on a connected display) and `updateCheck.ts`
-(version comparison and the release-check responses). Test files are
-excluded from the packaged app.
+(version comparison and the release-check responses).
+
+The SSH stack is tested end to end against a **real SSH server running inside the test process**
+(`src/main/testing/sshTestServer.ts`, built on `ssh2`'s `Server`), not mocks: `sshManager.test.ts`
+(shell sessions, resize, wrong password, rejected host key, one connection shared by several
+sessions, jump hosts, reconnect after a dropped connection), `sftpManager.test.ts` (listing, editing,
+file operations, upload/download with progress, server-to-server copy, search limits) and
+`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, restart after a drop).
+Only Electron's windows, the saved-host and secret stores and the interactive host-key prompt are
+stubbed. Test files and the test server are excluded from the packaged app, but `npm run typecheck`
+still type-checks them.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
 full Linux `npm run package` on every pull request and every push to `main`, and uploads the
@@ -370,7 +379,7 @@ src/
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
       aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
-      *.test.ts               vitest unit tests, next to the module they cover
+      *.test.ts               vitest tests, next to the module they cover
   renderer/               React UI (Vite)
     components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
                             Tunnels, Settings, QuickConnect, ContextMenu, SnippetPicker,
@@ -382,6 +391,8 @@ src/
   shared/                 Types shared between main & renderer (no Node/DOM APIs)
     types.ts                Domain types + IPC channel name constants
     api.ts                   window.wharf contract (WharfApi interface)
+src/main/testing/
+  sshTestServer.ts        in-process SSH/SFTP/port-forwarding server for the integration tests
 scripts/
   verify-pty.js          postinstall check that node-pty actually loads under Electron
 .github/workflows/ci.yml  lint, format, typecheck, test, build and package on every PR

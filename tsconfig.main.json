@@ -22,8 +22,9 @@
     "declaration": false
   },
   "include": ["src/main", "src/shared"],
-  // *.test.ts files are run directly by vitest (see vitest.config.ts) —
-  // compiling them here too would ship test code (and a dev-only `vitest`
-  // import) inside dist-electron, which electron-builder then packages.
-  "exclude": ["src/main/**/*.test.ts"]
+  // *.test.ts files and src/main/testing are run directly by vitest (see
+  // vitest.config.mts) — compiling them here too would ship test code (and
+  // a dev-only `vitest` import) inside dist-electron, which electron-builder
+  // then packages. They are still type-checked, by tsconfig.test.json.
+  "exclude": ["src/main/**/*.test.ts", "src/main/testing"]
 }
