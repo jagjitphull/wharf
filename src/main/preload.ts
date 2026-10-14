@@ -92,6 +92,14 @@ const api: WharfApi = {
     openExternal: (url) => ipcRenderer.invoke(IPC.shell.openExternal, url),
     openLogsFolder: () => ipcRenderer.invoke(IPC.shell.openLogsFolder),
   },
+  update: {
+    check: () => ipcRenderer.invoke(IPC.update.check),
+    getVersion: () => ipcRenderer.invoke(IPC.update.getVersion),
+    getAvailable: () => ipcRenderer.invoke(IPC.update.getAvailable),
+    getAutoCheck: () => ipcRenderer.invoke(IPC.update.getAutoCheck),
+    setAutoCheck: (enabled) => ipcRenderer.invoke(IPC.update.setAutoCheck, enabled),
+    onAvailable: (cb) => on(IPC.update.onAvailable, cb as (...args: unknown[]) => void),
+  },
   backup: {
     export: () => ipcRenderer.invoke(IPC.backup.export),
     import: () => ipcRenderer.invoke(IPC.backup.import),

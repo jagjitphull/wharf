@@ -19,6 +19,7 @@ import { registerSshConfigIpc } from "./ipc/sshConfig";
 import { registerCommandHistoryIpc } from "./ipc/commandHistory";
 import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
+import { registerUpdateIpc, scheduleLaunchUpdateCheck } from "./ipc/update";
 import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
@@ -308,6 +309,7 @@ app.whenReady().then(() => {
   registerCommandHistoryIpc();
   registerAiIpc();
   registerCommandBlocksIpc();
+  registerUpdateIpc();
 
   // Packaged macOS builds get the dock icon from icon.icns automatically;
   // in dev the app runs as plain Electron, so without this it shows
@@ -316,6 +318,7 @@ app.whenReady().then(() => {
 
   installAppMenu();
   createWindow(true);
+  scheduleLaunchUpdateCheck();
 
   if (recoveredFromCorruptDataFile) {
     log.error(`Data file was corrupt, reset to defaults — original backed up to ${recoveredFromCorruptDataFile}`);

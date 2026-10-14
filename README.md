@@ -185,6 +185,12 @@ A personal SSH/SFTP terminal client, Termius-style.
   lightweight `exec` on its existing connection (never the interactive
   shell itself); Linux remotes only, and any field a remote doesn't support
   is just left out rather than shown as an error
+- Update check — Settings → About shows the installed version and a **Check for updates** button; a
+  newer release also shows as a small "Update available" pill in the status bar, which opens its
+  download page. Wharf never updates itself. A check is a single request to GitHub's public releases
+  API (nothing about you or your hosts is sent); an installed build makes one quiet check shortly
+  after launch unless you turn **Check on launch** off, and a failed background check (offline, no
+  release yet) is only logged
 - Crash recovery and logging — an unhandled renderer error shows a reload
   screen instead of a blank window, a crashed renderer reloads itself
   automatically (capped after repeated crashes in a row), and both main-
@@ -250,7 +256,8 @@ They currently cover the security- and data-sensitive modules: `knownHosts.ts` (
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
 (`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
 real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside) and
-`windowBounds.ts` (is a saved window position still on a connected display). Test files are
+`windowBounds.ts` (is a saved window position still on a connected display) and `updateCheck.ts`
+(version comparison and the release-check responses). Test files are
 excluded from the packaged app.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
@@ -339,6 +346,7 @@ src/
       tunnelManager.ts       local/remote/dynamic SSH port forwarding
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
       sshConfigParser.ts      ~/.ssh/config parser for the import dialog
+      updateCheck.ts          GitHub releases "is there a newer version" check (no self-update)
       shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
@@ -480,5 +488,9 @@ scripts/
 - The log file captures the renderer's `console.*` output as well as the main process's, so nothing
   that touches a password, key passphrase, API key or terminal content should ever be passed to
   `console.*` or `log.*`. Today's log calls are limited to error objects and event descriptions.
+- The only network request Wharf makes on its own is the optional launch-time update check described
+  above (to `api.github.com`, through the system's proxy settings); hosts you connect to, AI providers
+  you configure, and your Ollama server are contacted only when you use those features. The returned
+  release link is only ever opened if it points at this repository on github.com.
 - Only one Wharf process may run per user (single-instance lock), so the data file never has two
   concurrent writers.

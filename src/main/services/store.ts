@@ -43,6 +43,8 @@ interface Schema {
   aiProviderConfig: Partial<Record<AiProvider, AiProviderConfig>>;
   /** Whether new sessions get OSC-133 shell integration injected (bash/zsh only) — powers Command Blocks and real exit codes. Off disables it for every new session; existing ones are unaffected until reconnected. */
   commandBlocksEnabled: boolean;
+  /** Whether to ask GitHub once at launch if a newer release exists (the manual button in Settings always works). */
+  updateCheckEnabled: boolean;
   windowBounds: WindowBounds | null;
 }
 
@@ -59,6 +61,7 @@ const defaults: Schema = {
   aiApiKeySecretIds: {},
   aiProviderConfig: {},
   commandBlocksEnabled: true,
+  updateCheckEnabled: true,
   windowBounds: null,
 };
 
@@ -220,6 +223,14 @@ export function getCommandBlocksEnabled(): boolean {
 
 export function setCommandBlocksEnabled(enabled: boolean): void {
   store.set("commandBlocksEnabled", enabled);
+}
+
+export function getUpdateCheckEnabled(): boolean {
+  return store.get("updateCheckEnabled");
+}
+
+export function setUpdateCheckEnabled(enabled: boolean): void {
+  store.set("updateCheckEnabled", enabled);
 }
 
 export function getWindowBounds(): WindowBounds | null {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { HostStatsSnapshot } from "@shared/types";
+import type { HostStatsSnapshot, UpdateCheckResult } from "@shared/types";
 import { useAppStore } from "../../state/store";
 import { wharf } from "../../api/wharf";
 import "./StatusBar.css";
@@ -21,6 +21,23 @@ function formatDuration(ms: number): string {
   const s = totalSeconds % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+/** Shown (in either status-bar layout) once the launch-time check has found a
+ * newer release; clicking opens its download page. */
+function UpdatePill() {
+  const [update, setUpdate] = useState<UpdateCheckResult | null>(null);
+  useEffect(() => {
+    void wharf.update.getAvailable().then(setUpdate);
+    return wharf.update.onAvailable(setUpdate);
+  }, []);
+  if (!update?.updateAvailable || !update.releaseUrl) return null;
+  const url = update.releaseUrl;
+  return (
+    <button className="status-update" title={`You have v${update.currentVersion}`} onClick={() => void wharf.shell.openExternal(url)}>
+      Update available: v{update.latestVersion}
+    </button>
+  );
 }
 
 export function StatusBar() {
@@ -76,6 +93,8 @@ export function StatusBar() {
     return (
       <div className="status-bar">
         <span className="status-dim">No active session</span>
+        <span className="status-spacer" />
+        <UpdatePill />
       </div>
     );
   }
@@ -103,6 +122,7 @@ export function StatusBar() {
       {activeMeta.closeError && <span className="status-error">{activeMeta.closeError}</span>}
       {statsText && <span className="status-stats">{statsText}</span>}
       <span className="status-spacer" />
+      <UpdatePill />
       <span className="status-dim">
         {sessionCount} session{sessionCount === 1 ? "" : "s"}
       </span>

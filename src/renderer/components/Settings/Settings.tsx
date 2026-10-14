@@ -11,6 +11,7 @@ import { CommandBlocksSettings } from "./CommandBlocksSettings";
 import { GhostSuggestionSettings } from "./GhostSuggestionSettings";
 import { AiAutocompleteSettings } from "./AiAutocompleteSettings";
 import { NotificationSettings } from "./NotificationSettings";
+import { UpdateSettings } from "./UpdateSettings";
 import { TerminalPreview } from "./TerminalPreview";
 import { GROUPS as SHORTCUT_GROUPS } from "../KeyboardShortcuts/KeyboardShortcuts";
 import "../../styles/dialog.css";
@@ -240,6 +241,7 @@ export function Settings() {
           Wharf — a personal SSH/SFTP client. Save hosts and groups, connect via password, private key, or SSH agent, chain through jump
           hosts, and set up local/remote port forwarding.
         </p>
+        <UpdateSettings />
         <p className="hint">
           Wharf keeps a log file of app activity and errors — useful to find if something goes wrong and you need to report it.
         </p>

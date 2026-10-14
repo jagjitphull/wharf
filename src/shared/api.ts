@@ -28,6 +28,7 @@ import type {
   AiProviderConfig,
   AiExplainFailureRequest,
   AiExplainFailureResult,
+  UpdateCheckResult,
   AiGenerateCommandRequest,
   SshConfigCandidate,
   SshConfigImportResult,
@@ -139,6 +140,17 @@ export interface WharfApi {
      * log file (electron-log's default location) — so a user hitting a
      * crash or bug has a discoverable way to find and share it. */
     openLogsFolder(): Promise<void>;
+  };
+  update: {
+    /** Asks GitHub whether a newer release exists. Never rejects — failures come back in `error`. */
+    check(): Promise<UpdateCheckResult>;
+    getVersion(): Promise<string>;
+    /** The newer release found by the launch-time check, if it found one. */
+    getAvailable(): Promise<UpdateCheckResult | null>;
+    getAutoCheck(): Promise<boolean>;
+    setAutoCheck(enabled: boolean): Promise<void>;
+    /** Fires when the launch-time check finds a newer release. */
+    onAvailable(cb: (result: UpdateCheckResult) => void): Unsubscribe;
   };
   backup: {
     /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */

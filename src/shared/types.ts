@@ -353,6 +353,21 @@ export interface TunnelStateEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Update check
+// ---------------------------------------------------------------------------
+
+export interface UpdateCheckResult {
+  currentVersion: string;
+  /** null when the latest version couldn't be determined — see `error`. */
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  /** Page for the newer release (always on github.com); null when latestVersion is null. */
+  releaseUrl: string | null;
+  /** Why latestVersion is null (offline, no release published yet, rate limited, …). */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
 // IPC channel names
 // ---------------------------------------------------------------------------
 
@@ -440,6 +455,15 @@ export const IPC = {
   shell: {
     openExternal: "shell:open-external",
     openLogsFolder: "shell:open-logs-folder",
+  },
+  update: {
+    check: "update:check",
+    getVersion: "update:get-version",
+    getAvailable: "update:get-available",
+    getAutoCheck: "update:get-auto-check",
+    setAutoCheck: "update:set-auto-check",
+    /** Main -> renderer: the launch-time check found a newer release. */
+    onAvailable: "update:available",
   },
   backup: {
     export: "backup:export",
