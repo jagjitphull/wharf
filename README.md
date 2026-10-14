@@ -228,13 +228,32 @@ npm install
 npm run dev        # starts Vite (renderer) + Electron together, with hot reload
 ```
 
+Requires Node 20 or newer. `npm install` also compiles `node-pty` (Local Shell / Mosh) and then
+verifies it loads — if that fails the install stops with instructions (usually missing build tools);
+skip the check with `WHARF_SKIP_PTY_CHECK=1 npm install` if you don't need Local Shell or Mosh.
+
 Other scripts:
 
 ```bash
-npm run typecheck  # tsc --noEmit for both renderer and main
-npm run build      # production build of renderer + main into dist-electron/
-npm run package    # build + electron-builder (produces installers in release/)
+npm run typecheck     # tsc --noEmit for both renderer and main
+npm test              # vitest unit tests (src/**/*.test.ts)
+npm run lint          # eslint
+npm run format:check  # prettier --check (npm run format fixes in place)
+npm run build         # production build of renderer + main into dist-electron/
+npm run package       # build + electron-builder (produces installers in release/; never publishes)
 ```
+
+### Tests and CI
+
+Unit tests live next to the code they cover (`*.test.ts`) and run on plain Node — no Electron needed.
+They currently cover the security- and data-sensitive modules: `knownHosts.ts` (host-key
+verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
+(`~/.ssh/config` import) and `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
+real `bash`, and `zsh` when installed). Test files are excluded from the packaged app.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
+full Linux `npm run package` on every pull request and every push to `main`, and uploads the
+`.AppImage` and `.deb` as build artifacts.
 
 ## Installing on Ubuntu / Debian
 
@@ -267,30 +286,64 @@ unprivileged user namespaces (the default on some newer distros) and the AppImag
 step to fix that itself the way the `.deb` package does — run it with `--no-sandbox` instead:
 `./release/Wharf-0.1.0.AppImage --no-sandbox`.
 
+## Data, logs, and recovery
+
+On Linux everything lives in `~/.config/Wharf/`:
+
+- `wharf-data.json` — hosts, groups, tunnels, snippets, workspaces, settings and the (encrypted)
+  secrets. Passwords and key passphrases are encrypted with the OS keychain via Electron's
+  `safeStorage`; see the known limitation below for systems without one.
+- `logs/main.log` — a log of app activity and errors from both the main process and the renderer's
+  console, rotated at 1 MB (the previous file is kept as `main.old.log`). **Settings → About → Open
+  logs folder** opens it — attach this file when reporting a problem.
+
+What Wharf does when things go wrong, instead of failing silently or crashing:
+
+- **Corrupted data file** (e.g. a crash or full disk mid-write): it is moved aside to
+  `wharf-data.json.corrupted-<timestamp>`, Wharf starts with defaults, and a dialog tells you where the
+  original is so nothing is silently discarded.
+- **A saved password can't be decrypted** (e.g. the data was copied to another machine or user, or the
+  Linux keyring was reset): connecting shows "Couldn't decrypt the saved password/passphrase … re-enter
+  it by editing the host"; the underlying error is in the log.
+- **Window saved on a monitor that's gone**: the saved position is ignored if it isn't on any connected
+  display (the saved size is kept), so the window can't open unreachably off-screen.
+- **Renderer crash or unhandled UI error**: the window reloads itself (up to 3 times in a row before
+  asking you to restart), and an error screen offers Reload / Copy details. Failing to save the window
+  position (e.g. disk full) is logged and ignored rather than crashing the app.
+- **Launching Wharf a second time** focuses the already-running window instead of starting a second
+  process, because two instances would write the same data file.
+
 ## Project structure
 
 ```
 src/
   main/                  Electron main process (Node)
-    index.ts             App entry: window creation, IPC registration
+    index.ts             App entry: single-instance lock, crash/log handlers, window creation,
+                          IPC registration
     preload.ts            contextBridge: exposes window.wharf to the renderer
                            (bundled to a single file via esbuild — see below)
     ipc/                  One module per IPC surface (hosts, groups, ssh, sftp, tunnels, window,
-                          clipboard, backup, snippets)
+                          clipboard, backup, snippets, shell, ai, ...)
     services/
-      store.ts             electron-store wrapper (hosts/groups/tunnels/snippets/window bounds)
+      store.ts             electron-store wrapper (hosts/groups/tunnels/snippets/window bounds),
+                            with corrupt-data-file recovery
       secretStore.ts        safeStorage-backed secret storage (passwords/passphrases)
       sshManager.ts          ssh2 connection + shell session manager (incl. jump-host chaining,
                               reconnect-on-drop with backoff)
+      connectionPool.ts       shared SSH connections (sessions, SFTP and tunnels to a host reuse one)
       localShellManager.ts    node-pty local shell session manager (Local Shell tabs)
+      moshManager.ts          Mosh sessions via the system `mosh` client
       sftpManager.ts         ssh2 SFTP subsystem wrapper, pooled per host
-      tunnelManager.ts       local/remote SSH port forwarding
+      tunnelManager.ts       local/remote/dynamic SSH port forwarding
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
       sshConfigParser.ts      ~/.ssh/config parser for the import dialog
+      shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
+      aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
+      *.test.ts               vitest unit tests, next to the module they cover
   renderer/               React UI (Vite)
     components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
                             Tunnels, Settings, QuickConnect, ContextMenu, SnippetPicker,
-                            StatusBar, Icons
+                            ErrorBoundary, StatusBar, Icons, ...
     state/
       store.ts              zustand store (hosts, groups, tunnels, snippets, open terminal tabs)
       themeStore.ts           theme mode + accent color, persisted to localStorage
@@ -298,6 +351,9 @@ src/
   shared/                 Types shared between main & renderer (no Node/DOM APIs)
     types.ts                Domain types + IPC channel name constants
     api.ts                   window.wharf contract (WharfApi interface)
+scripts/
+  verify-pty.js          postinstall check that node-pty actually loads under Electron
+.github/workflows/ci.yml  lint, format, typecheck, test, build and package on every PR
 ```
 
 ## Known limitations
@@ -409,3 +465,8 @@ src/
 - `will-navigate` and `setWindowOpenHandler` are locked down so a
   compromised or malicious remote shell can't pivot into opening arbitrary
   URLs inside the app.
+- The log file captures the renderer's `console.*` output as well as the main process's, so nothing
+  that touches a password, key passphrase, API key or terminal content should ever be passed to
+  `console.*` or `log.*`. Today's log calls are limited to error objects and event descriptions.
+- Only one Wharf process may run per user (single-instance lock), so the data file never has two
+  concurrent writers.
