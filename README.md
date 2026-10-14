@@ -228,7 +228,7 @@ npm install
 npm run dev        # starts Vite (renderer) + Electron together, with hot reload
 ```
 
-Requires Node 20 or newer. `npm install` also compiles `node-pty` (Local Shell / Mosh) and then
+Requires Node 20.19 or newer (or 22.12+) — Vite 8 needs it. `npm install` also compiles `node-pty` (Local Shell / Mosh) and then
 verifies it loads — if that fails the install stops with instructions (usually missing build tools);
 skip the check with `WHARF_SKIP_PTY_CHECK=1 npm install` if you don't need Local Shell or Mosh.
 
@@ -448,6 +448,14 @@ scripts/
 
 ## Security notes
 
+- Dependency audit: `npm audit --omit=dev` (what ships in the packaged app) reports **0** vulnerabilities.
+  `npm audit` still lists 8 moderate findings, all in the build-time `electron-builder` chain, all one
+  flaw: `sprintf-js` (a denial of service via unbounded precision specifiers), pulled in through
+  `@electron/get → global-agent → roarr`. Every released `sprintf-js` version is affected, so there is
+  nothing to upgrade to, and npm's suggested "fix" is a downgrade of `electron-builder` that doesn't
+  remove it. It only runs on a developer or CI machine while downloading Electron, never in the app.
+  Re-check after `electron-builder` updates; the Vite, Vitest and esbuild findings that used to appear
+  here were resolved by upgrading those tools.
 - SSH host keys are checked against `~/.ssh/known_hosts` on every connection
   (shell, jump-host, SFTP, tunnels all share this via `buildConnectConfig`).
   A new host prompts a trust-on-first-use dialog; a key that has changed
