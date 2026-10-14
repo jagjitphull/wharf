@@ -330,7 +330,6 @@ export interface TunnelRecord {
   /** Not used for "dynamic" (SOCKS) tunnels. */
   dstHost?: string;
   dstPort?: number;
-  autoStart?: boolean;
 }
 
 export interface TunnelInput {
@@ -341,7 +340,6 @@ export interface TunnelInput {
   srcPort: number;
   dstHost?: string;
   dstPort?: number;
-  autoStart?: boolean;
 }
 
 export type TunnelStatus = "stopped" | "starting" | "running" | "error";
