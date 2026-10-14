@@ -49,7 +49,7 @@ function escapeRegExp(s: string): string {
 function splitDirective(line: string): [string, string] | null {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("#")) return null;
-  const match = trimmed.match(/^(\S+?)(?:\s+|\s*=\s*)(.+)$/);
+  const match = trimmed.match(/^(\S+?)(?:\s*=\s*|\s+)(.+)$/);
   if (!match) return null;
   const [, keyword, rawValue] = match;
   const value = rawValue.trim().replace(/^"(.*)"$/, "$1");
@@ -121,6 +121,15 @@ export function parseSshConfig(filePath: string = DEFAULT_SSH_CONFIG_PATH): SshC
         const concrete = patterns.find((p) => !p.includes("*") && !p.includes("?"));
         currentIsWildcardOnly = !concrete;
         current = { alias: concrete ?? patterns[0] ?? "*", ...defaults };
+        continue;
+      }
+
+      if (keyword === "match") {
+        // Match blocks aren't modeled: end the current Host block here so the
+        // directives inside the Match don't get attributed to it.
+        flush();
+        current = null;
+        currentIsWildcardOnly = false;
         continue;
       }
 
