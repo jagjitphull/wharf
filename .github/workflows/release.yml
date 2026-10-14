@@ -1,0 +1,86 @@
+name: Release
+
+# Pushing a tag like v0.2.0 builds the Linux packages and publishes them as a
+# GitHub Release. Running it by hand (Actions -> Release -> Run workflow) does
+# the same build and uploads the files as a workflow artifact, but never
+# publishes anything — a safe way to rehearse a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and release (Linux)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and attach files to it
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      # The file names (and the in-app update check) come from package.json's
+      # version, so a tag that disagrees with it would publish mislabeled files.
+      - name: Check the tag matches package.json
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$expected" ]; then
+            echo "::error::Tag $TAG doesn't match package.json's version ($expected). Bump the version, commit, then tag that commit."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The same gates as CI: a release must never ship something CI would reject.
+      - name: Lint, format, typecheck, test
+        run: |
+          npm run lint
+          npm run format:check
+          npm run typecheck
+          npm test
+
+      - name: Package
+        run: npm run package
+
+      - name: Checksums
+        working-directory: release
+        run: sha256sum *.AppImage *.deb > SHA256SUMS
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wharf-linux-${{ github.sha }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish the GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          flags=()
+          # A tag with a hyphen (v0.2.0-rc.1) is a pre-release; GitHub's "latest
+          # release" — which the app's update check reads — skips those.
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$TAG" release/*.AppImage release/*.deb release/SHA256SUMS \
+            --title "Wharf $TAG" --generate-notes --verify-tag "${flags[@]}"

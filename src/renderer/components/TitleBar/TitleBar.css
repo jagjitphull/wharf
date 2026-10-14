@@ -1,0 +1,191 @@
+.title-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* .title-bar-nav-wrap is absolutely positioned (out of flow, centered
+     independently — see its own comment), so the only two real flex
+     children left here are .title-bar-left and .title-bar-controls;
+     space-between pushes those to the two ends as before. Without it they
+     just pack together at the start (flex-basis default), which is what
+     put the window controls right next to the left icons instead of at
+     the far right. */
+  justify-content: space-between;
+  height: 38px;
+  min-height: 38px;
+  /* A light wash of the user's own accent color (the same --accent-bg used
+     for selected/highlighted surfaces throughout the app — drop zones,
+     active list rows, etc.) rather than a new hardcoded color, so this
+     stays in sync with both their accent choice and the light/dark theme.
+     Was plain --bg-sidebar, identical to the sidebar right below it, which
+     made the two hard to tell apart at a glance. */
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.title-bar.mac {
+  padding-left: 78px; /* clears the native traffic-light buttons */
+}
+
+.title-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+}
+
+.title-bar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.title-bar-brand svg {
+  color: var(--accent);
+}
+
+.title-bar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 5px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.title-bar-icon-btn:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+/* Absolutely positioned and centered on .title-bar, sized to its own
+   content rather than stretched with flex:1 — a stretched, no-drag flex
+   item here would claim the ENTIRE middle strip of the title bar as its
+   hit-box even where it's visually empty (most of the bar's width, and
+   effectively all of it while the nav is collapsed to just the toggle
+   button), which is exactly the region users grab to drag/move the window.
+   Sizing to content instead keeps the no-drag area limited to the pills
+   actually drawn, leaving the empty space around them draggable — same as
+   it was before this existed. */
+.title-bar-nav-wrap {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100% - 260px);
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title-bar-nav-item {
+  flex: 0 1 auto;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.title-bar-nav-item:hover:not(.active) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.title-bar-nav-item.active {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.title-bar-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  padding: 0 10px;
+  -webkit-app-region: no-drag;
+}
+
+/* Each button is the actual hit target (roomier than the visible dot, same
+   idea as macOS/GNOME traffic lights) — the colored circle inside it is
+   purely visual. */
+.title-bar-controls .win-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.win-btn-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  transition: filter 0.1s ease, background-color 0.1s ease, border-color 0.1s ease;
+}
+
+.win-btn-glyph {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+/* Glyphs reveal on hover of the whole control group, like macOS traffic
+   lights — a subtle hint of what each dot does without cluttering the bar
+   at rest. */
+.title-bar-controls:hover .win-btn-glyph {
+  opacity: 1;
+}
+
+/* macOS-style traffic lights (the same red/orange/green hues macOS itself
+   uses, incl. recent releases like Tahoe) on every platform this renders
+   on at all — Windows and every Linux distro alike, rather than trying to
+   approximate each desktop's own native button theme. */
+.win-btn-dot.win-btn-minimize {
+  background: #ffbd2e;
+  color: #8a5a00;
+}
+.win-btn-dot.win-btn-maximize {
+  background: #28c840;
+  color: #17641f;
+}
+.win-btn-dot.win-btn-close {
+  background: #ff5f57;
+  color: #7a1610;
+}
+.title-bar-controls .win-btn:hover .win-btn-dot {
+  filter: brightness(1.08);
+}

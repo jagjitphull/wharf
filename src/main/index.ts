@@ -1,0 +1,358 @@
+import path from "node:path";
+import { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, screen, shell } from "electron";
+import log from "electron-log/main";
+import { IPC } from "../shared/types";
+import { registerHostsIpc } from "./ipc/hosts";
+import { registerGroupsIpc } from "./ipc/groups";
+import { registerSshIpc } from "./ipc/ssh";
+import { registerSftpIpc } from "./ipc/sftp";
+import { registerLocalFsIpc } from "./ipc/localFs";
+import { registerTunnelsIpc } from "./ipc/tunnels";
+import { registerWindowIpc } from "./ipc/window";
+import { registerClipboardIpc } from "./ipc/clipboard";
+import { registerShellIpc } from "./ipc/shell";
+import { registerBackupIpc } from "./ipc/backup";
+import { registerSnippetsIpc } from "./ipc/snippets";
+import { registerWorkspacesIpc } from "./ipc/workspaces";
+import { registerHostStatsIpc } from "./ipc/hostStats";
+import { registerSshConfigIpc } from "./ipc/sshConfig";
+import { registerCommandHistoryIpc } from "./ipc/commandHistory";
+import { registerAiIpc } from "./ipc/ai";
+import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
+import { registerUpdateIpc, scheduleLaunchUpdateCheck } from "./ipc/update";
+import { stopAll as stopAllTunnels } from "./services/tunnelManager";
+import { closeAllSftp } from "./services/sftpManager";
+import { stopAll as stopAllHostStats } from "./services/hostStats";
+import { getWindowBounds, recoveredFromCorruptDataFile, setWindowBounds, type WindowBounds } from "./services/store";
+import { isOnscreen } from "./services/windowBounds";
+
+// Every window shares one electron-store-backed data file (hosts, groups,
+// tunnels, etc.) with no cross-process locking — two instances writing to it
+// concurrently (e.g. double-clicking the launcher, or an AppImage run twice)
+// would race and could silently drop whichever write lost. Refusing to start
+// a second process keeps that file single-writer; the user still gets a
+// window, since this just focuses whichever one is already running.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
+const isDev = process.env.NODE_ENV === "development";
+const isMac = process.platform === "darwin";
+
+// Persists console output (main process, and — via the preload it injects —
+// the renderer's console.* too) to a rotating log file (~/.config/Wharf/logs
+// on Linux) so a crash a user hits remotely leaves something to ask for,
+// instead of nothing beyond whatever scrolled past in a terminal that's
+// long gone. initialize() defers its own setup to app.whenReady()
+// internally, so calling it this early is safe.
+log.initialize();
+
+// Registered as early as possible (before app.whenReady()) so nothing
+// thrown during startup's own setup can slip past unlogged either.
+//
+// An uncaughtException here means something in the main process threw
+// outside any of its own try/catch — session state at that point is
+// unverified, so rather than limp along in an unknown state (Electron's
+// own default behavior without a handler installed is to exit anyway),
+// this logs the real cause first, since the default crash output is often
+// swallowed by whatever launched the app, then exits deliberately.
+process.on("uncaughtException", (error) => {
+  log.error("Uncaught exception in main process:", error);
+  app.exit(1);
+});
+
+// A rejected promise with no .catch — an IPC handler's async body, a
+// one-off probe — is noisy but rarely fatal on its own, so (unlike
+// uncaughtException above) this only makes sure it's actually visible
+// instead of vanishing, rather than tearing down the whole app for it.
+process.on("unhandledRejection", (reason) => {
+  log.error("Unhandled promise rejection in main process:", reason);
+});
+
+const DEFAULT_WIDTH = 1280;
+const DEFAULT_HEIGHT = 800;
+
+// The OS-level app/installer icon (taskbar pin, .desktop file, DMG/NSIS
+// artwork) comes from electron-builder's mac/win/linux `icon` config and
+// needs no runtime wiring. This is only for the *running window's* icon —
+// window managers (especially on Linux, including inside an AppImage) don't
+// reliably reuse the launcher icon for an already-open window, so it's set
+// explicitly here. extraResources copies resources/icons alongside the
+// packaged app; in dev it's read straight from the repo.
+const windowIconPath = app.isPackaged
+  ? path.join(process.resourcesPath, "icons", "256x256.png")
+  : path.join(__dirname, "..", "..", "resources", "icons", "256x256.png");
+const windowIcon = nativeImage.createFromPath(windowIconPath);
+
+/**
+ * @param primary Restore the exact saved position (x/y) as well as size —
+ * used for the app's first window. Secondary windows ("New Window") only
+ * reuse the saved size so the OS can cascade their position normally
+ * instead of stacking them exactly on top of the first.
+ */
+function createWindow(primary: boolean): BrowserWindow {
+  const saved = getWindowBounds();
+  const sizeAndPosition =
+    saved &&
+    primary &&
+    isOnscreen(
+      saved,
+      screen.getAllDisplays().map((d) => d.workArea),
+    )
+      ? saved
+      : saved
+        ? { width: saved.width, height: saved.height }
+        : { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+
+  const win = new BrowserWindow({
+    ...sizeAndPosition,
+    minWidth: 800,
+    minHeight: 560,
+    backgroundColor: "#111318",
+    title: "Wharf",
+    ...(windowIcon.isEmpty() ? {} : { icon: windowIcon }),
+    show: false,
+    // Frameless everywhere: we draw our own title bar in the renderer so
+    // minimize/maximize/close are always visible regardless of the host
+    // window manager's decoration behavior. On macOS, hiddenInset keeps
+    // the native traffic-light buttons (users expect those) while still
+    // hiding the rest of the standard title bar.
+    frame: false,
+    ...(isMac ? { titleBarStyle: "hiddenInset" as const } : {}),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  // Persist size/position (debounced) as the user resizes or moves the
+  // window, and once more on close so the very last adjustment sticks.
+  // getNormalBounds() (not getBounds()) so a maximized window doesn't
+  // overwrite the saved "restored" size with the full-screen one.
+  //
+  // Both call sites below run outside any ipcMain.handle, so nothing
+  // catches a thrown write failure (a full disk, a read-only filesystem,
+  // permissions) before it reaches our uncaughtException handler — which
+  // exits the whole app. Losing the remembered window position is a far
+  // smaller problem than crashing every open terminal/SSH session over it,
+  // so this is deliberately swallowed-and-logged rather than left to
+  // propagate.
+  function trySaveWindowBounds(bounds: WindowBounds): void {
+    try {
+      setWindowBounds(bounds);
+    } catch (err) {
+      log.error("Failed to save window bounds:", err);
+    }
+  }
+  let saveBoundsTimer: NodeJS.Timeout | null = null;
+  function scheduleSaveBounds() {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+    saveBoundsTimer = setTimeout(() => {
+      if (!win.isDestroyed() && !win.isMinimized()) trySaveWindowBounds(win.getNormalBounds());
+    }, 400);
+  }
+  win.on("resize", scheduleSaveBounds);
+  win.on("move", scheduleSaveBounds);
+  win.on("close", () => {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+    if (!win.isMinimized()) trySaveWindowBounds(win.getNormalBounds());
+  });
+
+  // The periodic/debounced "last session" persist (state/store.ts) can be up
+  // to 30s stale — fine while the app keeps running, not fine for the single
+  // moment that actually matters most: whatever's on screen right as this
+  // window closes. This holds the close open just long enough for the
+  // renderer to run one final flush (each pane's current scrollback
+  // included), the same way a browser relies on a shutdown-time save, not
+  // only a periodic one.
+  //
+  // This has to live on the window's own "close" event, not app's
+  // "before-quit": closing the last window fires "window-all-closed" first,
+  // which turns into app.quit() — by the time "before-quit" would run, this
+  // window (and its webContents) is already destroyed, too late to ask the
+  // renderer to do anything. "close" is the one event that's still early
+  // enough for the webContents to be alive to receive the request and ack it.
+  let sessionFlushed = false;
+  win.on("close", (event) => {
+    if (sessionFlushed) return; // this is win.close() re-firing after the flush below completed
+    event.preventDefault();
+
+    let settled = false;
+    function onAck(ipcEvent: Electron.IpcMainEvent): void {
+      if (ipcEvent.sender !== win.webContents) return;
+      finish();
+    }
+    function finish(): void {
+      if (settled) return;
+      settled = true;
+      ipcMain.removeListener(IPC.session.flushed, onAck);
+      sessionFlushed = true;
+      win.close();
+    }
+
+    ipcMain.on(IPC.session.flushed, onAck);
+    // A renderer that's hung, crashed mid-flush, or (shouldn't happen) never
+    // had the listener registered can't block this window from closing forever.
+    setTimeout(finish, 1500);
+    win.webContents.send(IPC.session.flushRequest);
+  });
+
+  // Terminal sessions open arbitrary remote shells; don't let the app spawn
+  // new BrowserWindows or navigate away from the renderer bundle.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!isDev || !url.startsWith("http://localhost:5173")) event.preventDefault();
+  });
+
+  // Unlike a main-process crash, a renderer crash (OOM, a GPU-process
+  // SIGTRAP taking its renderer down with it, Electron's own crashes) isn't
+  // fatal to the app — but without this, the window is just left showing
+  // its last frame forever, frozen and unresponsive, with nothing telling
+  // the user what happened. Reload the same window instead; a crash loop
+  // (reload itself failing repeatedly) gets capped rather than retried
+  // forever, with a dialog so it's at least not a silent freeze.
+  let crashReloadCount = 0;
+  const MAX_CRASH_RELOADS = 3;
+  win.webContents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit" || win.isDestroyed()) return;
+    log.error(`Renderer process gone for window ${win.id}: reason=${details.reason} exitCode=${details.exitCode}`);
+
+    crashReloadCount += 1;
+    if (crashReloadCount > MAX_CRASH_RELOADS) {
+      dialog.showErrorBox(
+        "Wharf keeps crashing",
+        `Wharf's window has crashed ${crashReloadCount} times in a row (reason: ${details.reason}) and won't be ` +
+          "reloaded automatically again. Please restart Wharf. If this keeps happening, it's worth reporting.",
+      );
+      return;
+    }
+    if (isDev) {
+      void win.loadURL("http://localhost:5173");
+    } else {
+      void win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+    }
+  });
+
+  win.on("maximize", () => win.webContents.send(IPC.window.onMaximizedChange, true));
+  win.on("unmaximize", () => win.webContents.send(IPC.window.onMaximizedChange, false));
+  win.once("ready-to-show", () => {
+    win.show();
+    // show() alone doesn't reliably grant real OS input focus on every
+    // platform/window manager (a well-known Electron gap, especially on
+    // Linux) — without this, the window can appear active but not actually
+    // be receiving keyboard input until the user clicks it once themselves.
+    win.focus();
+  });
+  // The native window regaining OS focus (alt-tab back, clicking the
+  // taskbar/dock icon, switching from another app) doesn't always mean
+  // Chromium's own DOM focus follows it — with contextIsolation + sandbox
+  // both on, an explicit webContents.focus() keeps keyboard events actually
+  // routing into the page's currently-focused element (the terminal) rather
+  // than requiring an extra click inside the window itself.
+  win.on("focus", () => win.webContents.focus());
+
+  if (isDev) {
+    void win.loadURL("http://localhost:5173");
+    win.webContents.openDevTools({ mode: "detach" });
+  } else {
+    // dist-electron/main/index.js's __dirname is dist-electron/main; the
+    // renderer build output is a sibling directory at dist-electron/renderer.
+    void win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+  }
+
+  return win;
+}
+
+function installAppMenu(): void {
+  // frame: false already hides the menu bar UI on Windows/Linux, so this
+  // exists mainly for macOS: without an Edit-role menu, Cmd+C/Cmd+V/Cmd+A
+  // don't work in text inputs on macOS (Electron relies on the app menu's
+  // roles for the standard-edit-actions responder chain). New Window's
+  // accelerator is a bonus on top of the in-app "+" button.
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [{ role: "appMenu" as const }] : []),
+    {
+      label: "File",
+      submenu: [
+        { label: "New Window", accelerator: "CmdOrCtrl+N", click: () => createWindow(false) },
+        { type: "separator" as const },
+        isMac ? { role: "close" as const } : { role: "quit" as const },
+      ],
+    },
+    { role: "editMenu" as const },
+    { role: "windowMenu" as const },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+app.whenReady().then(() => {
+  registerHostsIpc();
+  registerGroupsIpc();
+  registerSshIpc();
+  registerSftpIpc();
+  registerLocalFsIpc();
+  registerTunnelsIpc();
+  registerWindowIpc(() => createWindow(false));
+  registerClipboardIpc();
+  registerShellIpc();
+  registerBackupIpc();
+  registerSnippetsIpc();
+  registerWorkspacesIpc();
+  registerHostStatsIpc();
+  registerSshConfigIpc();
+  registerCommandHistoryIpc();
+  registerAiIpc();
+  registerCommandBlocksIpc();
+  registerUpdateIpc();
+
+  // Packaged macOS builds get the dock icon from icon.icns automatically;
+  // in dev the app runs as plain Electron, so without this it shows
+  // Electron's own icon in the dock.
+  if (isMac && isDev && !windowIcon.isEmpty()) app.dock?.setIcon(windowIcon);
+
+  installAppMenu();
+  createWindow(true);
+  scheduleLaunchUpdateCheck();
+
+  if (recoveredFromCorruptDataFile) {
+    log.error(`Data file was corrupt, reset to defaults — original backed up to ${recoveredFromCorruptDataFile}`);
+    dialog.showErrorBox(
+      "Wharf's saved data was reset",
+      "Wharf's hosts/groups/settings file couldn't be read (it was corrupted) and has been reset to defaults. " +
+        `The unreadable original was kept at:\n\n${recoveredFromCorruptDataFile}\n\n` +
+        "A text editor may be able to recover parts of it.",
+    );
+  }
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(true);
+  });
+
+  // Fired in this (the first) instance when the OS launches the app again
+  // while it's already running — requestSingleInstanceLock() above already
+  // stopped that second process from doing anything, so all that's left is
+  // to surface the already-running instance instead of leaving the user
+  // thinking nothing happened.
+  app.on("second-instance", () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  stopAllTunnels();
+  closeAllSftp();
+  stopAllHostStats();
+});
