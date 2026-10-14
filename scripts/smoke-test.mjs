@@ -202,6 +202,24 @@ async function main() {
       return version;
     });
 
+    await check("web permissions are denied except notifications", async () => {
+      // Electron grants every permission Chromium asks about unless told
+      // otherwise; Wharf only needs desktop notifications.
+      const states = await evaluate(
+        page,
+        `Promise.all(["geolocation", "midi", "camera", "notifications"].map((name) =>
+          navigator.permissions.query({ name }).then((s) => [name, s.state], () => [name, "unsupported"]),
+        )).then((pairs) => Object.fromEntries(pairs))`,
+      );
+      for (const name of ["geolocation", "midi", "camera"]) {
+        if (states[name] === "granted") throw new Error(`${name} is granted`);
+      }
+      if (states.notifications !== "granted") throw new Error(`notifications is ${states.notifications}`);
+      return Object.entries(states)
+        .map(([name, state]) => `${name}: ${state}`)
+        .join(", ");
+    });
+
     await check("data store is readable over IPC", async () => {
       const isArray = await evaluate(page, `window.wharf.hosts.list().then((h) => Array.isArray(h))`);
       if (!isArray) throw new Error("hosts.list() did not return an array");

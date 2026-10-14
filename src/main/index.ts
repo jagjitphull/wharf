@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, screen, shell } from "electron";
+import { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, screen, session, shell } from "electron";
 import log from "electron-log/main";
 import { IPC } from "../shared/types";
 import { registerHostsIpc } from "./ipc/hosts";
@@ -25,6 +25,7 @@ import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
 import { getWindowBounds, recoveredFromCorruptDataFile, setWindowBounds, type WindowBounds } from "./services/store";
 import { isOnscreen } from "./services/windowBounds";
+import { installPermissionHandlers, isAppUrl, isSafeExternalUrl } from "./security";
 
 // Every window shares one electron-store-backed data file (hosts, groups,
 // tunnels, etc.) with no cross-process locking — two instances writing to it
@@ -203,11 +204,12 @@ function createWindow(primary: boolean): BrowserWindow {
   // Terminal sessions open arbitrary remote shells; don't let the app spawn
   // new BrowserWindows or navigate away from the renderer bundle.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (isSafeExternalUrl(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, url) => {
-    if (!isDev || !url.startsWith("http://localhost:5173")) event.preventDefault();
+    // Packaged: nothing navigates. Dev: only the Vite dev server (hot reload).
+    if (!(isDev && isAppUrl(url, true))) event.preventDefault();
   });
 
   // Unlike a main-process crash, a renderer crash (OOM, a GPU-process
@@ -292,6 +294,7 @@ function installAppMenu(): void {
 }
 
 app.whenReady().then(() => {
+  installPermissionHandlers(session.defaultSession, isDev);
   registerHostsIpc();
   registerGroupsIpc();
   registerSshIpc();
