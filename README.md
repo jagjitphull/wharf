@@ -295,6 +295,25 @@ unprivileged user namespaces (the default on some newer distros) and the AppImag
 step to fix that itself the way the `.deb` package does — run it with `--no-sandbox` instead:
 `./release/Wharf-0.1.0.AppImage --no-sandbox`.
 
+## Releasing
+
+Releases are cut by pushing a version tag; `.github/workflows/release.yml` does the rest (the same
+lint, format, typecheck and tests as CI, then `npm run package`, then a GitHub Release with the
+`.AppImage`, the `.deb` and a `SHA256SUMS` file attached):
+
+```bash
+npm version 0.2.0 --no-git-tag-version   # bumps package.json and the lockfile
+git commit -am "Release 0.2.0"           # merge this to main first
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The workflow refuses to publish if the tag doesn't match `package.json`'s version, uses only the
+built-in `GITHUB_TOKEN` (no personal access token), and treats a tag with a hyphen (`v0.2.0-rc.1`) as a
+pre-release — which the in-app update check ignores. To rehearse without publishing, run it by hand
+from the Actions tab (**Release → Run workflow**, available once the workflow is on the default
+branch): it builds and uploads the files as a workflow artifact only. Downloaders can check a file with
+`sha256sum -c SHA256SUMS`.
+
 ## Data, logs, and recovery
 
 On Linux everything lives in `~/.config/Wharf/`:
