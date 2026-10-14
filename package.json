@@ -27,6 +27,7 @@
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",
+    "smoke": "node scripts/smoke-test.mjs",
     "postinstall": "node scripts/verify-pty.js"
   },
   "dependencies": {
@@ -64,6 +65,7 @@
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.4",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "ws": "^8.22.0"
   }
 }

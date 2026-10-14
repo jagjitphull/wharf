@@ -247,6 +247,7 @@ npm run lint          # eslint
 npm run format:check  # prettier --check (npm run format fixes in place)
 npm run build         # production build of renderer + main into dist-electron/
 npm run package       # build + electron-builder (produces installers in release/; never publishes)
+npm run smoke         # launch the packaged app and check it works (needs a display; see below)
 ```
 
 ### Tests and CI
@@ -274,9 +275,19 @@ terminal (`src/renderer/testing/fakeXterm.ts`): Command Blocks' OSC 133 state ma
 highlighting, keystroke capture, inline history/next-command suggestions, the local-path helpers and
 the SFTP drag payload. The React components themselves have no automated tests yet.
 
+**Launch smoke test.** `npm run smoke` (`scripts/smoke-test.mjs`) starts the packaged app from
+`release/linux-unpacked/wharf` with a throwaway profile and drives it over the Chrome DevTools
+Protocol. It checks that the UI mounts, the preload bridge and an IPC round trip work, a local
+shell (node-pty) runs a command, nothing threw in the renderer, a log file was written, and the app
+quits cleanly. These are the failures the Node-based tests can't see, such as a file missing from the
+asar or a native module that doesn't load in the packaged build. It needs a display: on a headless
+machine run `xvfb-run -a npm run smoke`. Set `SMOKE_NO_SANDBOX=1` where the unpacked `chrome-sandbox`
+isn't setuid root (containers, CI; it's applied automatically as root) and `SMOKE_SCREENSHOT=file.png`
+to save a screenshot.
+
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
-full Linux `npm run package` on every pull request and every push to `main`, and uploads the
-`.AppImage` and `.deb` as build artifacts.
+full Linux `npm run package` on every pull request and every push to `main`, then runs the smoke
+test against the unpacked build and uploads the `.AppImage` and `.deb` as build artifacts.
 
 ## Installing on Ubuntu / Debian
 
@@ -401,7 +412,8 @@ src/main/testing/
   sshTestServer.ts        in-process SSH/SFTP/port-forwarding server for the integration tests
 scripts/
   verify-pty.js          postinstall check that node-pty actually loads under Electron
-.github/workflows/ci.yml  lint, format, typecheck, test, build and package on every PR
+  smoke-test.mjs         launches the packaged app and checks it works (npm run smoke)
+.github/workflows/ci.yml  lint, format, typecheck, test, build, package and smoke test on every PR
 ```
 
 ## Known limitations

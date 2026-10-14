@@ -46,6 +46,32 @@ jobs:
       - name: Package
         run: npm run package
 
+      # Launches the unpacked build that Package just produced under a
+      # virtual display and drives it: UI mounts, preload/IPC works, a local
+      # shell (node-pty) runs a command, nothing throws, and it quits
+      # cleanly. See scripts/smoke-test.mjs. --no-sandbox because the
+      # unpacked chrome-sandbox isn't setuid root here.
+      - name: Install smoke-test display and audio libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Smoke test the packaged app
+        env:
+          SMOKE_NO_SANDBOX: "1"
+          SMOKE_SCREENSHOT: ${{ runner.temp }}/smoke-screenshot.png
+        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run smoke -- release/linux-unpacked/wharf
+
+      - name: Upload smoke-test screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshot-${{ github.sha }}
+          path: ${{ runner.temp }}/smoke-screenshot.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
         with:
