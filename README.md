@@ -248,8 +248,10 @@ npm run package       # build + electron-builder (produces installers in release
 Unit tests live next to the code they cover (`*.test.ts`) and run on plain Node — no Electron needed.
 They currently cover the security- and data-sensitive modules: `knownHosts.ts` (host-key
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
-(`~/.ssh/config` import) and `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
-real `bash`, and `zsh` when installed). Test files are excluded from the packaged app.
+(`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
+real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside) and
+`windowBounds.ts` (is a saved window position still on a connected display). Test files are
+excluded from the packaged app.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
 full Linux `npm run package` on every pull request and every push to `main`, and uploads the
@@ -338,6 +340,8 @@ src/
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
       sshConfigParser.ts      ~/.ssh/config parser for the import dialog
       shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
+      dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
+      windowBounds.ts         is a saved window position still on a connected display
       aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
       *.test.ts               vitest unit tests, next to the module they cover
   renderer/               React UI (Vite)

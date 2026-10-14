@@ -23,6 +23,7 @@ import { stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
 import { getWindowBounds, recoveredFromCorruptDataFile, setWindowBounds, type WindowBounds } from "./services/store";
+import { isOnscreen } from "./services/windowBounds";
 
 // Every window shares one electron-store-backed data file (hosts, groups,
 // tunnels, etc.) with no cross-process locking — two instances writing to it
@@ -83,24 +84,6 @@ const windowIconPath = app.isPackaged
   : path.join(__dirname, "..", "..", "resources", "icons", "256x256.png");
 const windowIcon = nativeImage.createFromPath(windowIconPath);
 
-/** A saved x/y only means something if it still lands on a currently
- * connected display — e.g. the position was last saved while docked to a
- * second monitor that's since been unplugged. Without this check, restoring
- * it verbatim plants the window fully off every connected screen: it opens,
- * it's running, and the user simply can't see or reach it, with no built-in
- * way back short of editing the data file by hand. */
-function isOnscreen(bounds: WindowBounds): boolean {
-  return screen.getAllDisplays().some((d) => {
-    const area = d.workArea;
-    return (
-      bounds.x < area.x + area.width &&
-      bounds.x + bounds.width > area.x &&
-      bounds.y < area.y + area.height &&
-      bounds.y + bounds.height > area.y
-    );
-  });
-}
-
 /**
  * @param primary Restore the exact saved position (x/y) as well as size —
  * used for the app's first window. Secondary windows ("New Window") only
@@ -110,7 +93,12 @@ function isOnscreen(bounds: WindowBounds): boolean {
 function createWindow(primary: boolean): BrowserWindow {
   const saved = getWindowBounds();
   const sizeAndPosition =
-    saved && primary && isOnscreen(saved)
+    saved &&
+    primary &&
+    isOnscreen(
+      saved,
+      screen.getAllDisplays().map((d) => d.workArea),
+    )
       ? saved
       : saved
         ? { width: saved.width, height: saved.height }
