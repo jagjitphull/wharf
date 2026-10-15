@@ -17,6 +17,21 @@ files:
 # app.isPackaged time via process.resourcesPath — needed because Linux window
 # managers don't reliably pick up the hicolor-theme icon below for an
 # AppImage's own running window, only for its launcher/taskbar pin.
+# Electron "fuses": switches flipped in the packaged binary itself, which can't
+# be changed afterwards without re-signing/re-writing it. Out of the box the
+# binary will run arbitrary JavaScript as a plain Node.js process when
+# ELECTRON_RUN_AS_NODE is set, honor NODE_OPTIONS, and open a debugger on
+# --inspect, none of which Wharf uses (nothing here forks Electron as Node;
+# verify-pty.js runs against the *installed* electron, which isn't fused).
+# Left at their defaults on purpose: grantFileProtocolExtraPrivileges (the UI
+# is loaded from file://, so it needs them) and
+# enableEmbeddedAsarIntegrityValidation (not supported on Linux).
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  enableCookieEncryption: true
 extraResources:
   - from: resources/icons
     to: icons

@@ -280,8 +280,9 @@ the SFTP drag payload. The React components themselves have no automated tests y
 `release/linux-unpacked/wharf` with a throwaway profile and drives it over the Chrome DevTools
 Protocol. It checks that the UI mounts, the preload bridge and an IPC round trip work, a local
 shell (node-pty) runs a command, nothing threw in the renderer, a log file was written, and the app
-quits cleanly. These are the failures the Node-based tests can't see, such as a file missing from the
-asar or a native module that doesn't load in the packaged build. It needs a display: on a headless
+quits cleanly, and that the binary's security fuses are set. These are the failures the Node-based
+tests can't see, such as a file missing from the asar or a native module that doesn't load in the
+packaged build. It needs a display: on a headless
 machine run `xvfb-run -a npm run smoke`. Set `SMOKE_NO_SANDBOX=1` where the unpacked `chrome-sandbox`
 isn't setuid root (containers, CI; it's applied automatically as root) and `SMOKE_SCREENSHOT=file.png`
 to save a screenshot.
@@ -541,6 +542,12 @@ scripts/
   asks for (location, camera, microphone, MIDI, ...), and Wharf needs none of it except
   desktop notifications for finished commands, which are allowed for the app's own page
   only. The launch smoke test checks this against the packaged app.
+- The packaged binary has Electron fuses flipped (`electronFuses` in `electron-builder.yml`):
+  `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are ignored, so the installed `wharf`
+  executable can't be reused as a general-purpose Node.js runtime or debugged from outside, and
+  it only loads the app from `app.asar`. Two are left at their defaults on purpose: file-protocol
+  privileges (the UI is loaded from `file://`) and ASAR integrity validation (not supported on
+  Linux). The smoke test fails if any of this is switched back.
 - The log file captures the renderer's `console.*` output as well as the main process's, so nothing
   that touches a password, key passphrase, API key or terminal content should ever be passed to
   `console.*` or `log.*`. Today's log calls are limited to error objects and event descriptions.

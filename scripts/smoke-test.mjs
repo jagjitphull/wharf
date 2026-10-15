@@ -23,7 +23,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,6 +110,48 @@ async function evaluate(page, expression) {
   return result.result.value;
 }
 
+/**
+ * Starts the app with extra arguments/environment in its own throwaway
+ * profile, lets it run for `ms`, then kills it. Used for the checks that
+ * prove the binary's fuses are flipped: they're about what the *binary*
+ * refuses to do, so there's nothing to drive over CDP.
+ */
+async function probeLaunch({ args = [], env = {}, ms = 6_000, afterMs, bare = false }) {
+  const dir = mkdtempSync(path.join(tmpdir(), "wharf-probe-"));
+  mkdirSync(path.join(dir, "home"), { recursive: true });
+  // `bare` passes exactly `args`: with the RunAsNode fuse on, the binary
+  // behaves as Node.js, which rejects Chromium switches like --no-sandbox.
+  const probeArgs = bare ? args : ["--disable-gpu", ...args];
+  if (!bare && (process.env.SMOKE_NO_SANDBOX === "1" || process.getuid?.() === 0)) probeArgs.push("--no-sandbox");
+  const child = spawn(executable, probeArgs, {
+    env: { ...process.env, HOME: path.join(dir, "home"), XDG_CONFIG_HOME: path.join(dir, "config"), ...env },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const chunks = [];
+  child.stdout.on("data", (c) => chunks.push(c.toString()));
+  child.stderr.on("data", (c) => chunks.push(c.toString()));
+  const exited = new Promise((resolve) => child.once("exit", resolve));
+  try {
+    await Promise.race([exited, sleep(ms)]);
+    const during = afterMs ? await afterMs() : undefined;
+    return { output: chunks.join(""), during };
+  } finally {
+    child.kill("SIGKILL");
+    await Promise.race([exited, sleep(5_000)]);
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+}
+
+function portAcceptsConnections(port) {
+  return new Promise((resolve) => {
+    const socket = connect({ port, host: "127.0.0.1" }, () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+  });
+}
+
 const results = [];
 async function check(name, fn) {
   try {
@@ -127,6 +169,46 @@ async function main() {
     console.error(`No executable at ${executable}. Build it first (npm run package) or pass a path.`);
     return 2;
   }
+
+  // Checks on the binary itself, before the main launch (the app holds a
+  // single-instance lock, so these can't overlap with it).
+  await check("ELECTRON_RUN_AS_NODE is ignored (RunAsNode fuse off)", async () => {
+    // With the fuse on, this would run the snippet as plain Node.js and exit.
+    const { output } = await probeLaunch({
+      args: ["-e", "process.stdout.write('RAN-AS-NODE:' + process.versions.node)"],
+      env: { ELECTRON_RUN_AS_NODE: "1" },
+      bare: true,
+    });
+    if (output.includes("RAN-AS-NODE")) throw new Error("the binary ran arbitrary JavaScript as Node.js");
+  });
+
+  await check("--inspect does not open a debugger (NodeCliInspect fuse off)", async () => {
+    const inspectPort = await freePort();
+    const { during } = await probeLaunch({
+      args: [`--inspect=${inspectPort}`],
+      afterMs: () => portAcceptsConnections(inspectPort),
+    });
+    if (during) throw new Error(`a debugger is listening on port ${inspectPort}`);
+  });
+
+  await check("fuses are set as electron-builder.yml configures them", async () => {
+    // Reads the flags straight out of the binary. The two checks above prove
+    // the behavior of the riskiest ones; this covers the rest (NODE_OPTIONS
+    // can't be probed reliably from outside).
+    const { getCurrentFuseWire, FuseV1Options } = (await import("@electron/fuses")).default;
+    const wire = await getCurrentFuseWire(executable);
+    const expected = {
+      RunAsNode: false,
+      EnableNodeOptionsEnvironmentVariable: false,
+      EnableNodeCliInspectArguments: false,
+      OnlyLoadAppFromAsar: true,
+      EnableCookieEncryption: true,
+    };
+    const wrong = Object.entries(expected)
+      .filter(([name, enabled]) => (wire[FuseV1Options[name]] === 49) !== enabled)
+      .map(([name, enabled]) => `${name} should be ${enabled ? "on" : "off"}`);
+    if (wrong.length > 0) throw new Error(wrong.join(", "));
+  });
 
   // A throwaway profile: XDG_CONFIG_HOME decides where Electron puts userData
   // (and so the data file and logs), HOME is what the local shell starts in.
@@ -289,7 +371,7 @@ async function main() {
     browser?.close();
     if (!exitInfo) child.kill("SIGKILL");
     await Promise.race([exited, sleep(5_000)]);
-    rmSync(sandboxDir, { recursive: true, force: true });
+    rmSync(sandboxDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 
   const failed = results.filter((r) => !r.ok);
