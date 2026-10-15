@@ -257,7 +257,8 @@ They currently cover the security- and data-sensitive modules: `knownHosts.ts` (
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
 (`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
 real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside),
-`windowBounds.ts` (is a saved window position still on a connected display) and `updateCheck.ts`
+`windowBounds.ts` (is a saved window position still on a connected display), `security.ts`
+(which URLs may be opened and which permissions are granted) and `updateCheck.ts`
 (version comparison and the release-check responses).
 
 The SSH stack is tested end to end against a **real SSH server running inside the test process**
@@ -394,6 +395,7 @@ src/
       shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
+      security.ts             allowed external URLs and web permissions (deny by default)
       aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
       *.test.ts               vitest tests, next to the module they cover
   renderer/               React UI (Vite)
@@ -532,7 +534,13 @@ scripts/
   plaintext; only their `secretId` reference lives on the `HostRecord`.
 - `will-navigate` and `setWindowOpenHandler` are locked down so a
   compromised or malicious remote shell can't pivot into opening arbitrary
-  URLs inside the app.
+  URLs inside the app. Links that do open in the browser (terminal links, the update
+  pill) must be `http(s)`: `file:`, `smb:` and other schemes the OS would hand to some
+  registered program are refused (`src/main/security.ts`).
+- Web permissions are denied by default. Electron otherwise grants everything Chromium
+  asks for (location, camera, microphone, MIDI, ...), and Wharf needs none of it except
+  desktop notifications for finished commands, which are allowed for the app's own page
+  only. The launch smoke test checks this against the packaged app.
 - The log file captures the renderer's `console.*` output as well as the main process's, so nothing
   that touches a password, key passphrase, API key or terminal content should ever be passed to
   `console.*` or `log.*`. Today's log calls are limited to error objects and event descriptions.
