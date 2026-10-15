@@ -345,6 +345,13 @@ export interface TunnelInput {
   autoStart?: boolean;
 }
 
+export interface SecretStorageStatus {
+  /** True when saved passwords and key passphrases are encrypted with the OS keyring. */
+  encrypted: boolean;
+  /** How many saved secrets are currently stored only base64-encoded. */
+  unencryptedCount: number;
+}
+
 export type TunnelStatus = "stopped" | "starting" | "running" | "error";
 
 export interface TunnelStateEvent {
@@ -458,6 +465,9 @@ export const IPC = {
   shell: {
     openExternal: "shell:open-external",
     openLogsFolder: "shell:open-logs-folder",
+  },
+  secrets: {
+    status: "secrets:status",
   },
   update: {
     check: "update:check",

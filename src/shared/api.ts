@@ -28,6 +28,7 @@ import type {
   AiProviderConfig,
   AiExplainFailureRequest,
   AiExplainFailureResult,
+  SecretStorageStatus,
   UpdateCheckResult,
   AiGenerateCommandRequest,
   SshConfigCandidate,
@@ -144,6 +145,10 @@ export interface WharfApi {
      * log file (electron-log's default location) — so a user hitting a
      * crash or bug has a discoverable way to find and share it. */
     openLogsFolder(): Promise<void>;
+  };
+  secrets: {
+    /** Whether saved passwords and key passphrases are encrypted with the OS keyring, or (on a machine without one) only base64-encoded. */
+    status(): Promise<SecretStorageStatus>;
   };
   update: {
     /** Asks GitHub whether a newer release exists. Never rejects — failures come back in `error`. */

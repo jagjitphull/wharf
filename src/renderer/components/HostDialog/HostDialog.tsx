@@ -4,6 +4,9 @@ import { ipcErrorMessage, wharf } from "../../api/wharf";
 import "../../styles/dialog.css";
 import "./HostDialog.css";
 
+const UNENCRYPTED_NOTE =
+  "No system keyring found: this will be saved base64-encoded, not encrypted (see Settings). An SSH agent avoids storing it at all.";
+
 /** Distinct hues for telling hosts apart at a glance in the sidebar and on
  * terminal tabs — deliberately a separate, wider palette from the app's
  * accent-color presets (theme accent is one color for the whole UI; this
@@ -63,6 +66,11 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
       : emptyForm(defaultGroupId),
   );
   const [secretPlaceholder] = useState(host?.secretId ? "•••••••• (unchanged)" : "");
+  // Null until known (and for a keyring-backed install, where there is nothing to say).
+  const [storedUnencrypted, setStoredUnencrypted] = useState(false);
+  useEffect(() => {
+    void wharf.secrets.status().then((s) => setStoredUnencrypted(!s.encrypted));
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
@@ -224,6 +232,7 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
             />
           </label>
         )}
+        {form.authMethod === "password" && storedUnencrypted && <p className="secret-note">{UNENCRYPTED_NOTE}</p>}
 
         {form.authMethod === "privateKey" && (
           <>
@@ -245,6 +254,7 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
                 onChange={(e) => setForm({ ...form, secret: e.target.value })}
               />
             </label>
+            {storedUnencrypted && <p className="secret-note">{UNENCRYPTED_NOTE}</p>}
           </>
         )}
 

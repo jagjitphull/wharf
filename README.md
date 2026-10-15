@@ -259,7 +259,8 @@ They currently cover the security- and data-sensitive modules: `knownHosts.ts` (
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
 (`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
 real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside),
-`windowBounds.ts` (is a saved window position still on a connected display), `security.ts`
+`windowBounds.ts` (is a saved window position still on a connected display), `dataFilePermissions.ts`
+(owner-only data file), `security.ts`
 (which URLs may be opened and which permissions are granted) and `updateCheck.ts`
 (version comparison and the release-check responses).
 
@@ -354,7 +355,9 @@ On Linux everything lives in `~/.config/Wharf/`:
 
 - `wharf-data.json` — hosts, groups, tunnels, snippets, workspaces, settings and the (encrypted)
   secrets. Passwords and key passphrases are encrypted with the OS keychain via Electron's
-  `safeStorage`; see the known limitation below for systems without one.
+  `safeStorage`; see the known limitation below for systems without one. The file and this folder
+  are readable and writable by your user only (mode 600 / 700); earlier versions created the file
+  world-readable, and Wharf tightens an existing one on launch.
 - `logs/main.log` — a log of app activity and errors from both the main process and the renderer's
   console, rotated at 1 MB (the previous file is kept as `main.old.log`). **Settings → About → Open
   logs folder** opens it — attach this file when reporting a problem.
@@ -403,6 +406,7 @@ src/
       shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
+      dataFilePermissions.ts  makes the data file and folder owner-only
       security.ts             allowed external URLs and web permissions (deny by default)
       aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
       *.test.ts               vitest tests, next to the module they cover
@@ -439,6 +443,11 @@ scripts/
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.
+  This is no longer silent: Settings shows a warning (and the host dialog a note next to the
+  password field) whenever it applies, `wharf-data.json` and its folder are owner-only, and the
+  next launch after you install and unlock a keyring re-encrypts what was saved. What Wharf
+  doesn't have is a master password for machines that will never have a keyring; an SSH agent or
+  a key without a passphrase avoids storing anything.
 - `knownHosts.ts` supports exact-host and `*`/`?` glob patterns (including
   `!negation`), hashed (`HashKnownHosts`) entries, and `@revoked` (a
   revoked key is always refused, with no "trust anyway" option, even if
@@ -537,7 +546,12 @@ scripts/
   self-contained file with esbuild (`npm run build:preload`) so it has no
   relative imports left to resolve at runtime.
 - Host passwords and key passphrases are never written to disk in
-  plaintext; only their `secretId` reference lives on the `HostRecord`.
+  plaintext; only their `secretId` reference lives on the `HostRecord`. Without an OS keyring they
+  are only base64-encoded, and Wharf says so in Settings (see Known limitations).
+- The data file is created owner-only (mode 600, folder 700). The store library's default is
+  world-readable, which would have exposed every saved host (and any base64-stored password) to
+  other users of the machine and let them rewrite it. The launch smoke test fails if the packaged
+  app ever leaves it looser.
 - `will-navigate` and `setWindowOpenHandler` are locked down so a
   compromised or malicious remote shell can't pivot into opening arbitrary
   URLs inside the app. Links that do open in the browser (terminal links, the update

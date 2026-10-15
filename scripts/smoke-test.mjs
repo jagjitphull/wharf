@@ -348,6 +348,23 @@ async function main() {
       if (exitInfo) throw new Error(`exited ${JSON.stringify(exitInfo)}`);
     });
 
+    await check("data file and its directory are owner-only", async () => {
+      // The store library creates its file world-readable; that file holds
+      // every saved host (and, without a keyring, the saved passwords).
+      const userData = path.join(configHome, "Wharf");
+      const dataFile = path.join(userData, "wharf-data.json");
+      await until("the data file", () => existsSync(dataFile));
+      const modes = {
+        "data directory": statSync(userData).mode & 0o777,
+        "data file": statSync(dataFile).mode & 0o777,
+      };
+      const loose = Object.entries(modes).filter(([, mode]) => mode & 0o077);
+      if (loose.length > 0) {
+        throw new Error(loose.map(([name, mode]) => `${name} is ${mode.toString(8)}`).join(", "));
+      }
+      return `dir ${modes["data directory"].toString(8)}, file ${modes["data file"].toString(8)}`;
+    });
+
     await check("log file was written", async () => {
       const logFile = path.join(configHome, "Wharf", "logs", "main.log");
       const size = await until(`${logFile}`, () => existsSync(logFile) && statSync(logFile).size > 0 && statSync(logFile).size);

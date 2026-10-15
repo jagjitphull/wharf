@@ -40,6 +40,40 @@ export function deleteSecret(id: string | null | undefined): void {
   store.set("secrets", secrets);
 }
 
+/** Whether new secrets are encrypted with the OS keyring. False on a Linux
+ * machine with no secret service running (see encrypt()). */
+export function isEncryptionAvailable(): boolean {
+  return safeStorage.isEncryptionAvailable();
+}
+
+/** How many saved secrets are stored only base64-encoded (the no-keyring fallback). */
+export function countUnencryptedSecrets(): number {
+  return Object.values(store.get("secrets")).filter((v) => v.startsWith("plain:")).length;
+}
+
+/**
+ * Re-encrypts secrets that were saved in the no-keyring fallback format once
+ * a keyring is available (the user installed or unlocked one since). Returns
+ * how many it upgraded; does nothing while the keyring is still missing. An
+ * entry that can't be read is left exactly as it was.
+ */
+export function upgradeUnencryptedSecrets(): number {
+  if (!safeStorage.isEncryptionAvailable()) return 0;
+  const secrets = { ...store.get("secrets") };
+  let upgraded = 0;
+  for (const [id, stored] of Object.entries(secrets)) {
+    if (!stored.startsWith("plain:")) continue;
+    try {
+      secrets[id] = encrypt(decrypt(stored));
+      upgraded++;
+    } catch (err) {
+      log.error(`Couldn't upgrade secret ${id} to encrypted storage:`, err);
+    }
+  }
+  if (upgraded > 0) store.set("secrets", secrets);
+  return upgraded;
+}
+
 function encrypt(plaintext: string): string {
   if (!safeStorage.isEncryptionAvailable()) {
     // Fall back to storing base64 rather than plaintext so the format stays

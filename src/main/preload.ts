@@ -94,6 +94,9 @@ const api: WharfApi = {
     openExternal: (url) => ipcRenderer.invoke(IPC.shell.openExternal, url),
     openLogsFolder: () => ipcRenderer.invoke(IPC.shell.openLogsFolder),
   },
+  secrets: {
+    status: () => ipcRenderer.invoke(IPC.secrets.status),
+  },
   update: {
     check: () => ipcRenderer.invoke(IPC.update.check),
     getVersion: () => ipcRenderer.invoke(IPC.update.getVersion),

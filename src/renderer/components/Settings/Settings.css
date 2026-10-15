@@ -222,6 +222,17 @@
   font-size: 11px;
 }
 
+.secret-warning {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--danger-bg);
+  color: var(--text);
+  border-left: 3px solid var(--danger-text);
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .backup-message {
   margin-top: 10px;
   padding: 8px 10px;
