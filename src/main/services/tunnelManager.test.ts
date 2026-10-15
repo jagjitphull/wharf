@@ -26,6 +26,7 @@ vi.mock("./secretStore", async () => {
   return { readSecret: (id: string | null) => (id === "pw" ? TEST_PASSWORD : null) };
 });
 vi.mock("./knownHosts", () => ({ verifyHostKeyInteractive: async () => true }));
+vi.mock("electron-log/main", () => ({ default: { warn: () => {}, error: () => {}, info: () => {} } }));
 
 let server: TestSshServer;
 let echo: Awaited<ReturnType<typeof startEchoServer>>;
@@ -359,5 +360,90 @@ describe("management", () => {
     tunnels.stopAll();
     expect(tunnels.isRunning(a.id) || tunnels.isRunning(b.id)).toBe(false);
     await until(() => server.stats.open === 0, "the shared connection to close");
+  });
+});
+
+describe("auto-start", () => {
+  it("starts exactly the tunnels marked to start on launch", async () => {
+    const auto = await makeTunnel({ srcPort: await freePort(), autoStart: true });
+    const manual = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.startAutoStartTunnels();
+    expect(tunnels.isRunning(auto.id)).toBe(true);
+    expect(tunnels.isRunning(manual.id)).toBe(false);
+    expect((await exchange(auto.srcPort, "hello")).toString()).toBe("hello");
+    expect(await canConnect(manual.srcPort)).toBe(false);
+  });
+
+  it("does nothing when no tunnel is marked", async () => {
+    await makeTunnel({ srcPort: await freePort() });
+    await tunnels.startAutoStartTunnels();
+    expect(server.stats.open).toBe(0);
+    expect(tunnels.statuses()).toEqual([]);
+  });
+
+  it("starts the rest when one fails, and reports that one's error", async () => {
+    const taken = net.createServer();
+    await new Promise<void>((r) => taken.listen(0, "127.0.0.1", r));
+    const takenPort = (taken.address() as net.AddressInfo).port;
+    try {
+      const bad = await makeTunnel({ srcPort: takenPort, autoStart: true });
+      const good = await makeTunnel({ srcPort: await freePort(), autoStart: true });
+      await expect(tunnels.startAutoStartTunnels()).resolves.toBeUndefined();
+      expect(tunnels.isRunning(good.id)).toBe(true);
+      expect(tunnels.isRunning(bad.id)).toBe(false);
+      const byId = new Map(tunnels.statuses().map((s) => [s.tunnelId, s]));
+      expect(byId.get(good.id)!.status).toBe("running");
+      expect(byId.get(bad.id)!.status).toBe("error");
+      expect(byId.get(bad.id)!.error).toMatch(/EADDRINUSE/);
+    } finally {
+      taken.close();
+    }
+  });
+
+  it("tunnels on the same host started together share one SSH connection", async () => {
+    const a = await makeTunnel({ srcPort: await freePort(), autoStart: true });
+    const b = await makeTunnel({ srcPort: await freePort(), autoStart: true });
+    const c = await makeTunnel({ srcPort: await freePort(), autoStart: true });
+    const before = server.stats.total;
+    await tunnels.startAutoStartTunnels();
+    expect([a, b, c].every((t) => tunnels.isRunning(t.id))).toBe(true);
+    expect(server.stats.total - before).toBe(1);
+    expect(pool.poolRefCount("a")).toBe(3);
+    // Letting go of all three must actually close that connection: with
+    // duplicate dials one of them would have been left open and untracked.
+    tunnels.stopAll();
+    await until(() => server.stats.open === 0, "the shared connection to close");
+  });
+
+  it("setAutoStart turns it on and off and keeps the rest of the tunnel", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    tunnels.setAutoStart(t.id, true);
+    expect(tunnels.list()[0]).toEqual({ ...t, autoStart: true });
+    tunnels.setAutoStart(t.id, false);
+    expect(tunnels.list()[0].autoStart).toBe(false);
+    await tunnels.startAutoStartTunnels();
+    expect(tunnels.isRunning(t.id)).toBe(false);
+  });
+
+  it("setAutoStart rejects a tunnel that doesn't exist", () => {
+    expect(() => tunnels.setAutoStart("nope", true)).toThrow(/not found/);
+  });
+});
+
+describe("statuses", () => {
+  it("reports the latest state of each tunnel, including after it stops", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    expect(tunnels.statuses()).toEqual([]);
+    await tunnels.start(t.id);
+    expect(tunnels.statuses()).toEqual([{ tunnelId: t.id, status: "running", error: undefined }]);
+    tunnels.stop(t.id);
+    expect(tunnels.statuses().map((s) => s.status)).toEqual(["stopped"]);
+  });
+
+  it("forgets a tunnel once it is removed", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    tunnels.remove(t.id);
+    expect(tunnels.statuses()).toEqual([]);
   });
 });

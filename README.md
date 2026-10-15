@@ -72,7 +72,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   sessions), implemented natively since this app talks SSH directly
   rather than shelling out to the system `ssh`
 - Port forwarding — local, remote & dynamic (SOCKS5) SSH tunnels, managed
-  from a Tunnels panel
+  from a Tunnels panel. Tick **On launch** on a tunnel and Wharf starts it by itself every time
+  the app opens (one that can't start, say because the port is taken, shows its error in the panel
+  and doesn't hold up the others; tunnels to the same host share one connection).
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
@@ -266,7 +268,8 @@ The SSH stack is tested end to end against a **real SSH server running inside th
 (shell sessions, resize, wrong password, rejected host key, one connection shared by several
 sessions, jump hosts, reconnect after a dropped connection), `sftpManager.test.ts` (listing, editing,
 file operations, upload/download with progress, server-to-server copy, search limits) and
-`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, restart after a drop).
+`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, restart after a drop,
+starting marked tunnels at launch).
 Only Electron's windows, the saved-host and secret stores and the interactive host-key prompt are
 stubbed. Test files and the test server are excluded from the packaged app, but `npm run typecheck`
 still type-checks them.
@@ -427,15 +430,12 @@ scripts/
 ## Known limitations
 
 - When a shared connection drops, every session/SFTP-browse/tunnel that
-  was using it reconnects independently and through the same shared pool
-  — so a session that reconnects quickly can end up sharing its new
-  connection with others reconnecting to the same host afterward (or with
-  a brand new tab opened to that host during the outage), but two
-  sessions that both drop and start reconnecting at essentially the same
-  instant will usually each dial their own fresh connection rather than
-  perfectly re-grouping onto one, since neither's dial is done yet when
-  the other starts (the same inherent race as two simultaneous first-time
-  connects to a host that was never pooled before).
+  was using it reconnects independently, each through the same shared
+  pool. Anything that asks for the host while a dial to it is already in
+  progress waits for that dial and shares it, so they end up back on one
+  connection; the catch is that each one decides to reconnect on its own
+  backoff schedule, so a session whose retry comes later than the others'
+  simply joins the connection they re-established.
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.

@@ -20,7 +20,7 @@ import { registerCommandHistoryIpc } from "./ipc/commandHistory";
 import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
 import { registerUpdateIpc, scheduleLaunchUpdateCheck } from "./ipc/update";
-import { stopAll as stopAllTunnels } from "./services/tunnelManager";
+import { startAutoStartTunnels, stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
 import { getWindowBounds, recoveredFromCorruptDataFile, setWindowBounds, type WindowBounds } from "./services/store";
@@ -321,6 +321,9 @@ app.whenReady().then(() => {
 
   installAppMenu();
   createWindow(true);
+  // Host-key prompts for these use native dialogs, so they don't depend on the
+  // renderer having finished loading.
+  void startAutoStartTunnels();
   scheduleLaunchUpdateCheck();
 
   if (recoveredFromCorruptDataFile) {

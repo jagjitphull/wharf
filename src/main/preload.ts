@@ -72,6 +72,8 @@ const api: WharfApi = {
     remove: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.remove, tunnelId),
     start: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.start, tunnelId),
     stop: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.stop, tunnelId),
+    setAutoStart: (tunnelId, enabled) => ipcRenderer.invoke(IPC.tunnels.setAutoStart, tunnelId, enabled),
+    statuses: () => ipcRenderer.invoke(IPC.tunnels.statuses),
     onState: (cb) => on(IPC.tunnels.onState, cb as (...args: unknown[]) => void),
   },
   window: {

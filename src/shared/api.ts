@@ -116,6 +116,10 @@ export interface WharfApi {
     remove(tunnelId: string): Promise<void>;
     start(tunnelId: string): Promise<void>;
     stop(tunnelId: string): Promise<void>;
+    /** Turns "start when Wharf launches" on or off for a saved tunnel. */
+    setAutoStart(tunnelId: string, enabled: boolean): Promise<void>;
+    /** The latest known state of every tunnel that has started, stopped or failed since launch — so a panel opened later (or after an automatic start) doesn't have to wait for the next change event. */
+    statuses(): Promise<TunnelStateEvent[]>;
     onState(cb: (event: TunnelStateEvent) => void): Unsubscribe;
   };
   window: {

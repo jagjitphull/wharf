@@ -11,19 +11,16 @@ import { connectHostClient, type EstablishedClient } from "./sshConnect";
  * that one authenticated transport (opening just a new channel on it)
  * instead of paying for a fresh TCP handshake + auth round trip.
  *
- * Scope, deliberately: this pools CONNECT-TIME sharing only. Reconnect-on-
- * drop (sshManager's attemptReconnect) does NOT go through here — a drop
- * means the shared transport is dead, and each session/SFTP-pool/tunnel
- * that was using it detects that independently (ssh2's Client is a plain
+ * Scope, deliberately: this pools connections, not recovery. A drop means
+ * the shared transport is dead, and each session/SFTP-pool/tunnel that was
+ * using it detects that independently (ssh2's Client is a plain
  * EventEmitter; every listener on the same "error"/"close" fires for
- * everyone) and reconnects on its own terms with its own fresh, unshared
- * connection. Sessions that were multiplexed together before a drop are
- * not re-multiplexed with each other afterward — each just gets its own
- * connection back, same as if multiplexing had never applied to them.
- * That's a real simplification, not a bug: generalizing reconnect itself
- * to fan out across every dependent of a shared transport is a much
- * bigger change for a benefit (fast reconnects) reconnect-on-drop's own
- * backoff already provides per-session. What this pool guarantees is the
+ * everyone) and reconnects on its own backoff schedule (sshManager's
+ * attemptReconnect goes back through acquireClient, so whoever retries
+ * first dials and the others share that connection). Generalizing
+ * reconnect itself to fan out across every dependent of a shared transport
+ * would be a much bigger change for a benefit (fast reconnects) the
+ * per-session backoff already provides. What this pool guarantees is the
  * common case that actually matters day to day: opening more sessions to
  * a host you're already connected to is instant.
  */
@@ -34,10 +31,20 @@ interface PooledConnection extends EstablishedClient {
 
 const pool = new Map<string, PooledConnection>();
 
+/** Dials currently in progress, by host. Without this, two callers asking for
+ * the same not-yet-connected host at the same moment (two tunnels starting
+ * together at launch, two tabs opened in quick succession) each dial their
+ * own connection — two host-key prompts, and the second registration
+ * replaces the first in `pool`, leaving that connection open but untracked,
+ * so nothing would ever close it. */
+const connecting = new Map<string, Promise<EstablishedClient>>();
+
 /**
  * Returns a live, authenticated connection for `hostId` — an existing
  * pooled one if another caller already has one open, or a freshly
- * established one (registered here for the next caller to find).
+ * established one (registered here for the next caller to find). Callers
+ * that arrive while a dial to the same host is still in progress wait for
+ * it and share the result.
  *
  * Every successful call MUST be paired with exactly one `release(hostId)`
  * once the caller is done with it (on disconnect/stop/etc.) — the
@@ -51,22 +58,35 @@ export async function acquireClient(hostId: string): Promise<EstablishedClient> 
     return { client: existing.client, jumpClient: existing.jumpClient };
   }
 
+  const inFlight = connecting.get(hostId);
+  if (inFlight) {
+    // If that dial failed, so does this call. Otherwise the connection is
+    // pooled by now, and the recursive call just takes a reference to it.
+    await inFlight;
+    return acquireClient(hostId);
+  }
+
   const host = getHosts().find((h) => h.id === hostId);
   if (!host) throw new Error(`Host ${hostId} not found`);
 
-  const established = await connectHostClient(host);
-  const entry: PooledConnection = { ...established, refCount: 1 };
-  pool.set(hostId, entry);
+  const dial = connectHostClient(host)
+    .then((established) => {
+      const entry: PooledConnection = { ...established, refCount: 1 };
+      pool.set(hostId, entry);
 
-  established.client.on("close", () => {
-    // Only remove this exact entry: by the time this fires, a later
-    // acquireClient() call (e.g. a session that reconnected and happened
-    // to re-register) may already have replaced it in the map, and that
-    // one is very much still alive.
-    if (pool.get(hostId) === entry) pool.delete(hostId);
-  });
+      established.client.on("close", () => {
+        // Only remove this exact entry: by the time this fires, a later
+        // acquireClient() call (e.g. a session that reconnected and happened
+        // to re-register) may already have replaced it in the map, and that
+        // one is very much still alive.
+        if (pool.get(hostId) === entry) pool.delete(hostId);
+      });
 
-  return established;
+      return established;
+    })
+    .finally(() => connecting.delete(hostId));
+  connecting.set(hostId, dial);
+  return dial;
 }
 
 /** Releases one reference acquired via acquireClient for this host. */

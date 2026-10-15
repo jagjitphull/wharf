@@ -330,6 +330,8 @@ export interface TunnelRecord {
   /** Not used for "dynamic" (SOCKS) tunnels. */
   dstHost?: string;
   dstPort?: number;
+  /** Start this tunnel by itself each time Wharf launches. */
+  autoStart?: boolean;
 }
 
 export interface TunnelInput {
@@ -340,6 +342,7 @@ export interface TunnelInput {
   srcPort: number;
   dstHost?: string;
   dstPort?: number;
+  autoStart?: boolean;
 }
 
 export type TunnelStatus = "stopped" | "starting" | "running" | "error";
@@ -432,6 +435,8 @@ export const IPC = {
     remove: "tunnels:remove",
     start: "tunnels:start",
     stop: "tunnels:stop",
+    setAutoStart: "tunnels:set-auto-start",
+    statuses: "tunnels:statuses",
     onState: "tunnels:state",
   },
   window: {

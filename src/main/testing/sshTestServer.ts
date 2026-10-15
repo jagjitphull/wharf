@@ -21,6 +21,8 @@ const { STATUS_CODE, flagsToString } = utils.sftp;
 
 export interface TestSshServer {
   port: number;
+  /** The server's public host key in SSH wire format — what a known_hosts line holds (base64). */
+  hostKeyBlob: Buffer;
   /** Directory the SFTP server exposes as "/". */
   root: string;
   /** Connections currently open / ever opened. */
@@ -301,8 +303,13 @@ export async function startTestSshServer(): Promise<TestSshServer> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as net.AddressInfo).port;
 
+  const parsedHostKey = utils.parseKey(hostKey);
+  if (parsedHostKey instanceof Error) throw parsedHostKey;
+  const hostKeyBlob = Array.isArray(parsedHostKey) ? parsedHostKey[0].getPublicSSH() : parsedHostKey.getPublicSSH();
+
   return {
     port,
+    hostKeyBlob,
     root,
     stats,
     connectInbound(bindPort, payload, opts) {
