@@ -289,7 +289,10 @@ to save a screenshot.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
 full Linux `npm run package` on every pull request and every push to `main`, then runs the smoke
-test against the unpacked build and uploads the `.AppImage` and `.deb` as build artifacts.
+test against the unpacked build and uploads the `.AppImage` and `.deb` as build artifacts. It runs
+with a read-only `GITHUB_TOKEN`, and fails if `npm audit --omit=dev` reports a high or critical
+advisory in a runtime dependency. Dependabot (`.github/dependabot.yml`) opens a weekly PR for npm and
+GitHub Actions updates, with minor and patch updates grouped.
 
 ## Installing on Ubuntu / Debian
 
@@ -325,8 +328,9 @@ step to fix that itself the way the `.deb` package does — run it with `--no-sa
 ## Releasing
 
 Releases are cut by pushing a version tag; `.github/workflows/release.yml` does the rest (the same
-lint, format, typecheck and tests as CI, then `npm run package`, then a GitHub Release with the
-`.AppImage`, the `.deb` and a `SHA256SUMS` file attached):
+audit, lint, format, typecheck and tests as CI, then `npm run package`, the launch smoke test on the
+packaged build, then a GitHub Release with the `.AppImage`, the `.deb` and a `SHA256SUMS` file
+attached):
 
 ```bash
 npm version 0.2.0 --no-git-tag-version   # bumps package.json and the lockfile
@@ -416,7 +420,8 @@ src/main/testing/
 scripts/
   verify-pty.js          postinstall check that node-pty actually loads under Electron
   smoke-test.mjs         launches the packaged app and checks it works (npm run smoke)
-.github/workflows/ci.yml  lint, format, typecheck, test, build, package and smoke test on every PR
+.github/workflows/ci.yml  audit, lint, format, typecheck, test, build, package and smoke test on every PR
+.github/dependabot.yml    weekly npm and GitHub Actions update PRs
 ```
 
 ## Known limitations

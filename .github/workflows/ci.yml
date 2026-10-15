@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Nothing in this workflow writes to the repository, so the token it runs with
+# shouldn't be able to either (the repo-wide default may be read/write).
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Lint, typecheck, test, build, and package (Linux)
@@ -22,6 +27,11 @@ jobs:
       # the same postinstall check) an actual release build depends on.
       - name: Install dependencies
         run: npm ci
+
+      # What ships in the app. Fails on a high or critical advisory in a runtime
+      # dependency; dev-only findings (build tooling) are tracked in the README.
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint
