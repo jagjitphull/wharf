@@ -14,7 +14,7 @@ import { app } from "electron";
  * fix for commandCapture.ts's documented keystroke-buffer blind spots
  * (tab completion, arrow-key history recall) — see
  * correctLastCommandHistoryEntry() and commandBlocks.ts's handling of the
- * ;C payload. Bash and zsh are supported; other shells (fish, sh/dash,
+ * ;C payload. Bash, zsh and fish are supported; other shells (sh/dash,
  * PowerShell, cmd.exe) are left alone entirely — a session without
  * integration still works exactly as before, just without blocks/exit
  * codes/corrected history, falling back to the keystroke-buffer guess.
@@ -82,6 +82,41 @@ add-zsh-hook preexec __wharf_preexec
 PS1="\${PS1}"'%{'$'\\033]133;B\\007''%}'
 `.trim();
 
+// fish has event handlers for exactly this: fish_preexec runs right before a
+// command line executes and gets its full text, fish_postexec right after
+// with the command's $status still in place. Prompt markers wrap the user's
+// own fish_prompt (copied aside, then called with the real $status restored
+// so prompts that show it, like the default one's "[1]", keep working).
+//
+// fish 4.0 and later write these OSC 133 sequences themselves, so installing
+// ours on top would double every marker — the whole script is skipped there.
+// (Its own ;C carries no base64 text, which commandBlocks.ts already treats as
+// "fall back to the typed text".)
+const FISH_HOOKS = `
+if test (string split . -- $version)[1] -lt 4
+    function __wharf_preexec --on-event fish_preexec
+        printf '\\e]133;C;%s\\a' (printf '%s' "$argv[1]" | base64 | tr -d '\\n')
+    end
+    function __wharf_postexec --on-event fish_postexec
+        set -l __wharf_ec $status
+        printf '\\e]133;D;%s\\a' $__wharf_ec
+    end
+    function __wharf_with_status
+        return $argv[1]
+    end
+    if not functions -q __wharf_orig_fish_prompt
+        functions -c fish_prompt __wharf_orig_fish_prompt
+        function fish_prompt
+            set -l __wharf_ec $status
+            printf '\\e]133;A\\a'
+            __wharf_with_status $__wharf_ec
+            __wharf_orig_fish_prompt
+            printf '\\e]133;B\\a'
+        end
+    end
+end
+`.trim();
+
 function integrationDir(): string {
   const dir = join(app.getPath("userData"), "shell-integration");
   mkdirSync(dir, { recursive: true });
@@ -129,15 +164,30 @@ export function prepareLocalShellIntegration(shellPath: string): LocalIntegratio
     };
   }
 
+  if (shellName === "fish") {
+    // --init-command runs after the user's config.fish, so their own
+    // fish_prompt is already defined when the hooks wrap it.
+    return { args: ["--init-command", FISH_HOOKS], env: {} };
+  }
+
   return null;
 }
 
 /** For a remote shell we don't control the startup of (SSH, Mosh) — sent as
  * one line of real input right after the session connects, exactly as if
- * the user had typed and run it themselves. Detects bash vs. zsh (or
- * neither) at runtime on the remote end and evals the matching hooks via a
- * base64 payload, so it's a single robust line regardless of quoting in the
- * script bodies; a no-op, harmless on any other remote shell. This line
+ * the user had typed and run it themselves. Detects bash, zsh or fish (or
+ * none of them) at runtime on the remote end and loads the matching hooks
+ * from a base64 payload, so it's a single robust line regardless of quoting
+ * in the script bodies; a no-op, harmless on any other remote shell.
+ *
+ * The line has to be *parsed* without complaint by every shell that might
+ * receive it, not just run by the right one: POSIX sh/dash/ash (embedded
+ * and minimal hosts), bash, zsh and fish all see the whole text. That rules
+ * out if/then/fi (fish has no `then`) and process substitution (not POSIX),
+ * leaving `test … && …` lists, with `eval "$(…)"` for bash/zsh and a pipe
+ * into `source` for fish. (fish older than 3.4 doesn't know `$(…)` and
+ * rejects the line with a syntax error, which is no worse than before: it
+ * used to reject the old if/then form too.) This line
  * will be visible in the session's scrollback (and shell history, unless
  * the remote's HISTCONTROL ignores space-prefixed lines) — a deliberate
  * trade of a little visual noise for not risking silently eating real
@@ -145,9 +195,14 @@ export function prepareLocalShellIntegration(shellPath: string): LocalIntegratio
 export function buildRemoteBootstrapCommand(): string {
   const bashB64 = Buffer.from(BASH_HOOKS, "utf8").toString("base64");
   const zshB64 = Buffer.from(ZSH_HOOKS, "utf8").toString("base64");
+  const fishB64 = Buffer.from(FISH_HOOKS, "utf8").toString("base64");
   return (
-    ` if [ -n "$BASH_VERSION" ]; then eval "$(echo ${bashB64} | base64 -d)"; ` +
-    `elif [ -n "$ZSH_VERSION" ]; then eval "$(echo ${zshB64} | base64 -d)"; fi`
+    ` test -n "$BASH_VERSION" && eval "$(echo ${bashB64} | base64 -d)"; ` +
+    `test -n "$ZSH_VERSION" && eval "$(echo ${zshB64} | base64 -d)"; ` +
+    `test -n "$FISH_VERSION" && echo ${fishB64} | base64 -d | source; ` +
+    // A \`test … &&\` list that doesn't match exits 1, and that would show up as
+    // the "last command failed" status at the user's first prompt.
+    "true"
   );
 }
 
@@ -168,7 +223,7 @@ const PROMPT_START_MARKER = "\x1b]133;A\x07";
  * everything from the marker onward, including the shell's real fresh
  * prompt, passes through untouched.
  *
- * A remote shell our hooks don't support (fish, dash, PowerShell, …) never
+ * A remote shell our hooks don't support (dash, PowerShell, …) never
  * emits that marker — timeoutMs is the safety net: whatever was held back
  * gets flushed as-is (bootstrap echo included) instead of silently lost, so
  * an unsupported shell just sees the old un-suppressed behavior, delayed

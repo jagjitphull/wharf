@@ -140,7 +140,7 @@ A personal SSH/SFTP terminal client, Termius-style.
   timestamp and a per-block menu: copy the command, copy just its output,
   re-run it, bookmark it, or (on a failed command) "Explain & Fix…". Driven
   by a small, standard shell-integration script (OSC 133, the same protocol
-  iTerm2/VS Code/Warp use) sent to bash/zsh sessions on connect — see Known
+  iTerm2/VS Code/Warp use) sent to bash/zsh/fish sessions on connect — see Known
   limitations below for what that means for other shells and for SSH/Mosh.
   Toggle it off in Settings → Command Blocks if you'd rather not have it
   sent to new sessions
@@ -258,7 +258,7 @@ Unit tests live next to the code they cover (`*.test.ts`) and run on plain Node 
 They currently cover the security- and data-sensitive modules: `knownHosts.ts` (host-key
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
 (`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
-real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside),
+real `bash`, `fish` and, when installed, `zsh`), `dataFileRecovery.ts` (moving a corrupt data file aside),
 `windowBounds.ts` (is a saved window position still on a connected display), `dataFilePermissions.ts`
 (owner-only data file), `security.ts`
 (which URLs may be opened and which permissions are granted) and `updateCheck.ts`
@@ -403,7 +403,7 @@ src/
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
       sshConfigParser.ts      ~/.ssh/config parser for the import dialog
       updateCheck.ts          GitHub releases "is there a newer version" check (no self-update)
-      shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
+      shellIntegration.ts     OSC 133 bash/zsh/fish hooks behind Command Blocks and exit codes
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
       dataFilePermissions.ts  makes the data file and folder owner-only
@@ -493,10 +493,15 @@ scripts/
   to the underlying ssh command, same as a direct connection would use.
 - Command Blocks (and the AI's "Explain & Fix…") need the session's shell
   to support the OSC 133 shell-integration hooks Wharf sends — currently
-  bash and zsh only; any other shell (fish, a restricted shell, etc.) just
+  bash, zsh and fish; any other shell (a restricted shell, dash, PowerShell, etc.) just
   never emits the block-boundary sequences, so the panel stays empty and
-  nothing else about the session is affected. For a local shell tab the
-  integration script loads invisibly (via `--rcfile`/`ZDOTDIR`); for SSH and
+  nothing else about the session is affected. fish 4 and later write these sequences
+  themselves, so Wharf installs nothing there (the block's command text then comes from
+  what was typed rather than from the shell, since fish's own marker doesn't carry it);
+  on fish 3 Wharf's hooks wrap your own `fish_prompt`. A remote fish older than 3.4
+  can't parse the one-line bootstrap (no `$(…)` syntax) and prints a syntax error once
+  at connect. For a local shell tab the
+  integration script loads invisibly (via `--rcfile`/`ZDOTDIR`/`--init-command`); for SSH and
   Mosh sessions — where Wharf doesn't control how the remote shell starts —
   it's delivered as one base64 line of real typed input shortly after
   connect, so it's visible once in the terminal/scrollback by design (hiding
