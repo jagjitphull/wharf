@@ -11,6 +11,9 @@ const hasShell = (name: string): boolean => spawnSync(name, ["-c", "true"]).stat
 const hasBash = hasShell("bash");
 const hasZsh = hasShell("zsh");
 const hasFish = hasShell("fish");
+// /bin/sh is dash on Debian/Ubuntu, but bash (in POSIX mode, still setting
+// $BASH_VERSION) on macOS: the "neither bash, zsh nor fish" tests need a sh that really is neither.
+const hasPlainSh = spawnSync("sh", ["-c", 'test -z "$BASH_VERSION$ZSH_VERSION$FISH_VERSION"']).status === 0;
 // A pty to run an interactive fish in (fish only fires its preexec/postexec
 // events interactively): util-linux's `script` provides one.
 const hasScript = spawnSync("script", ["--version"]).status === 0;
@@ -97,8 +100,7 @@ describe("buildRemoteBootstrapCommand", () => {
     expect(out).toContain("status=0");
   });
 
-  it("is a silent no-op, exiting 0, on a shell that is neither bash, zsh nor fish", () => {
-    // /bin/sh is dash on Debian/Ubuntu: neither $BASH_VERSION nor $ZSH_VERSION is set.
+  it.skipIf(!hasPlainSh)("is a silent no-op, exiting 0, on a shell that is neither bash, zsh nor fish", () => {
     const out = execFileSync("sh", ["-c", mod.buildRemoteBootstrapCommand()], { encoding: "utf8", env: { PATH: process.env.PATH } });
     expect(out).toBe("");
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { IPC, type SelfUpdateState } from "../../shared/types";
 
@@ -48,11 +48,15 @@ class FakeUpdater extends EventEmitter {
 }
 vi.mock("electron-updater", () => ({ AppImageUpdater: FakeUpdater }));
 
+const realPlatform = process.platform;
+const setPlatform = (platform: NodeJS.Platform) => Object.defineProperty(process, "platform", { value: platform, configurable: true });
+
 let mod: typeof import("./selfUpdate");
 const updater = () => h.created[0] as FakeUpdater;
 const phases = () => h.sent.map((e) => e.payload.phase);
 
 beforeEach(async () => {
+  setPlatform("linux"); // in-place updating is Linux-only; the host running the tests may not be
   h.isPackaged = true;
   h.sent = [];
   h.created = [];
@@ -63,10 +67,18 @@ beforeEach(async () => {
   mod = await import("./selfUpdate");
 });
 
+afterEach(() => setPlatform(realPlatform));
+
 describe("canSelfUpdate", () => {
   it("is true for an installed AppImage on Linux", () => {
-    if (process.platform !== "linux") return;
     expect(mod.canSelfUpdate()).toBe(true);
+  });
+
+  it("is false on macOS and Windows, even with APPIMAGE set", () => {
+    for (const platform of ["darwin", "win32"] as const) {
+      setPlatform(platform);
+      expect(mod.canSelfUpdate(), platform).toBe(false);
+    }
   });
 
   it("is false when not packaged (a dev checkout), whatever else is true", () => {
