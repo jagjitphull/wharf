@@ -151,6 +151,25 @@ jobs:
           SMOKE_SCREENSHOT: ${{ runner.temp }}/smoke-screenshot.png
         run: npm run smoke
 
+      # Only runs when the smoke test failed on macOS: is the bundle's signature
+      # intact (flipping fuses edits the binary), and what does launching it say?
+      - name: Diagnose a failed macOS launch
+        if: failure() && runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          APP=release/mac-arm64/Wharf.app
+          echo "--- codesign verify"; codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 || true
+          echo "--- codesign details"; codesign -dv --verbose=2 "$APP" 2>&1 | head -12 || true
+          echo "--- launching directly for 15s"
+          "$APP/Contents/MacOS/Wharf" --remote-debugging-port=9333 --disable-gpu --user-data-dir="$RUNNER_TEMP/diag" > "$RUNNER_TEMP/diag.log" 2>&1 &
+          PID=$!
+          sleep 15
+          echo "alive: $(kill -0 $PID 2>/dev/null && echo yes || echo no)"
+          curl -s --max-time 5 http://127.0.0.1:9333/json/version || echo "no debugger answer"
+          kill $PID 2>/dev/null || true
+          echo "--- app output"; tail -30 "$RUNNER_TEMP/diag.log"
+          echo "--- recent crash reports"; ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -3
+
       - name: Upload smoke-test screenshot
         if: always()
         uses: actions/upload-artifact@v4

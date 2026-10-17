@@ -276,6 +276,15 @@ async function main() {
     });
   });
 
+  let outputPrinted = false;
+  const printAppOutput = () => {
+    if (outputPrinted) return;
+    outputPrinted = true;
+    console.log("\n--- app output (last 60 lines) ---");
+    console.log(output.join("").split("\n").slice(-60).join("\n"));
+    console.log(`--- app exit: ${exitInfo ? JSON.stringify(exitInfo) : "still running"} ---`);
+  };
+
   const rendererProblems = [];
   let page;
   let browser;
@@ -283,7 +292,8 @@ async function main() {
     await check("window opens and exposes a debuggable page", async () => {
       const target = await until("the app window", async () => {
         if (exitInfo) throw new Error(`the app exited early (${JSON.stringify(exitInfo)})`);
-        const response = await fetch(`http://127.0.0.1:${port}/json/list`);
+        // A per-attempt timeout: against a port nothing answers on, a bare fetch can sit far longer than the step's own deadline.
+        const response = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(2_000) });
         const targets = await response.json();
         return targets.find((t) => t.type === "page" && !t.url.startsWith("devtools://"));
       });
@@ -415,7 +425,7 @@ async function main() {
     });
 
     await check("app quits cleanly when asked", async () => {
-      const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+      const version = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5_000) })).json();
       browser = await connectCdp(version.webSocketDebuggerUrl);
       await browser.send("Browser.close").catch(() => {});
       const result = await Promise.race([
@@ -429,13 +439,12 @@ async function main() {
   } finally {
     page?.close();
     browser?.close();
+    if (results.some((r) => !r.ok) || process.exitCode) printAppOutput();
     await killAndClean(child, sandboxDir);
   }
 
   const failed = results.filter((r) => !r.ok);
   if (failed.length > 0) {
-    console.log("\n--- app output (last 60 lines) ---");
-    console.log(output.join("").split("\n").slice(-60).join("\n"));
     console.log(`\nSmoke test FAILED: ${failed.length} of ${results.length} checks`);
     return 1;
   }
