@@ -336,10 +336,17 @@ step to fix that itself the way the `.deb` package does — run it with `--no-sa
 
 ## Releasing
 
-Releases are cut by pushing a version tag; `.github/workflows/release.yml` does the rest (the same
-audit, lint, format, typecheck and tests as CI, then `npm run package`, the launch smoke test on the
-packaged build, then a GitHub Release with the `.AppImage`, the `.deb` and a `SHA256SUMS` file
-attached):
+Releases are cut by pushing a version tag; `.github/workflows/release.yml` does the rest. It builds on
+Linux, Windows and macOS in parallel (each runs the same audit, lint, format, typecheck and tests as CI,
+then `npm run package` and the launch smoke test on the packaged build), and only if all three pass does
+one job publish a single GitHub Release containing:
+
+| Platform | Files |
+| -------- | ----- |
+| Linux | `Wharf-x.y.z.AppImage`, the `.deb`, `latest-linux.yml` |
+| Windows | `Wharf-Setup-x.y.z.exe`, `latest.yml` |
+| macOS | `Wharf-x.y.z-arm64.dmg` (Apple Silicon), `Wharf-x.y.z.dmg` (Intel), `latest-mac.yml` |
+| All | `SHA256SUMS` |
 
 ```bash
 npm version 0.2.0 --no-git-tag-version   # bumps package.json and the lockfile
@@ -349,11 +356,32 @@ git tag v0.2.0 && git push origin v0.2.0
 
 The workflow refuses to publish if the tag doesn't match `package.json`'s version, uses only the
 built-in `GITHUB_TOKEN` (no personal access token), and treats a tag with a hyphen (`v0.2.0-rc.1`) as a
-pre-release — which the in-app update check ignores. The release also carries `latest-linux.yml`, which
-the AppImage's in-place update reads to find the new file and its checksum. To rehearse without publishing, run it by hand
-from the Actions tab (**Release → Run workflow**, available once the workflow is on the default
-branch): it builds and uploads the files as a workflow artifact only. Downloaders can check a file with
-`sha256sum -c SHA256SUMS`.
+pre-release — which the in-app update check ignores. `latest-linux.yml` is what the AppImage's in-place
+update reads to find the new file and its checksum (Windows and macOS builds don't update themselves yet).
+To rehearse without publishing, run it by hand from the Actions tab (**Release → Run workflow**, pick the
+branch): it builds all three and uploads the files as workflow artifacts only. Downloaders can check a
+file with `sha256sum -c SHA256SUMS`.
+
+### Code signing (optional, off until you add secrets)
+
+Without any secrets the Windows and macOS packages are **unsigned**: they run, but Windows SmartScreen
+says "Windows protected your PC" and macOS Gatekeeper refuses the DMG until the user right-clicks → Open.
+The workflow signs automatically once these exist. Store them as secrets of a GitHub
+[Environment](https://docs.github.com/actions/deployment/targeting-different-environments) named
+`release` (tag builds run in it, so you can require reviewers; rehearsals can't reach them):
+
+| Secret | What |
+| ------ | ---- |
+| `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD` | Windows Authenticode certificate (`.pfx`, base64-encoded) and its password |
+| `CSC_LINK`, `CSC_KEY_PASSWORD` | macOS "Developer ID Application" certificate (`.p12`, base64-encoded) and its password |
+| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Notarization (needs the Apple Developer Program) |
+
+A signed build is then verified (`codesign`/`spctl` on macOS, `Get-AuthenticodeSignature` on Windows) and
+the job fails if the signature isn't valid. macOS is notarized when the `APPLE_*` secrets are present; the
+hardened-runtime entitlements Electron and node-pty need are electron-builder's defaults. The signing
+paths have not been exercised yet (no certificates were available when this was written), so rehearse
+with a pre-release tag and install the result on a clean machine before relying on it. Azure Trusted
+Signing for Windows would need a few extra lines under `win:` in `electron-builder.yml`.
 
 ## Data, logs, and recovery
 

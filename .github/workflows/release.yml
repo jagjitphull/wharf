@@ -1,9 +1,14 @@
 name: Release
 
-# Pushing a tag like v0.2.0 builds the Linux packages and publishes them as a
-# GitHub Release. Running it by hand (Actions -> Release -> Run workflow) does
-# the same build and uploads the files as a workflow artifact, but never
-# publishes anything — a safe way to rehearse a release.
+# Pushing a tag like v0.2.0 builds the Linux, Windows and macOS packages and
+# publishes them together as one GitHub Release. Running it by hand (Actions ->
+# Release -> Run workflow) does the same builds and uploads the files as
+# workflow artifacts, but never publishes anything — a safe way to rehearse a
+# release.
+#
+# Signing is optional and off until the secrets exist (see README -> Releasing):
+# without them the Windows and macOS builds are unsigned, which works but draws
+# SmartScreen / Gatekeeper warnings.
 on:
   push:
     tags: ["v*"]
@@ -17,11 +22,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and release (Linux)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # create the release and attach files to it
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    # Tag builds run in the "release" environment, so signing secrets stored
+    # there (with required reviewers, if you want a manual gate) are only
+    # reachable from a tag push — never from a pull request or a rehearsal.
+    environment: ${{ github.ref_type == 'tag' && 'release' || '' }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            id: linux
+            package-args: ""
+          - os: windows-latest
+            name: Windows
+            id: windows
+            package-args: ""
+          # macos-latest is Apple Silicon; --x64 cross-builds the Intel app too.
+          # The smoke test launches the arm64 one (an Intel build can't run on
+          # this runner without Rosetta, so it is built but not launched).
+          - os: macos-latest
+            name: macOS
+            id: macos
+            package-args: "--arm64 --x64"
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -55,39 +85,118 @@ jobs:
           npm run typecheck
           npm test
 
+      # Every signing variable is passed in but only used if it is non-empty.
+      # electron-builder signs Windows with WIN_CSC_LINK/WIN_CSC_KEY_PASSWORD and
+      # macOS with CSC_LINK/CSC_KEY_PASSWORD, and notarizes macOS when the
+      # APPLE_* variables are present. With none of them it must be told not to
+      # go looking for a certificate in the runner's keychain.
       - name: Package
-        run: npm run package
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PACKAGE_ARGS: ${{ matrix.package-args }}
+          PLATFORM: ${{ matrix.id }}
+        run: |
+          signing=none
+          case "$PLATFORM" in
+            windows) [ -n "$WIN_CSC_LINK" ] && signing=windows ;;
+            macos) [ -n "$CSC_LINK" ] && signing=macos ;;
+          esac
+          if [ "$signing" = none ]; then
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            if [ "$PLATFORM" != linux ]; then
+              echo "::warning::Packaging $PLATFORM unsigned: no signing certificate secret is configured."
+            fi
+          fi
+          if [ "$signing" = macos ] && [ -z "$APPLE_ID$APPLE_TEAM_ID" ]; then
+            echo "::warning::macOS is signed but not notarized: APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are not all set."
+          fi
+          echo "SIGNING=$signing" >> "$GITHUB_ENV"
+          # shellcheck disable=SC2086
+          npm run package -- $PACKAGE_ARGS
+
+      # When a certificate was supplied, check the result really is signed;
+      # electron-builder can otherwise fall through to an unsigned artifact.
+      - name: Verify the signature (macOS)
+        if: env.SIGNING == 'macos'
+        run: |
+          for app in release/mac-arm64/Wharf.app release/mac/Wharf.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+          done
+
+      - name: Verify the signature (Windows)
+        if: env.SIGNING == 'windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem release/*.exe | ForEach-Object {
+            $sig = Get-AuthenticodeSignature $_.FullName
+            Write-Host "$($_.Name): $($sig.Status)"
+            if ($sig.Status -ne 'Valid') { throw "$($_.Name) is not validly signed ($($sig.Status))" }
+          }
 
       # The same launch check CI runs, on the build that is about to be published.
       - name: Install smoke-test display and audio libraries
+        if: matrix.id == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
           sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
 
-      - name: Smoke test the packaged app
+      - name: Smoke test the packaged app (Linux)
+        if: matrix.id == 'linux'
         env:
           SMOKE_NO_SANDBOX: "1"
         run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run smoke -- release/linux-unpacked/wharf
 
-      - name: Checksums
-        working-directory: release
-        run: sha256sum *.AppImage *.deb > SHA256SUMS
+      - name: Smoke test the packaged app
+        if: matrix.id != 'linux'
+        run: npm run smoke
 
+      # Installers plus the update metadata electron-builder writes beside them
+      # (latest-linux.yml, latest.yml, latest-mac.yml).
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wharf-linux-${{ github.sha }}
+          name: wharf-${{ matrix.id }}-${{ github.sha }}
           path: |
             release/*.AppImage
             release/*.deb
-            release/latest-linux.yml
-            release/SHA256SUMS
+            release/*.exe
+            release/*.dmg
+            release/latest*.yml
           if-no-files-found: error
           retention-days: 14
 
+  publish:
+    name: Publish the GitHub Release
+    needs: build
+    # Only a tag publishes; a manual run stops after uploading the artifacts.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and attach files to it
+    steps:
+      - name: Download every platform's files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wharf-*-${{ github.sha }}
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          ls -l
+          sha256sum *.AppImage *.deb *.exe *.dmg > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Publish the GitHub Release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -96,5 +205,6 @@ jobs:
           # A tag with a hyphen (v0.2.0-rc.1) is a pre-release; GitHub's "latest
           # release" — which the app's update check reads — skips those.
           case "$TAG" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "$TAG" release/*.AppImage release/*.deb release/latest-linux.yml release/SHA256SUMS \
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
             --title "Wharf $TAG" --generate-notes --verify-tag "${flags[@]}"
