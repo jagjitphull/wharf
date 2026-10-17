@@ -4,6 +4,11 @@ import { createHmac, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+// Only the interactive prompt touches Electron (a native dialog); the rest of
+// the module never does.
+const showMessageBox = vi.hoisted(() => vi.fn());
+vi.mock("electron", () => ({ dialog: { showMessageBox } }));
+
 // knownHosts.ts resolves ~/.ssh/known_hosts from os.homedir() once, at
 // module-load time — os.homedir() reads $HOME on POSIX, so pointing HOME at
 // a fresh temp directory before each dynamic import (with resetModules() to
@@ -154,5 +159,88 @@ describe("fingerprintSha256", () => {
     const a = mod.fingerprintSha256(keyBlob("ssh-ed25519", "a"));
     const b = mod.fingerprintSha256(keyBlob("ssh-ed25519", "b"));
     expect(a).not.toBe(b);
+  });
+});
+
+describe("@cert-authority lines", () => {
+  const ca = keyBlob("ssh-ed25519", "the-ca");
+  const hostKey = keyBlob("ssh-ed25519", "the-host");
+
+  it("don't make a host look like its key changed: it is just unknown, so it gets the normal prompt", () => {
+    writeKnownHosts([`@cert-authority *.example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    expect(mod.checkHostKey("web.example.com", 22, hostKey)).toBe("new");
+  });
+
+  it("never trust the CA's own key as if it were the host's key", () => {
+    writeKnownHosts([`@cert-authority *.example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    expect(mod.checkHostKey("web.example.com", 22, ca)).toBe("new");
+  });
+
+  it("don't interfere with an ordinary line for the same host", () => {
+    writeKnownHosts([
+      `@cert-authority *.example.com ssh-ed25519 ${ca.toString("base64")}`,
+      `web.example.com ssh-ed25519 ${hostKey.toString("base64")}`,
+    ]);
+    expect(mod.checkHostKey("web.example.com", 22, hostKey)).toBe("match");
+    expect(mod.checkHostKey("web.example.com", 22, keyBlob("ssh-ed25519", "other"))).toBe("mismatch");
+  });
+
+  it("are ignored when they appear after an unknown marker too", () => {
+    writeKnownHosts([`@something-else web.example.com ssh-ed25519 ${hostKey.toString("base64")}`]);
+    expect(mod.checkHostKey("web.example.com", 22, hostKey)).toBe("new");
+  });
+});
+
+describe("matchesCertAuthority", () => {
+  const ca = keyBlob("ssh-ed25519", "the-ca");
+
+  it("is true for a host covered by an @cert-authority pattern (globs, ports, negation)", () => {
+    writeKnownHosts([`@cert-authority *.example.com,!legacy.example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    expect(mod.matchesCertAuthority("web.example.com", 22)).toBe(true);
+    expect(mod.matchesCertAuthority("legacy.example.com", 22)).toBe(false);
+    expect(mod.matchesCertAuthority("other.org", 22)).toBe(false);
+  });
+
+  it("matches a [host]:port pattern only on that port", () => {
+    writeKnownHosts([`@cert-authority [web.example.com]:2222 ssh-ed25519 ${ca.toString("base64")}`]);
+    expect(mod.matchesCertAuthority("web.example.com", 2222)).toBe(true);
+    expect(mod.matchesCertAuthority("web.example.com", 22)).toBe(false);
+  });
+
+  it("is false for ordinary and @revoked lines, and with no known_hosts at all", () => {
+    expect(mod.matchesCertAuthority("example.com", 22)).toBe(false);
+    writeKnownHosts([`example.com ssh-ed25519 ${ca.toString("base64")}`, `@revoked example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    expect(mod.matchesCertAuthority("example.com", 22)).toBe(false);
+  });
+});
+
+describe("verifyHostKeyInteractive on a host covered by an @cert-authority line", () => {
+  const ca = keyBlob("ssh-ed25519", "the-ca");
+  const hostKey = keyBlob("ssh-ed25519", "the-host");
+
+  beforeEach(() => {
+    showMessageBox.mockReset().mockResolvedValue({ response: 0 });
+  });
+
+  it("explains why it is asking, and still shows the fingerprint", async () => {
+    writeKnownHosts([`@cert-authority *.example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    await mod.verifyHostKeyInteractive("web.example.com", 22, hostKey);
+    const detail = showMessageBox.mock.calls[0][0].detail as string;
+    expect(detail).toContain("@cert-authority");
+    expect(detail).toContain(mod.fingerprintSha256(hostKey));
+  });
+
+  it("says nothing about certificates for an ordinary unknown host", async () => {
+    writeKnownHosts([`@cert-authority *.example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    await mod.verifyHostKeyInteractive("db.other.org", 22, hostKey);
+    expect(showMessageBox.mock.calls[0][0].detail).not.toContain("@cert-authority");
+  });
+
+  it("still refuses unless the user chooses to trust, and trusts the plain key when they do", async () => {
+    writeKnownHosts([`@cert-authority *.example.com ssh-ed25519 ${ca.toString("base64")}`]);
+    expect(await mod.verifyHostKeyInteractive("web.example.com", 22, hostKey)).toBe(false);
+    showMessageBox.mockResolvedValue({ response: 1 });
+    expect(await mod.verifyHostKeyInteractive("web.example.com", 22, hostKey)).toBe(true);
+    expect(mod.checkHostKey("web.example.com", 22, hostKey)).toBe("match");
   });
 });

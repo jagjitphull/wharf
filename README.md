@@ -449,10 +449,17 @@ scripts/
   doesn't have is a master password for machines that will never have a keyring; an SSH agent or
   a key without a passphrase avoids storing anything.
 - `knownHosts.ts` supports exact-host and `*`/`?` glob patterns (including
-  `!negation`), hashed (`HashKnownHosts`) entries, and `@revoked` (a
-  revoked key is always refused, with no "trust anyway" option, even if
-  it matches the host), but not the full OpenSSH known_hosts spec — no
-  CIDR ranges or `@cert-authority` (CA-signed host certificates).
+  `!negation`), `[host]:port`, hashed (`HashKnownHosts`) entries, and `@revoked`
+  (a revoked key is always refused, with no "trust anyway" option, even if
+  it matches the host). CIDR ranges aren't part of the known_hosts format
+  (OpenSSH only uses them for `Match Address` and `from=`), so there is
+  nothing to add there. `@cert-authority` (CA-signed host certificates) is
+  recognized but can't be used: checking a host certificate means negotiating
+  the `*-cert-v01@openssh.com` host-key algorithms, which the SSH library
+  (ssh2, including its latest release) doesn't offer, so the server only ever
+  sends its plain key. A host covered by such a line is treated as unknown and
+  gets the normal trust prompt, with a note saying why; the CA's key is never
+  accepted as the host's own.
 - Local shell tabs use [`node-pty`](https://github.com/microsoft/node-pty),
   a native addon that has to compile during `npm install` (it has no
   prebuilt binary for Linux). `postinstall` (`scripts/verify-pty.js`) checks
