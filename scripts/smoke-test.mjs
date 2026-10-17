@@ -36,6 +36,26 @@ const stepTimeout = Number(process.env.SMOKE_TIMEOUT_MS ?? 30_000);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Kills the app and everything it spawned (Chromium's helper processes keep
+ * writing into the profile for a moment after the main one is gone), then
+ * clears the throwaway profile. Cleanup is best-effort: a leftover temp
+ * directory is harmless, a failed check run because of one is not. */
+async function killAndClean(child, dir) {
+  for (const target of [-child.pid, child.pid]) {
+    try {
+      process.kill(target, "SIGKILL");
+    } catch {
+      /* already gone */
+    }
+  }
+  await sleep(300);
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch {
+    /* leave it for the OS temp cleaner */
+  }
+}
+
 async function until(description, probe, timeoutMs = stepTimeout) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
@@ -126,6 +146,7 @@ async function probeLaunch({ args = [], env = {}, ms = 6_000, afterMs, bare = fa
   const child = spawn(executable, probeArgs, {
     env: { ...process.env, HOME: path.join(dir, "home"), XDG_CONFIG_HOME: path.join(dir, "config"), ...env },
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true, // its own process group, so killAndClean can take the helpers with it
   });
   const chunks = [];
   child.stdout.on("data", (c) => chunks.push(c.toString()));
@@ -136,9 +157,7 @@ async function probeLaunch({ args = [], env = {}, ms = 6_000, afterMs, bare = fa
     const during = afterMs ? await afterMs() : undefined;
     return { output: chunks.join(""), during };
   } finally {
-    child.kill("SIGKILL");
-    await Promise.race([exited, sleep(5_000)]);
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    await killAndClean(child, dir);
   }
 }
 
@@ -225,6 +244,7 @@ async function main() {
   const child = spawn(executable, args, {
     env: { ...process.env, HOME: home, XDG_CONFIG_HOME: configHome, ELECTRON_ENABLE_LOGGING: "1" },
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
   const capture = (chunk) => output.push(chunk.toString());
   child.stdout.on("data", capture);
@@ -386,9 +406,7 @@ async function main() {
   } finally {
     page?.close();
     browser?.close();
-    if (!exitInfo) child.kill("SIGKILL");
-    await Promise.race([exited, sleep(5_000)]);
-    rmSync(sandboxDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    await killAndClean(child, sandboxDir);
   }
 
   const failed = results.filter((r) => !r.ok);

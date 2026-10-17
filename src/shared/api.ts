@@ -29,6 +29,7 @@ import type {
   AiExplainFailureRequest,
   AiExplainFailureResult,
   SecretStorageStatus,
+  SelfUpdateState,
   UpdateCheckResult,
   AiGenerateCommandRequest,
   SshConfigCandidate,
@@ -160,6 +161,14 @@ export interface WharfApi {
     setAutoCheck(enabled: boolean): Promise<void>;
     /** Fires when the launch-time check finds a newer release. */
     onAvailable(cb: (result: UpdateCheckResult) => void): Unsubscribe;
+    /** Whether this install can replace itself (an installed AppImage). Other builds only get a link to the download page. */
+    canSelfUpdate(): Promise<boolean>;
+    selfUpdateState(): Promise<SelfUpdateState>;
+    /** Checks for and downloads the newer version; progress arrives through onSelfUpdateState. Never rejects. */
+    downloadUpdate(): Promise<void>;
+    /** Restarts into the downloaded version. Rejects if nothing has been downloaded. */
+    installUpdate(): Promise<void>;
+    onSelfUpdateState(cb: (state: SelfUpdateState) => void): Unsubscribe;
   };
   backup: {
     /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */

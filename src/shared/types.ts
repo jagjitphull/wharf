@@ -345,6 +345,16 @@ export interface TunnelInput {
   autoStart?: boolean;
 }
 
+/** Where an in-place update (AppImage builds only) currently stands. */
+export interface SelfUpdateState {
+  phase: "idle" | "checking" | "downloading" | "ready" | "error";
+  /** The version being downloaded, or waiting to be installed. */
+  version?: string;
+  /** 0-100, while downloading. */
+  percent?: number;
+  error?: string;
+}
+
 export interface SecretStorageStatus {
   /** True when saved passwords and key passphrases are encrypted with the OS keyring. */
   encrypted: boolean;
@@ -477,6 +487,12 @@ export const IPC = {
     setAutoCheck: "update:set-auto-check",
     /** Main -> renderer: the launch-time check found a newer release. */
     onAvailable: "update:available",
+    canSelfUpdate: "update:can-self-update",
+    selfUpdateState: "update:self-update-state",
+    downloadUpdate: "update:download",
+    installUpdate: "update:install",
+    /** Main -> renderer: the in-place update moved to a new phase, or made progress. */
+    onSelfUpdateState: "update:self-update-state-changed",
   },
   backup: {
     export: "backup:export",

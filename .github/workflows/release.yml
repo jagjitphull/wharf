@@ -81,6 +81,7 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+            release/latest-linux.yml
             release/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -95,5 +96,5 @@ jobs:
           # A tag with a hyphen (v0.2.0-rc.1) is a pre-release; GitHub's "latest
           # release" — which the app's update check reads — skips those.
           case "$TAG" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "$TAG" release/*.AppImage release/*.deb release/SHA256SUMS \
+          gh release create "$TAG" release/*.AppImage release/*.deb release/latest-linux.yml release/SHA256SUMS \
             --title "Wharf $TAG" --generate-notes --verify-tag "${flags[@]}"

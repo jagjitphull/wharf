@@ -189,10 +189,14 @@ A personal SSH/SFTP terminal client, Termius-style.
   is just left out rather than shown as an error
 - Update check — Settings → About shows the installed version and a **Check for updates** button; a
   newer release also shows as a small "Update available" pill in the status bar, which opens its
-  download page. Wharf never updates itself. A check is a single request to GitHub's public releases
-  API (nothing about you or your hosts is sent); an installed build makes one quiet check shortly
-  after launch unless you turn **Check on launch** off, and a failed background check (offline, no
-  release yet) is only logged
+  download page. The **AppImage** build can then update itself in place: **Download and install**
+  fetches the new AppImage from the GitHub release, checks it against the SHA-512 published in the
+  release's `latest-linux.yml` (a mismatch is refused and nothing is replaced), swaps it in for the
+  running file and restarts on **Restart to install**. Nothing downloads or installs without that
+  click. A `.deb` install is owned by your package manager, so it only gets the link. A check is a
+  single request to GitHub's public releases API (nothing about you or your hosts is sent); an
+  installed build makes one quiet check shortly after launch unless you turn **Check on launch** off,
+  and a failed background check (offline, no release yet) is only logged
 - Crash recovery and logging — an unhandled renderer error shows a reload
   screen instead of a blank window, a crashed renderer reloads itself
   automatically (capped after repeated crashes in a row), and both main-
@@ -261,8 +265,9 @@ verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error),
 real `bash`, `fish` and, when installed, `zsh`), `dataFileRecovery.ts` (moving a corrupt data file aside),
 `windowBounds.ts` (is a saved window position still on a connected display), `dataFilePermissions.ts`
 (owner-only data file), `security.ts`
-(which URLs may be opened and which permissions are granted) and `updateCheck.ts`
-(version comparison and the release-check responses).
+(which URLs may be opened and which permissions are granted) `updateCheck.ts`
+(version comparison and the release-check responses) and `selfUpdate.ts` (the in-place update's
+states and guards, with the updater stubbed).
 
 The SSH stack is tested end to end against a **real SSH server running inside the test process**
 (`src/main/testing/sshTestServer.ts`, built on `ssh2`'s `Server`), not mocks: `sshManager.test.ts`
@@ -344,7 +349,8 @@ git tag v0.2.0 && git push origin v0.2.0
 
 The workflow refuses to publish if the tag doesn't match `package.json`'s version, uses only the
 built-in `GITHUB_TOKEN` (no personal access token), and treats a tag with a hyphen (`v0.2.0-rc.1`) as a
-pre-release — which the in-app update check ignores. To rehearse without publishing, run it by hand
+pre-release — which the in-app update check ignores. The release also carries `latest-linux.yml`, which
+the AppImage's in-place update reads to find the new file and its checksum. To rehearse without publishing, run it by hand
 from the Actions tab (**Release → Run workflow**, available once the workflow is on the default
 branch): it builds and uploads the files as a workflow artifact only. Downloaders can check a file with
 `sha256sum -c SHA256SUMS`.
@@ -402,7 +408,8 @@ src/
       tunnelManager.ts       local/remote/dynamic SSH port forwarding
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
       sshConfigParser.ts      ~/.ssh/config parser for the import dialog
-      updateCheck.ts          GitHub releases "is there a newer version" check (no self-update)
+      updateCheck.ts          GitHub releases "is there a newer version" check
+      selfUpdate.ts           in-place update for the AppImage build (electron-updater)
       shellIntegration.ts     OSC 133 bash/zsh/fish hooks behind Command Blocks and exit codes
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
@@ -583,7 +590,10 @@ scripts/
   that touches a password, key passphrase, API key or terminal content should ever be passed to
   `console.*` or `log.*`. Today's log calls are limited to error objects and event descriptions.
 - The only network request Wharf makes on its own is the optional launch-time update check described
-  above (to `api.github.com`, through the system's proxy settings); hosts you connect to, AI providers
+  above (to `api.github.com`, through the system's proxy settings). Downloading an update happens only
+  when you click it. It trusts the same thing downloading the file by hand does, the release on this
+  repository's GitHub page, plus the checksum in `latest-linux.yml`; there is no code signature to
+  check on Linux, so anyone who can publish a release can ship an update; hosts you connect to, AI providers
   you configure, and your Ollama server are contacted only when you use those features. The returned
   release link is only ever opened if it points at this repository on github.com.
 - Only one Wharf process may run per user (single-instance lock), so the data file never has two
