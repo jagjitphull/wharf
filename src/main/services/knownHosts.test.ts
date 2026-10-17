@@ -45,6 +45,7 @@ beforeEach(async () => {
   mkdirSync(sshDir, { recursive: true });
   knownHostsPath = path.join(sshDir, "known_hosts");
   vi.stubEnv("HOME", tmpHome);
+  vi.stubEnv("USERPROFILE", tmpHome); // os.homedir() reads this on Windows
   vi.resetModules();
   mod = await import("./knownHosts");
 });
