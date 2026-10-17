@@ -43,6 +43,12 @@ const defaultExecutable = isWindows
 const executable = path.resolve(process.argv[2] ?? defaultExecutable);
 /** The .app bundle on macOS (what the fuse reader wants), the executable elsewhere. */
 const fuseTarget = isMac ? executable.slice(0, executable.indexOf(".app") + 4) : executable;
+// macOS: a fake $HOME and a detached (new-session) launch both stop Chromium's
+// helper processes from connecting back to the browser process ("Terminating
+// current process after 15 seconds with no connection"), so the app never
+// opens a window. Launched plainly, as a user would, it is fine.
+const isolateHome = !isMac;
+const detachApp = !isWindows && !isMac;
 const useSandboxFlag = !isWindows && !isMac && (process.env.SMOKE_NO_SANDBOX === "1" || process.getuid?.() === 0);
 const stepTimeout = Number(process.env.SMOKE_TIMEOUT_MS ?? 30_000);
 
@@ -161,9 +167,9 @@ async function probeLaunch({ args = [], env = {}, ms = 6_000, afterMs, bare = fa
   const probeArgs = bare ? args : ["--disable-gpu", `--user-data-dir=${path.join(dir, "userData")}`, ...args];
   if (!bare && useSandboxFlag) probeArgs.push("--no-sandbox");
   const child = spawn(executable, probeArgs, {
-    env: { ...process.env, HOME: path.join(dir, "home"), ...env },
+    env: { ...process.env, ...(isolateHome ? { HOME: path.join(dir, "home") } : {}), ...env },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: !isWindows, // its own process group, so killAndClean can take the helpers with it
+    detached: detachApp, // its own process group, so killAndClean can take the helpers with it
   });
   const chunks = [];
   child.stdout.on("data", (c) => chunks.push(c.toString()));
@@ -261,9 +267,9 @@ async function main() {
   const output = [];
   const child = spawn(executable, args, {
     // WHARF_SMOKE lets the local-shell check tell a command's output from the echo of what was typed.
-    env: { ...process.env, HOME: home, WHARF_SMOKE: "42", ELECTRON_ENABLE_LOGGING: "1" },
+    env: { ...process.env, ...(isolateHome ? { HOME: home } : {}), WHARF_SMOKE: "42", ELECTRON_ENABLE_LOGGING: "1" },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: !isWindows,
+    detached: detachApp,
   });
   const capture = (chunk) => output.push(chunk.toString());
   child.stdout.on("data", capture);
