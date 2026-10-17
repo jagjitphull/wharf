@@ -51,6 +51,8 @@ const isolateHome = !isMac;
 const detachApp = !isWindows && !isMac;
 const useSandboxFlag = !isWindows && !isMac && (process.env.SMOKE_NO_SANDBOX === "1" || process.getuid?.() === 0);
 const stepTimeout = Number(process.env.SMOKE_TIMEOUT_MS ?? 30_000);
+const requestTimeout = stepTimeout * 2; // the local-shell check legitimately waits up to stepTimeout inside one request
+const overallTimeout = 8 * 60_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -133,10 +135,20 @@ async function connectCdp(url) {
     pending.clear();
   });
   return {
+    // Every request gets a deadline: a main process stuck on something (a native
+    // dialog, say) otherwise leaves the run waiting forever for an answer.
     send: (method, params = {}) =>
       new Promise((resolve, reject) => {
         const id = nextId++;
-        pending.set(id, { method, resolve, reject });
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`${method}: no answer within ${requestTimeout / 1000}s`));
+        }, requestTimeout);
+        pending.set(id, {
+          method,
+          resolve: (value) => (clearTimeout(timer), resolve(value)),
+          reject: (err) => (clearTimeout(timer), reject(err)),
+        });
         ws.send(JSON.stringify({ id, method, params }));
       }),
     onEvent: (listener) => listeners.push(listener),
@@ -290,6 +302,15 @@ async function main() {
     console.log(output.join("").split("\n").slice(-60).join("\n"));
     console.log(`--- app exit: ${exitInfo ? JSON.stringify(exitInfo) : "still running"} ---`);
   };
+
+  // Whatever else goes wrong, this ends the run with the app's own output
+  // rather than leaving CI to hit its job limit with nothing to read.
+  const watchdog = setTimeout(() => {
+    console.error(`\nSmoke test exceeded ${overallTimeout / 60_000} minutes; giving up.`);
+    printAppOutput();
+    process.exit(1);
+  }, overallTimeout);
+  watchdog.unref();
 
   const rendererProblems = [];
   let page;
