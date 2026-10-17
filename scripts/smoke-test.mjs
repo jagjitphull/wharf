@@ -454,6 +454,26 @@ async function main() {
     await check("app quits cleanly when asked", async () => {
       const version = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5_000) })).json();
       browser = await connectCdp(version.webSocketDebuggerUrl);
+      if (isMac) {
+        // By macOS convention the app keeps running after its last window closes
+        // (Wharf follows that, see window-all-closed), and Browser.close then never
+        // answers. So: closing the windows must leave no window, and a terminate
+        // request (what Cmd+Q and a shutdown amount to) must end the process.
+        void browser.send("Browser.close").catch(() => {});
+        await sleep(2_000);
+        const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(5_000) })).json();
+        const windows = targets.filter((t) => t.type === "page");
+        if (windows.length > 0) throw new Error(`${windows.length} window(s) still open after Browser.close`);
+        child.kill("SIGTERM");
+        const result = await Promise.race([
+          exited,
+          sleep(stepTimeout).then(() => {
+            throw new Error("still running 30s after SIGTERM");
+          }),
+        ]);
+        if (result.code !== 0 && result.signal !== "SIGTERM") throw new Error(`exit code ${result.code} (signal ${result.signal})`);
+        return "windows closed; stays running as macOS apps do; ended on SIGTERM";
+      }
       await browser.send("Browser.close").catch(() => {});
       const result = await Promise.race([
         exited,
