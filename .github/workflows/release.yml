@@ -31,7 +31,7 @@ jobs:
     # reachable from a tag push — never from a pull request or a rehearsal.
     environment: ${{ github.ref_type == 'tag' && 'release' || '' }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -102,10 +102,16 @@ jobs:
           PACKAGE_ARGS: ${{ matrix.package-args }}
           PLATFORM: ${{ matrix.id }}
         run: |
+          # A secret that doesn't exist arrives as an empty string, and
+          # electron-builder treats an empty CSC_LINK as a path (the current
+          # directory: "not a file"), so drop every variable that is empty.
+          for var in WIN_CSC_LINK WIN_CSC_KEY_PASSWORD CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!var}" ] || unset "$var"
+          done
           signing=none
           case "$PLATFORM" in
-            windows) [ -n "$WIN_CSC_LINK" ] && signing=windows ;;
-            macos) [ -n "$CSC_LINK" ] && signing=macos ;;
+            windows) if [ -n "${WIN_CSC_LINK:-}" ]; then signing=windows; fi ;;
+            macos) if [ -n "${CSC_LINK:-}" ]; then signing=macos; fi ;;
           esac
           if [ "$signing" = none ]; then
             export CSC_IDENTITY_AUTO_DISCOVERY=false
@@ -113,7 +119,7 @@ jobs:
               echo "::warning::Packaging $PLATFORM unsigned: no signing certificate secret is configured."
             fi
           fi
-          if [ "$signing" = macos ] && [ -z "$APPLE_ID$APPLE_TEAM_ID" ]; then
+          if [ "$signing" = macos ] && [ -z "${APPLE_ID:-}${APPLE_TEAM_ID:-}" ]; then
             echo "::warning::macOS is signed but not notarized: APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are not all set."
           fi
           echo "SIGNING=$signing" >> "$GITHUB_ENV"
