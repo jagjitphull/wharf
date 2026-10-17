@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload smoke-test screenshot
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-screenshot-${{ github.sha }}
           path: ${{ runner.temp }}/smoke-screenshot.png
@@ -84,7 +84,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Linux build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wharf-linux-${{ github.sha }}
           path: |
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload smoke-test screenshot
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-screenshot-${{ matrix.name }}-${{ github.sha }}
           path: ${{ runner.temp }}/smoke-screenshot.png
