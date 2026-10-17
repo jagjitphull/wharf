@@ -13,6 +13,7 @@ const emptyForm = (hostId: string): TunnelInput => ({
   srcPort: 8080,
   dstHost: "127.0.0.1",
   dstPort: 80,
+  autoStart: false,
 });
 
 export function Tunnels() {
@@ -24,9 +25,20 @@ export function Tunnels() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    return wharf.tunnels.onState(({ tunnelId, status, error }) => {
+    const off = wharf.tunnels.onState(({ tunnelId, status, error }) => {
       setStatuses((prev) => ({ ...prev, [tunnelId]: { status, error } }));
     });
+    // Tunnels that started before this panel was open (automatically at
+    // launch, or from an earlier visit) won't send another event, so ask for
+    // where they stand now. Anything that changed in the meantime wins.
+    void wharf.tunnels.statuses().then((known) => {
+      setStatuses((prev) => {
+        const next = { ...prev };
+        for (const { tunnelId, status, error } of known) next[tunnelId] ??= { status, error };
+        return next;
+      });
+    });
+    return off;
   }, []);
 
   async function createTunnel(e: React.FormEvent) {
@@ -46,6 +58,16 @@ export function Tunnels() {
     if (!confirm("Delete this tunnel?")) return;
     await wharf.tunnels.remove(id);
     await refreshTunnels();
+  }
+
+  async function toggleAutoStart(id: string, enabled: boolean) {
+    setError(null);
+    try {
+      await wharf.tunnels.setAutoStart(id, enabled);
+      await refreshTunnels();
+    } catch (err) {
+      setError(ipcErrorMessage(err));
+    }
   }
 
   async function toggleTunnel(id: string, running: boolean) {
@@ -116,6 +138,10 @@ export function Tunnels() {
               </label>
             </div>
           )}
+          <label className="tunnel-autostart">
+            <input type="checkbox" checked={form.autoStart ?? false} onChange={(e) => setForm({ ...form, autoStart: e.target.checked })} />
+            Start automatically when Wharf launches
+          </label>
           <div className="dialog-actions">
             <button type="button" className="btn ghost" onClick={() => setShowForm(false)}>
               Cancel
@@ -146,6 +172,10 @@ export function Tunnels() {
                 </div>
               </div>
               <div className="tunnel-actions">
+                <label className="tunnel-autostart" title="Start this tunnel automatically each time Wharf launches">
+                  <input type="checkbox" checked={t.autoStart ?? false} onChange={(e) => void toggleAutoStart(t.id, e.target.checked)} />
+                  On launch
+                </label>
                 <button className="btn ghost small" onClick={() => toggleTunnel(t.id, running)}>
                   {running ? "Stop" : "Start"}
                 </button>

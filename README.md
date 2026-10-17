@@ -72,7 +72,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   sessions), implemented natively since this app talks SSH directly
   rather than shelling out to the system `ssh`
 - Port forwarding — local, remote & dynamic (SOCKS5) SSH tunnels, managed
-  from a Tunnels panel
+  from a Tunnels panel. Tick **On launch** on a tunnel and Wharf starts it by itself every time
+  the app opens (one that can't start, say because the port is taken, shows its error in the panel
+  and doesn't hold up the others; tunnels to the same host share one connection).
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
@@ -138,7 +140,7 @@ A personal SSH/SFTP terminal client, Termius-style.
   timestamp and a per-block menu: copy the command, copy just its output,
   re-run it, bookmark it, or (on a failed command) "Explain & Fix…". Driven
   by a small, standard shell-integration script (OSC 133, the same protocol
-  iTerm2/VS Code/Warp use) sent to bash/zsh sessions on connect — see Known
+  iTerm2/VS Code/Warp use) sent to bash/zsh/fish sessions on connect — see Known
   limitations below for what that means for other shells and for SSH/Mosh.
   Toggle it off in Settings → Command Blocks if you'd rather not have it
   sent to new sessions
@@ -187,10 +189,14 @@ A personal SSH/SFTP terminal client, Termius-style.
   is just left out rather than shown as an error
 - Update check — Settings → About shows the installed version and a **Check for updates** button; a
   newer release also shows as a small "Update available" pill in the status bar, which opens its
-  download page. Wharf never updates itself. A check is a single request to GitHub's public releases
-  API (nothing about you or your hosts is sent); an installed build makes one quiet check shortly
-  after launch unless you turn **Check on launch** off, and a failed background check (offline, no
-  release yet) is only logged
+  download page. The **AppImage** build can then update itself in place: **Download and install**
+  fetches the new AppImage from the GitHub release, checks it against the SHA-512 published in the
+  release's `latest-linux.yml` (a mismatch is refused and nothing is replaced), swaps it in for the
+  running file and restarts on **Restart to install**. Nothing downloads or installs without that
+  click. A `.deb` install is owned by your package manager, so it only gets the link. A check is a
+  single request to GitHub's public releases API (nothing about you or your hosts is sent); an
+  installed build makes one quiet check shortly after launch unless you turn **Check on launch** off,
+  and a failed background check (offline, no release yet) is only logged
 - Crash recovery and logging — an unhandled renderer error shows a reload
   screen instead of a blank window, a crashed renderer reloads itself
   automatically (capped after repeated crashes in a row), and both main-
@@ -256,17 +262,20 @@ Unit tests live next to the code they cover (`*.test.ts`) and run on plain Node 
 They currently cover the security- and data-sensitive modules: `knownHosts.ts` (host-key
 verification), `secretStore.ts` (encrypt/decrypt and the decrypt-failure error), `sshConfigParser.ts`
 (`~/.ssh/config` import), `shellIntegration.ts` (the OSC 133 hooks, which are exercised against
-real `bash`, and `zsh` when installed), `dataFileRecovery.ts` (moving a corrupt data file aside),
-`windowBounds.ts` (is a saved window position still on a connected display), `security.ts`
-(which URLs may be opened and which permissions are granted) and `updateCheck.ts`
-(version comparison and the release-check responses).
+real `bash`, `fish` and, when installed, `zsh`), `dataFileRecovery.ts` (moving a corrupt data file aside),
+`windowBounds.ts` (is a saved window position still on a connected display), `dataFilePermissions.ts`
+(owner-only data file), `security.ts`
+(which URLs may be opened and which permissions are granted) `updateCheck.ts`
+(version comparison and the release-check responses) and `selfUpdate.ts` (the in-place update's
+states and guards, with the updater stubbed).
 
 The SSH stack is tested end to end against a **real SSH server running inside the test process**
 (`src/main/testing/sshTestServer.ts`, built on `ssh2`'s `Server`), not mocks: `sshManager.test.ts`
 (shell sessions, resize, wrong password, rejected host key, one connection shared by several
 sessions, jump hosts, reconnect after a dropped connection), `sftpManager.test.ts` (listing, editing,
 file operations, upload/download with progress, server-to-server copy, search limits) and
-`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, restart after a drop).
+`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, restart after a drop,
+starting marked tunnels at launch).
 Only Electron's windows, the saved-host and secret stores and the interactive host-key prompt are
 stubbed. Test files and the test server are excluded from the packaged app, but `npm run typecheck`
 still type-checks them.
@@ -289,7 +298,10 @@ to save a screenshot.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
 full Linux `npm run package` on every pull request and every push to `main`, then runs the smoke
-test against the unpacked build and uploads the `.AppImage` and `.deb` as build artifacts.
+test against the unpacked build and uploads the `.AppImage` and `.deb` as build artifacts. It runs
+with a read-only `GITHUB_TOKEN`, and fails if `npm audit --omit=dev` reports a high or critical
+advisory in a runtime dependency. Dependabot (`.github/dependabot.yml`) opens a weekly PR for npm and
+GitHub Actions updates, with minor and patch updates grouped.
 
 ## Installing on Ubuntu / Debian
 
@@ -325,8 +337,9 @@ step to fix that itself the way the `.deb` package does — run it with `--no-sa
 ## Releasing
 
 Releases are cut by pushing a version tag; `.github/workflows/release.yml` does the rest (the same
-lint, format, typecheck and tests as CI, then `npm run package`, then a GitHub Release with the
-`.AppImage`, the `.deb` and a `SHA256SUMS` file attached):
+audit, lint, format, typecheck and tests as CI, then `npm run package`, the launch smoke test on the
+packaged build, then a GitHub Release with the `.AppImage`, the `.deb` and a `SHA256SUMS` file
+attached):
 
 ```bash
 npm version 0.2.0 --no-git-tag-version   # bumps package.json and the lockfile
@@ -336,7 +349,8 @@ git tag v0.2.0 && git push origin v0.2.0
 
 The workflow refuses to publish if the tag doesn't match `package.json`'s version, uses only the
 built-in `GITHUB_TOKEN` (no personal access token), and treats a tag with a hyphen (`v0.2.0-rc.1`) as a
-pre-release — which the in-app update check ignores. To rehearse without publishing, run it by hand
+pre-release — which the in-app update check ignores. The release also carries `latest-linux.yml`, which
+the AppImage's in-place update reads to find the new file and its checksum. To rehearse without publishing, run it by hand
 from the Actions tab (**Release → Run workflow**, available once the workflow is on the default
 branch): it builds and uploads the files as a workflow artifact only. Downloaders can check a file with
 `sha256sum -c SHA256SUMS`.
@@ -347,7 +361,9 @@ On Linux everything lives in `~/.config/Wharf/`:
 
 - `wharf-data.json` — hosts, groups, tunnels, snippets, workspaces, settings and the (encrypted)
   secrets. Passwords and key passphrases are encrypted with the OS keychain via Electron's
-  `safeStorage`; see the known limitation below for systems without one.
+  `safeStorage`; see the known limitation below for systems without one. The file and this folder
+  are readable and writable by your user only (mode 600 / 700); earlier versions created the file
+  world-readable, and Wharf tightens an existing one on launch.
 - `logs/main.log` — a log of app activity and errors from both the main process and the renderer's
   console, rotated at 1 MB (the previous file is kept as `main.old.log`). **Settings → About → Open
   logs folder** opens it — attach this file when reporting a problem.
@@ -392,10 +408,12 @@ src/
       tunnelManager.ts       local/remote/dynamic SSH port forwarding
       knownHosts.ts           ~/.ssh/known_hosts-compatible host-key verification (TOFU)
       sshConfigParser.ts      ~/.ssh/config parser for the import dialog
-      updateCheck.ts          GitHub releases "is there a newer version" check (no self-update)
-      shellIntegration.ts     OSC 133 bash/zsh hooks behind Command Blocks and exit codes
+      updateCheck.ts          GitHub releases "is there a newer version" check
+      selfUpdate.ts           in-place update for the AppImage build (electron-updater)
+      shellIntegration.ts     OSC 133 bash/zsh/fish hooks behind Command Blocks and exit codes
       dataFileRecovery.ts     moves a corrupt wharf-data.json aside before the store loads it
       windowBounds.ts         is a saved window position still on a connected display
+      dataFilePermissions.ts  makes the data file and folder owner-only
       security.ts             allowed external URLs and web permissions (deny by default)
       aiSuggest.ts            AI autocomplete / explain / generate (provider SDKs loaded lazily)
       *.test.ts               vitest tests, next to the module they cover
@@ -416,29 +434,39 @@ src/main/testing/
 scripts/
   verify-pty.js          postinstall check that node-pty actually loads under Electron
   smoke-test.mjs         launches the packaged app and checks it works (npm run smoke)
-.github/workflows/ci.yml  lint, format, typecheck, test, build, package and smoke test on every PR
+.github/workflows/ci.yml  audit, lint, format, typecheck, test, build, package and smoke test on every PR
+.github/dependabot.yml    weekly npm and GitHub Actions update PRs
 ```
 
 ## Known limitations
 
 - When a shared connection drops, every session/SFTP-browse/tunnel that
-  was using it reconnects independently and through the same shared pool
-  — so a session that reconnects quickly can end up sharing its new
-  connection with others reconnecting to the same host afterward (or with
-  a brand new tab opened to that host during the outage), but two
-  sessions that both drop and start reconnecting at essentially the same
-  instant will usually each dial their own fresh connection rather than
-  perfectly re-grouping onto one, since neither's dial is done yet when
-  the other starts (the same inherent race as two simultaneous first-time
-  connects to a host that was never pooled before).
+  was using it reconnects independently, each through the same shared
+  pool. Anything that asks for the host while a dial to it is already in
+  progress waits for that dial and shares it, so they end up back on one
+  connection; the catch is that each one decides to reconnect on its own
+  backoff schedule, so a session whose retry comes later than the others'
+  simply joins the connection they re-established.
 - Secrets fall back to a weaker (base64, clearly marked) storage format on
   Linux systems with no OS keychain/secret-service available, since
   Electron's `safeStorage.isEncryptionAvailable()` can return false there.
+  This is no longer silent: Settings shows a warning (and the host dialog a note next to the
+  password field) whenever it applies, `wharf-data.json` and its folder are owner-only, and the
+  next launch after you install and unlock a keyring re-encrypts what was saved. What Wharf
+  doesn't have is a master password for machines that will never have a keyring; an SSH agent or
+  a key without a passphrase avoids storing anything.
 - `knownHosts.ts` supports exact-host and `*`/`?` glob patterns (including
-  `!negation`), hashed (`HashKnownHosts`) entries, and `@revoked` (a
-  revoked key is always refused, with no "trust anyway" option, even if
-  it matches the host), but not the full OpenSSH known_hosts spec — no
-  CIDR ranges or `@cert-authority` (CA-signed host certificates).
+  `!negation`), `[host]:port`, hashed (`HashKnownHosts`) entries, and `@revoked`
+  (a revoked key is always refused, with no "trust anyway" option, even if
+  it matches the host). CIDR ranges aren't part of the known_hosts format
+  (OpenSSH only uses them for `Match Address` and `from=`), so there is
+  nothing to add there. `@cert-authority` (CA-signed host certificates) is
+  recognized but can't be used: checking a host certificate means negotiating
+  the `*-cert-v01@openssh.com` host-key algorithms, which the SSH library
+  (ssh2, including its latest release) doesn't offer, so the server only ever
+  sends its plain key. A host covered by such a line is treated as unknown and
+  gets the normal trust prompt, with a note saying why; the CA's key is never
+  accepted as the host's own.
 - Local shell tabs use [`node-pty`](https://github.com/microsoft/node-pty),
   a native addon that has to compile during `npm install` (it has no
   prebuilt binary for Linux). `postinstall` (`scripts/verify-pty.js`) checks
@@ -479,10 +507,15 @@ scripts/
   to the underlying ssh command, same as a direct connection would use.
 - Command Blocks (and the AI's "Explain & Fix…") need the session's shell
   to support the OSC 133 shell-integration hooks Wharf sends — currently
-  bash and zsh only; any other shell (fish, a restricted shell, etc.) just
+  bash, zsh and fish; any other shell (a restricted shell, dash, PowerShell, etc.) just
   never emits the block-boundary sequences, so the panel stays empty and
-  nothing else about the session is affected. For a local shell tab the
-  integration script loads invisibly (via `--rcfile`/`ZDOTDIR`); for SSH and
+  nothing else about the session is affected. fish 4 and later write these sequences
+  themselves, so Wharf installs nothing there (the block's command text then comes from
+  what was typed rather than from the shell, since fish's own marker doesn't carry it);
+  on fish 3 Wharf's hooks wrap your own `fish_prompt`. A remote fish older than 3.4
+  can't parse the one-line bootstrap (no `$(…)` syntax) and prints a syntax error once
+  at connect. For a local shell tab the
+  integration script loads invisibly (via `--rcfile`/`ZDOTDIR`/`--init-command`); for SSH and
   Mosh sessions — where Wharf doesn't control how the remote shell starts —
   it's delivered as one base64 line of real typed input shortly after
   connect, so it's visible once in the terminal/scrollback by design (hiding
@@ -532,7 +565,12 @@ scripts/
   self-contained file with esbuild (`npm run build:preload`) so it has no
   relative imports left to resolve at runtime.
 - Host passwords and key passphrases are never written to disk in
-  plaintext; only their `secretId` reference lives on the `HostRecord`.
+  plaintext; only their `secretId` reference lives on the `HostRecord`. Without an OS keyring they
+  are only base64-encoded, and Wharf says so in Settings (see Known limitations).
+- The data file is created owner-only (mode 600, folder 700). The store library's default is
+  world-readable, which would have exposed every saved host (and any base64-stored password) to
+  other users of the machine and let them rewrite it. The launch smoke test fails if the packaged
+  app ever leaves it looser.
 - `will-navigate` and `setWindowOpenHandler` are locked down so a
   compromised or malicious remote shell can't pivot into opening arbitrary
   URLs inside the app. Links that do open in the browser (terminal links, the update
@@ -552,7 +590,10 @@ scripts/
   that touches a password, key passphrase, API key or terminal content should ever be passed to
   `console.*` or `log.*`. Today's log calls are limited to error objects and event descriptions.
 - The only network request Wharf makes on its own is the optional launch-time update check described
-  above (to `api.github.com`, through the system's proxy settings); hosts you connect to, AI providers
+  above (to `api.github.com`, through the system's proxy settings). Downloading an update happens only
+  when you click it. It trusts the same thing downloading the file by hand does, the release on this
+  repository's GitHub page, plus the checksum in `latest-linux.yml`; there is no code signature to
+  check on Linux, so anyone who can publish a release can ship an update; hosts you connect to, AI providers
   you configure, and your Ollama server are contacted only when you use those features. The returned
   release link is only ever opened if it points at this repository on github.com.
 - Only one Wharf process may run per user (single-instance lock), so the data file never has two

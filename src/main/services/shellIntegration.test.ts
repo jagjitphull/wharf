@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -10,6 +10,14 @@ vi.mock("electron", () => ({ app: { getPath: () => state.userData } }));
 const hasShell = (name: string): boolean => spawnSync(name, ["-c", "true"]).status === 0;
 const hasBash = hasShell("bash");
 const hasZsh = hasShell("zsh");
+const hasFish = hasShell("fish");
+// /bin/sh is dash on Debian/Ubuntu, but bash (in POSIX mode, still setting
+// $BASH_VERSION) on macOS: the "neither bash, zsh nor fish" tests need a sh that really is neither.
+const hasPlainSh = spawnSync("sh", ["-c", 'test -z "$BASH_VERSION$ZSH_VERSION$FISH_VERSION"']).status === 0;
+// A pty to run an interactive fish in (fish only fires its preexec/postexec
+// events interactively): util-linux's `script` provides one.
+const hasScript = spawnSync("script", ["--version"]).status === 0;
+const canRunFishInPty = hasFish && hasScript;
 
 const OSC_PROMPT_START = "\x1b]133;A\x07";
 const b64 = (s: string): string => Buffer.from(s, "utf8").toString("base64");
@@ -26,11 +34,31 @@ afterEach(() => {
   rmSync(state.userData, { recursive: true, force: true });
 });
 
-/** Pulls the two base64 hook bodies back out of the bootstrap line. */
-function decodedHooks(command: string): { bash: string; zsh: string } {
+/** Pulls the three base64 hook bodies back out of the bootstrap line. */
+function decodedHooks(command: string): { bash: string; zsh: string; fish: string } {
   const payloads = [...command.matchAll(/echo ([A-Za-z0-9+/=]+) \| base64 -d/g)].map((m) => Buffer.from(m[1], "base64").toString("utf8"));
-  expect(payloads).toHaveLength(2);
-  return { bash: payloads[0], zsh: payloads[1] };
+  expect(payloads).toHaveLength(3);
+  return { bash: payloads[0], zsh: payloads[1], fish: payloads[2] };
+}
+
+/** Types `lines` into an interactive fish (no user config) running in a pty,
+ * after `fishArgs`, and returns everything it wrote. */
+function runFishInPty(fishArgs: string[], lines: string[]): string {
+  const quoted = ["fish", "--no-config", ...fishArgs, "-i"].map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(" ");
+  const result = spawnSync("script", ["-qfc", quoted, "/dev/null"], {
+    input: `${lines.join("\n")}\nexit\n`,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH, TERM: "xterm", HOME: state.userData },
+    timeout: 20000,
+  });
+  return result.stdout.replace(/\r/g, "\n");
+}
+
+/** The ;C/;D markers a pty run produced, in order: "C:<decoded command>" and "D:<exit code>". */
+function markersOf(output: string): string[] {
+  return [...output.matchAll(/\x1b\]133;([CD]);?([^\x07]*)\x07/g)].map(([, kind, arg]) =>
+    kind === "C" ? `C:${Buffer.from(arg, "base64").toString("utf8")}` : `D:${arg}`,
+  );
 }
 
 describe("buildRemoteBootstrapCommand", () => {
@@ -38,8 +66,10 @@ describe("buildRemoteBootstrapCommand", () => {
     expect(mod.buildRemoteBootstrapCommand()).not.toMatch(/[\r\n]/);
   });
 
-  it("embeds the bash and zsh hooks as base64 payloads that decode to the OSC 133 hook bodies", () => {
-    const { bash, zsh } = decodedHooks(mod.buildRemoteBootstrapCommand());
+  it("embeds the bash, zsh and fish hooks as base64 payloads that decode to the OSC 133 hook bodies", () => {
+    const { bash, zsh, fish } = decodedHooks(mod.buildRemoteBootstrapCommand());
+    expect(fish).toContain("--on-event fish_preexec");
+    expect(fish).toContain("133;D;");
     expect(bash).toContain("PROMPT_COMMAND");
     expect(bash).toContain("133;D;");
     expect(zsh).toContain("add-zsh-hook precmd");
@@ -51,8 +81,26 @@ describe("buildRemoteBootstrapCommand", () => {
     expect(result.status).toBe(0);
   });
 
-  it("is a silent no-op on a shell that is neither bash nor zsh", () => {
-    // /bin/sh is dash on Debian/Ubuntu: neither $BASH_VERSION nor $ZSH_VERSION is set.
+  it.skipIf(!hasFish)("is syntactically valid fish too (every shell has to parse the whole line)", () => {
+    const file = path.join(state.userData, "bootstrap.fish");
+    writeFileSync(file, mod.buildRemoteBootstrapCommand());
+    const result = spawnSync("fish", ["--no-config", "--no-execute", file], { encoding: "utf8" });
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
+  it.skipIf(!hasShell("dash"))("is syntactically valid POSIX sh, for minimal remote hosts", () => {
+    const result = spawnSync("dash", ["-n"], { input: mod.buildRemoteBootstrapCommand(), encoding: "utf8" });
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
+  it.skipIf(!hasBash)("leaves $? at 0, so the first prompt after connecting doesn't look like a failure", () => {
+    const out = execFileSync("bash", ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; echo "status=$?"`], { encoding: "utf8" });
+    expect(out).toContain("status=0");
+  });
+
+  it.skipIf(!hasPlainSh)("is a silent no-op, exiting 0, on a shell that is neither bash, zsh nor fish", () => {
     const out = execFileSync("sh", ["-c", mod.buildRemoteBootstrapCommand()], { encoding: "utf8", env: { PATH: process.env.PATH } });
     expect(out).toBe("");
   });
@@ -82,10 +130,18 @@ describe("buildRemoteBootstrapCommand", () => {
 
 describe("prepareLocalShellIntegration", () => {
   it("returns null for shells that aren't supported, so they spawn exactly as before", () => {
-    expect(mod.prepareLocalShellIntegration("/usr/bin/fish")).toBeNull();
     expect(mod.prepareLocalShellIntegration("/bin/sh")).toBeNull();
     expect(mod.prepareLocalShellIntegration("")).toBeNull();
     expect(mod.prepareLocalShellIntegration("powershell.exe")).toBeNull();
+  });
+
+  it("gives fish the hooks as an --init-command, which runs after the user's own config", () => {
+    const result = mod.prepareLocalShellIntegration("/usr/bin/fish");
+    expect(result).not.toBeNull();
+    expect(result!.args[0]).toBe("--init-command");
+    expect(result!.args[1]).toContain("--on-event fish_preexec");
+    expect(result!.args).toHaveLength(2);
+    expect(result!.env).toEqual({});
   });
 
   it("gives bash a generated --rcfile that sources the user's ~/.bashrc and then the hooks", () => {
@@ -210,5 +266,55 @@ describe("BootstrapEchoSuppressor", () => {
     vi.advanceTimersByTime(1000);
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledExactlyOnceWith("fresh");
+  });
+});
+
+describe.skipIf(!canRunFishInPty)("fish integration, run for real in a pty", () => {
+  it("reports each command's text and exit code, in order", () => {
+    const hooks = mod.prepareLocalShellIntegration("fish")!;
+    const out = runFishInPty(hooks.args, ["echo hi", "false", "sh -c 'exit 7'"]);
+    // (the trailing `exit` the helper types adds one more C/D pair after these)
+    expect(markersOf(out).slice(0, 6)).toEqual(["C:echo hi", "D:0", "C:false", "D:1", "C:sh -c 'exit 7'", "D:7"]);
+  });
+
+  it("brackets every prompt with prompt-start and prompt-end markers", () => {
+    const out = runFishInPty(mod.prepareLocalShellIntegration("fish")!.args, ["true"]);
+    const a = out.match(/\x1b\]133;A\x07/g)?.length ?? 0;
+    const b = out.match(/\x1b\]133;B\x07/g)?.length ?? 0;
+    expect(a).toBeGreaterThanOrEqual(2);
+    expect(b).toBe(a);
+    expect(out.indexOf("\x1b]133;A\x07")).toBeLessThan(out.indexOf("\x1b]133;B\x07"));
+  });
+
+  it("keeps the user's own prompt, including one that reads $status", () => {
+    const own = 'function fish_prompt; echo -n "[st=$status]> "; end';
+    const out = runFishInPty(["--init-command", own, ...mod.prepareLocalShellIntegration("fish")!.args], ["false", "true"]);
+    expect(out).toContain("[st=1]> ");
+    expect(out).toContain("[st=0]> ");
+  });
+
+  it("handles command text that would break a naive payload (;, quotes, unicode)", () => {
+    const text = "echo 'a;b' \"c\" é✓";
+    const out = runFishInPty(mod.prepareLocalShellIntegration("fish")!.args, [text]);
+    expect(markersOf(out)).toContain(`C:${text}`);
+  });
+
+  it("is loaded by the one-line remote bootstrap, typed into a fish session", () => {
+    const out = runFishInPty([], [mod.buildRemoteBootstrapCommand().trim(), "echo remote"]);
+    expect(markersOf(out)).toContain("C:echo remote");
+    expect(markersOf(out)).toContain("D:0");
+    expect(out).not.toMatch(/error|Unknown command|Expected/i);
+  });
+
+  it("installs nothing when the shell is fish 4 or later, which writes the markers itself", () => {
+    const { fish } = decodedHooks(mod.buildRemoteBootstrapCommand());
+    // `version` is read-only in fish, so run the same script with the version swapped in.
+    const asFish4 = fish.replace("(string split . -- $version)", "(string split . -- 4.1.0)");
+    const out = runFishInPty(
+      ["--init-command", asFish4, "--init-command", "functions -q __wharf_preexec; and echo HOOKS-PRESENT; or echo HOOKS-ABSENT"],
+      ["echo x"],
+    );
+    expect(out).toContain("HOOKS-ABSENT");
+    expect(markersOf(out)).toEqual(expect.not.arrayContaining(["C:echo x"]));
   });
 });

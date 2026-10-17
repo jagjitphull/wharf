@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { generateKeyPairSync } from "node:crypto";
 import { Server, utils, type Connection, type SFTPWrapper } from "ssh2";
@@ -21,6 +22,8 @@ const { STATUS_CODE, flagsToString } = utils.sftp;
 
 export interface TestSshServer {
   port: number;
+  /** The server's public host key in SSH wire format — what a known_hosts line holds (base64). */
+  hostKeyBlob: Buffer;
   /** Directory the SFTP server exposes as "/". */
   root: string;
   /** Connections currently open / ever opened. */
@@ -215,7 +218,7 @@ function serveSftp(sftp: SFTPWrapper, root: string): void {
 }
 
 export async function startTestSshServer(): Promise<TestSshServer> {
-  const root = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR ?? "/tmp"), "wharf-sshtest-"));
+  const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "wharf-sshtest-"));
   const hostKey = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs1", format: "pem" },
@@ -301,8 +304,13 @@ export async function startTestSshServer(): Promise<TestSshServer> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as net.AddressInfo).port;
 
+  const parsedHostKey = utils.parseKey(hostKey);
+  if (parsedHostKey instanceof Error) throw parsedHostKey;
+  const hostKeyBlob = Array.isArray(parsedHostKey) ? parsedHostKey[0].getPublicSSH() : parsedHostKey.getPublicSSH();
+
   return {
     port,
+    hostKeyBlob,
     root,
     stats,
     connectInbound(bindPort, payload, opts) {

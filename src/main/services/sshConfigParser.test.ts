@@ -23,6 +23,7 @@ beforeEach(async () => {
   mkdirSync(sshDir, { recursive: true });
   configPath = path.join(sshDir, "config");
   vi.stubEnv("HOME", tmpHome);
+  vi.stubEnv("USERPROFILE", tmpHome); // os.homedir() reads this on Windows
   vi.resetModules();
   mod = await import("./sshConfigParser");
 });

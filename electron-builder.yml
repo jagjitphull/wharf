@@ -7,6 +7,14 @@ productName: Wharf
 # in the dependency tree is native, so skipping electron-builder's rebuild
 # step is safe and avoids it needing network access to Electron's headers.
 npmRebuild: false
+# Where an installed build looks for updates (written into the package as
+# app-update.yml) and what `latest-linux.yml` describes. Nothing is ever
+# published from here: `npm run package` passes --publish never, and releases
+# are made by .github/workflows/release.yml.
+publish:
+  provider: github
+  owner: jagjitphull
+  repo: wharf
 directories:
   output: release
   buildResources: resources

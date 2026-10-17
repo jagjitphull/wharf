@@ -2,6 +2,7 @@ import path from "node:path";
 import { app } from "electron";
 import Store from "electron-store";
 import { moveAsideIfCorrupt } from "./dataFileRecovery";
+import { restrictToOwner } from "./dataFilePermissions";
 import type {
   AiProvider,
   AiProviderConfig,
@@ -75,6 +76,11 @@ const dataFilePath = path.join(app.getPath("userData"), "wharf-data.json");
  * guaranteed to show). */
 export const recoveredFromCorruptDataFile: string | null = moveAsideIfCorrupt(dataFilePath);
 
+// The store creates its file world-readable by default — see restrictToOwner.
+// This fixes an existing file/directory; `configFileMode` below keeps new
+// writes owner-only.
+const tightened = restrictToOwner(app.getPath("userData"), dataFilePath);
+
 /**
  * Single persisted JSON store (via electron-store, which writes to the OS
  * user-data directory) for everything that isn't a raw secret. Deliberately
@@ -84,7 +90,11 @@ export const recoveredFromCorruptDataFile: string | null = moveAsideIfCorrupt(da
 export const store = new Store<Schema>({
   name: "wharf-data",
   defaults,
+  configFileMode: 0o600,
 });
+
+/** What restrictToOwner changed at startup, so index.ts can log it once logging is up. */
+export const permissionsTightened: readonly string[] = tightened;
 
 // One-time migration from the pre-multi-provider single Claude key field
 // (`aiApiKeySecretId`, now removed from Schema) into the new per-provider

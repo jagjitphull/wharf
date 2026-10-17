@@ -72,6 +72,8 @@ const api: WharfApi = {
     remove: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.remove, tunnelId),
     start: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.start, tunnelId),
     stop: (tunnelId) => ipcRenderer.invoke(IPC.tunnels.stop, tunnelId),
+    setAutoStart: (tunnelId, enabled) => ipcRenderer.invoke(IPC.tunnels.setAutoStart, tunnelId, enabled),
+    statuses: () => ipcRenderer.invoke(IPC.tunnels.statuses),
     onState: (cb) => on(IPC.tunnels.onState, cb as (...args: unknown[]) => void),
   },
   window: {
@@ -92,6 +94,9 @@ const api: WharfApi = {
     openExternal: (url) => ipcRenderer.invoke(IPC.shell.openExternal, url),
     openLogsFolder: () => ipcRenderer.invoke(IPC.shell.openLogsFolder),
   },
+  secrets: {
+    status: () => ipcRenderer.invoke(IPC.secrets.status),
+  },
   update: {
     check: () => ipcRenderer.invoke(IPC.update.check),
     getVersion: () => ipcRenderer.invoke(IPC.update.getVersion),
@@ -99,6 +104,11 @@ const api: WharfApi = {
     getAutoCheck: () => ipcRenderer.invoke(IPC.update.getAutoCheck),
     setAutoCheck: (enabled) => ipcRenderer.invoke(IPC.update.setAutoCheck, enabled),
     onAvailable: (cb) => on(IPC.update.onAvailable, cb as (...args: unknown[]) => void),
+    canSelfUpdate: () => ipcRenderer.invoke(IPC.update.canSelfUpdate),
+    selfUpdateState: () => ipcRenderer.invoke(IPC.update.selfUpdateState),
+    downloadUpdate: () => ipcRenderer.invoke(IPC.update.downloadUpdate),
+    installUpdate: () => ipcRenderer.invoke(IPC.update.installUpdate),
+    onSelfUpdateState: (cb) => on(IPC.update.onSelfUpdateState, cb as (...args: unknown[]) => void),
   },
   backup: {
     export: () => ipcRenderer.invoke(IPC.backup.export),

@@ -105,7 +105,27 @@
 
 .tunnel-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+/* "Start automatically on launch": a checkbox with its label beside it, in
+   the create form and on each saved tunnel's row. */
+.tunnel-autostart,
+.tunnel-form label.tunnel-autostart {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tunnel-form .tunnel-autostart input {
+  width: auto;
+  padding: 0;
 }
 
 .hint {

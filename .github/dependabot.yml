@@ -1,0 +1,21 @@
+# Weekly update PRs, so security fixes and toolchain updates arrive on their
+# own instead of whenever someone remembers to run `npm outdated`. Minor and
+# patch updates are grouped into one PR per ecosystem to keep the noise down;
+# major versions each get their own PR since they're the ones that break things.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]

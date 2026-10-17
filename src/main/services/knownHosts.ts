@@ -11,11 +11,17 @@ import { dialog } from "electron";
  * entries) so hosts already trusted via the regular `ssh` CLI aren't
  * re-prompted; new trust decisions made here are appended in plain form.
  *
- * Deliberately scoped down from full OpenSSH semantics: exact-host or
- * `*`/`?` glob patterns (including `!negation`) and the `@revoked` marker
- * are handled, but not CIDR ranges or `@cert-authority` (CA-signed host
- * certificates) — enough to interoperate with typical known_hosts files
- * without reimplementing the whole spec.
+ * Scoped to what the format defines and what ssh2 can do: exact-host or
+ * `*`/`?` glob patterns (including `!negation`), `[host]:port`, hashed
+ * entries, and the `@revoked` marker. (CIDR ranges are not part of the
+ * known_hosts format — that's `Match Address` / `from=` territory — so there
+ * is nothing to support.) `@cert-authority` lines are recognized but can't be
+ * *used*: verifying a host certificate means negotiating the
+ * `*-cert-v01@openssh.com` host-key algorithms, which ssh2 doesn't offer, so
+ * the server only ever presents its plain key. Such a line is therefore kept
+ * out of key matching (its key is the CA's, not the host's) and only used to
+ * explain the trust prompt a CA-managed host will get — see
+ * matchesCertAuthority().
  */
 
 const KNOWN_HOSTS_PATH = path.join(homedir(), ".ssh", "known_hosts");
@@ -28,6 +34,8 @@ interface ParsedEntry {
   keyBlob: Buffer;
   /** True for a line marked `@revoked` — this key must never be trusted for this host, full stop. */
   revoked: boolean;
+  /** True for a line marked `@cert-authority` — its key is a CA's, not a host's. Never used for key matching. */
+  certAuthority: boolean;
 }
 
 function hostPortLabel(hostname: string, port: number): string {
@@ -65,12 +73,12 @@ function parseKnownHostsFile(): ParsedEntry[] {
     const parts = line.split(/\s+/);
     let idx = 0;
     let revoked = false;
+    let certAuthority = false;
     if (parts[idx]?.startsWith("@")) {
-      // @revoked is handled below; @cert-authority (CA-signed host certs) is
-      // a different trust model entirely and stays unsupported — an entry
-      // marked with it is skipped rather than mismatched into.
-      if (parts[idx] !== "@revoked") continue;
-      revoked = true;
+      // Any marker other than the two OpenSSH defines is skipped outright.
+      if (parts[idx] === "@revoked") revoked = true;
+      else if (parts[idx] === "@cert-authority") certAuthority = true;
+      else continue;
       idx += 1;
     }
 
@@ -97,12 +105,13 @@ function parseKnownHostsFile(): ParsedEntry[] {
           keyType,
           keyBlob,
           revoked,
+          certAuthority,
         });
       } catch {
         continue;
       }
     } else {
-      entries.push({ hostPatterns: hostsField.split(","), hashedHosts: [], keyType, keyBlob, revoked });
+      entries.push({ hostPatterns: hostsField.split(","), hashedHosts: [], keyType, keyBlob, revoked, certAuthority });
     }
   }
   return entries;
@@ -141,6 +150,7 @@ export function checkHostKey(hostname: string, port: number, keyBlob: Buffer): H
 
   let sameHostSameTypeSeen = false;
   for (const entry of entries) {
+    if (entry.certAuthority) continue; // a CA's key, not this host's — see matchesCertAuthority
     if (entry.keyType !== keyType) continue;
     if (!labelMatchesEntry(label, entry)) continue;
     if (entry.keyBlob.equals(keyBlob)) {
@@ -153,11 +163,19 @@ export function checkHostKey(hostname: string, port: number, keyBlob: Buffer): H
     sameHostSameTypeSeen = true;
   }
   for (const entry of entries) {
-    if (entry.keyType !== keyType || entry.revoked) continue;
+    if (entry.certAuthority || entry.keyType !== keyType || entry.revoked) continue;
     if (!labelMatchesEntry(label, entry)) continue;
     if (entry.keyBlob.equals(keyBlob)) return "match";
   }
   return sameHostSameTypeSeen ? "mismatch" : "new";
+}
+
+/** Whether known_hosts has an `@cert-authority` line covering this host — i.e.
+ * the user (or their admin) expects this host to be verified by a CA-signed
+ * certificate, which Wharf can't do. Used only to explain the trust prompt. */
+export function matchesCertAuthority(hostname: string, port: number): boolean {
+  const label = hostPortLabel(hostname, port);
+  return parseKnownHostsFile().some((entry) => entry.certAuthority && labelMatchesEntry(label, entry));
 }
 
 export function trustHostKey(hostname: string, port: number, keyBlob: Buffer): void {
@@ -230,11 +248,16 @@ export async function verifyHostKeyInteractive(hostname: string, port: number, k
     }
 
     // status === "new"
+    const caNote = matchesCertAuthority(hostname, port)
+      ? "Your known_hosts has an @cert-authority entry covering this host, but Wharf can't verify host certificates, " +
+        "so it can't use it — this is the server's plain key. Compare the fingerprint with one you trust " +
+        "(for example `ssh-keygen -lf` on the server's host key) before continuing.\n\n"
+      : "";
     const result = await dialog.showMessageBox({
       type: "question",
       title: "Verify host fingerprint",
       message: `The authenticity of host '${label}' can't be established.`,
-      detail: `Key fingerprint:\n${fingerprint}\n\nAre you sure you want to continue connecting?`,
+      detail: `${caNote}Key fingerprint:\n${fingerprint}\n\nAre you sure you want to continue connecting?`,
       buttons: ["Cancel", "Trust & Continue"],
       defaultId: 1,
       cancelId: 0,

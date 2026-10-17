@@ -127,3 +127,69 @@ describe("decrypt failure handling", () => {
     expect(mod.readSecret(id)).toBe("hunter2");
   });
 });
+
+describe("upgradeUnencryptedSecrets / countUnencryptedSecrets", () => {
+  function saveWithoutKeyring(value: string): string {
+    mockIsEncryptionAvailable.mockReturnValue(false);
+    const id = mod.saveSecret(value);
+    mockIsEncryptionAvailable.mockReturnValue(true);
+    return id;
+  }
+
+  it("counts only the base64-fallback entries", () => {
+    saveWithoutKeyring("a");
+    saveWithoutKeyring("b");
+    mod.saveSecret("c"); // keyring available: encrypted
+    expect(mod.countUnencryptedSecrets()).toBe(2);
+  });
+
+  it("re-encrypts fallback entries once a keyring is available, keeping their values", () => {
+    const a = saveWithoutKeyring("alpha");
+    const b = saveWithoutKeyring("béta ✓");
+    expect(mod.upgradeUnencryptedSecrets()).toBe(2);
+    expect(secrets[a]).toMatch(/^enc:/);
+    expect(secrets[b]).toMatch(/^enc:/);
+    expect(mod.readSecret(a)).toBe("alpha");
+    expect(mod.readSecret(b)).toBe("béta ✓");
+    expect(mod.countUnencryptedSecrets()).toBe(0);
+  });
+
+  it("leaves fallback entries alone while there is still no keyring", () => {
+    const id = saveWithoutKeyring("alpha");
+    mockIsEncryptionAvailable.mockReturnValue(false);
+    expect(mod.upgradeUnencryptedSecrets()).toBe(0);
+    expect(secrets[id]).toMatch(/^plain:/);
+    expect(mockStoreSet).toHaveBeenCalledTimes(1); // only the original save
+  });
+
+  it("doesn't touch entries that are already encrypted, and writes nothing when there's nothing to do", () => {
+    const id = mod.saveSecret("already");
+    const before = secrets[id];
+    mockStoreSet.mockClear();
+    expect(mod.upgradeUnencryptedSecrets()).toBe(0);
+    expect(secrets[id]).toBe(before);
+    expect(mockStoreSet).not.toHaveBeenCalled();
+  });
+
+  it("keeps an entry as it was if encrypting it fails, and still upgrades the others", () => {
+    const bad = saveWithoutKeyring("bad");
+    const good = saveWithoutKeyring("good");
+    const original = secrets[bad];
+    mockEncryptString.mockImplementation((plaintext: string) => {
+      if (plaintext === "bad") throw new Error("keyring went away");
+      return Buffer.from(plaintext, "utf8");
+    });
+    expect(mod.upgradeUnencryptedSecrets()).toBe(1);
+    expect(secrets[bad]).toBe(original);
+    expect(secrets[good]).toMatch(/^enc:/);
+    expect(mod.readSecret(bad)).toBe("bad");
+  });
+});
+
+describe("isEncryptionAvailable", () => {
+  it("reflects safeStorage", () => {
+    expect(mod.isEncryptionAvailable()).toBe(true);
+    mockIsEncryptionAvailable.mockReturnValue(false);
+    expect(mod.isEncryptionAvailable()).toBe(false);
+  });
+});

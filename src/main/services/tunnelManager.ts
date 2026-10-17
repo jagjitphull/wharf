@@ -2,7 +2,8 @@ import net from "node:net";
 import { randomUUID } from "node:crypto";
 import type { AcceptConnection, Client, ClientChannel, TcpConnectionDetails } from "ssh2";
 import { BrowserWindow } from "electron";
-import { IPC, type TunnelInput, type TunnelRecord, type TunnelStatus } from "../../shared/types";
+import log from "electron-log/main";
+import { IPC, type TunnelInput, type TunnelRecord, type TunnelStateEvent, type TunnelStatus } from "../../shared/types";
 import { getTunnels, setTunnels } from "./store";
 import { acquireClient, releaseClient } from "./connectionPool";
 
@@ -106,7 +107,13 @@ function pipeSocksConnection(socket: net.Socket, sshClient: Client): void {
   });
 }
 
+/** The last state broadcast for each tunnel, so a window that wasn't listening
+ * at the time (the tunnels panel opened later, or a tunnel started
+ * automatically at launch) can still ask what's going on. */
+const lastState = new Map<string, TunnelStateEvent>();
+
 function broadcastState(tunnelId: string, status: TunnelStatus, error?: string): void {
+  lastState.set(tunnelId, { tunnelId, status, error });
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send(IPC.tunnels.onState, { tunnelId, status, error });
   }
@@ -124,7 +131,35 @@ export function create(input: TunnelInput): TunnelRecord {
 
 export function remove(tunnelId: string): void {
   stop(tunnelId);
+  lastState.delete(tunnelId);
   setTunnels(getTunnels().filter((t) => t.id !== tunnelId));
+}
+
+export function setAutoStart(tunnelId: string, enabled: boolean): void {
+  const all = getTunnels();
+  if (!all.some((t) => t.id === tunnelId)) throw new Error(`Tunnel ${tunnelId} not found`);
+  setTunnels(all.map((t) => (t.id === tunnelId ? { ...t, autoStart: enabled } : t)));
+}
+
+export function statuses(): TunnelStateEvent[] {
+  return [...lastState.values()];
+}
+
+/**
+ * Starts every tunnel marked "start when Wharf launches". One failing
+ * (host down, port already taken, host key rejected) never keeps the others
+ * from starting — each failure is logged and shows up as that tunnel's
+ * error state in the panel. Resolves once every attempt has finished.
+ */
+export async function startAutoStartTunnels(): Promise<void> {
+  const wanted = getTunnels().filter((t) => t.autoStart);
+  const results = await Promise.allSettled(wanted.map((t) => start(t.id)));
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      log.warn(`Tunnel "${wanted[i].name}" didn't start automatically: ${reason}`);
+    }
+  });
 }
 
 export async function start(tunnelId: string): Promise<void> {

@@ -20,10 +20,12 @@ import { registerCommandHistoryIpc } from "./ipc/commandHistory";
 import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
 import { registerUpdateIpc, scheduleLaunchUpdateCheck } from "./ipc/update";
-import { stopAll as stopAllTunnels } from "./services/tunnelManager";
+import { registerSecretsIpc } from "./ipc/secrets";
+import { upgradeUnencryptedSecrets } from "./services/secretStore";
+import { startAutoStartTunnels, stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
-import { getWindowBounds, recoveredFromCorruptDataFile, setWindowBounds, type WindowBounds } from "./services/store";
+import { getWindowBounds, permissionsTightened, recoveredFromCorruptDataFile, setWindowBounds, type WindowBounds } from "./services/store";
 import { isOnscreen } from "./services/windowBounds";
 import { installPermissionHandlers, isAppUrl, isSafeExternalUrl } from "./security";
 
@@ -295,6 +297,13 @@ function installAppMenu(): void {
 
 app.whenReady().then(() => {
   installPermissionHandlers(session.defaultSession, isDev);
+  if (permissionsTightened.length > 0) {
+    log.warn(`Restricted to owner-only access (it was readable by other users): ${permissionsTightened.join(", ")}`);
+  }
+  // A keyring that wasn't there when these were saved may be now.
+  const upgraded = upgradeUnencryptedSecrets();
+  if (upgraded > 0) log.info(`Moved ${upgraded} saved password(s) from base64 to keyring-encrypted storage`);
+  registerSecretsIpc();
   registerHostsIpc();
   registerGroupsIpc();
   registerSshIpc();
@@ -321,6 +330,9 @@ app.whenReady().then(() => {
 
   installAppMenu();
   createWindow(true);
+  // Host-key prompts for these use native dialogs, so they don't depend on the
+  // renderer having finished loading.
+  void startAutoStartTunnels();
   scheduleLaunchUpdateCheck();
 
   if (recoveredFromCorruptDataFile) {

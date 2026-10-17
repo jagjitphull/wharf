@@ -158,11 +158,7 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
     // sessions/SFTP-browses/tunnels that were multiplexed onto the same
     // connection before it dropped can end up sharing a connection again
     // after reconnecting too, rather than each always paying for a private
-    // one. (Best-effort: if two sessions' reconnect attempts race, the
-    // second may not see the first's still-in-flight dial and end up with
-    // its own connection anyway — the same inherent limitation as two
-    // concurrent first-time connects to a host, not something reconnect
-    // makes worse.)
+    // one. (Attempts that overlap share one dial — see acquireClient.)
     const { client, jumpClient } = await acquireClient(stillTracked.hostId);
 
     let channel: ClientChannel;

@@ -47,8 +47,9 @@ jobs:
         run: npm ci
 
       # The same gates as CI: a release must never ship something CI would reject.
-      - name: Lint, format, typecheck, test
+      - name: Lint, format, audit, typecheck, test
         run: |
+          npm audit --omit=dev --audit-level=high
           npm run lint
           npm run format:check
           npm run typecheck
@@ -56,6 +57,18 @@ jobs:
 
       - name: Package
         run: npm run package
+
+      # The same launch check CI runs, on the build that is about to be published.
+      - name: Install smoke-test display and audio libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Smoke test the packaged app
+        env:
+          SMOKE_NO_SANDBOX: "1"
+        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run smoke -- release/linux-unpacked/wharf
 
       - name: Checksums
         working-directory: release
@@ -68,6 +81,7 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+            release/latest-linux.yml
             release/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -82,5 +96,5 @@ jobs:
           # A tag with a hyphen (v0.2.0-rc.1) is a pre-release; GitHub's "latest
           # release" — which the app's update check reads — skips those.
           case "$TAG" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "$TAG" release/*.AppImage release/*.deb release/SHA256SUMS \
+          gh release create "$TAG" release/*.AppImage release/*.deb release/latest-linux.yml release/SHA256SUMS \
             --title "Wharf $TAG" --generate-notes --verify-tag "${flags[@]}"

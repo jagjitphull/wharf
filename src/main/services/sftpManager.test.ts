@@ -75,7 +75,8 @@ describe("list", () => {
     expect(entries.map((e) => e.name)).toEqual(["alpha-dir", "zeta-dir", "a.txt", "b.txt"]);
     expect(entries.map((e) => e.type)).toEqual(["directory", "directory", "file", "file"]);
     const b = entries.find((e) => e.name === "b.txt")!;
-    expect(b).toMatchObject({ path: "/b.txt", size: 5, permissions: "-rw-r-----" });
+    // (Windows files have no Unix permission bits to set, so only check them elsewhere.)
+    expect(b).toMatchObject({ path: "/b.txt", size: 5, ...(process.platform === "win32" ? {} : { permissions: "-rw-r-----" }) });
     expect(entries[0].permissions.startsWith("d")).toBe(true);
   });
 

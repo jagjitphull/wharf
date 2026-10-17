@@ -330,6 +330,8 @@ export interface TunnelRecord {
   /** Not used for "dynamic" (SOCKS) tunnels. */
   dstHost?: string;
   dstPort?: number;
+  /** Start this tunnel by itself each time Wharf launches. */
+  autoStart?: boolean;
 }
 
 export interface TunnelInput {
@@ -340,6 +342,24 @@ export interface TunnelInput {
   srcPort: number;
   dstHost?: string;
   dstPort?: number;
+  autoStart?: boolean;
+}
+
+/** Where an in-place update (AppImage builds only) currently stands. */
+export interface SelfUpdateState {
+  phase: "idle" | "checking" | "downloading" | "ready" | "error";
+  /** The version being downloaded, or waiting to be installed. */
+  version?: string;
+  /** 0-100, while downloading. */
+  percent?: number;
+  error?: string;
+}
+
+export interface SecretStorageStatus {
+  /** True when saved passwords and key passphrases are encrypted with the OS keyring. */
+  encrypted: boolean;
+  /** How many saved secrets are currently stored only base64-encoded. */
+  unencryptedCount: number;
 }
 
 export type TunnelStatus = "stopped" | "starting" | "running" | "error";
@@ -432,6 +452,8 @@ export const IPC = {
     remove: "tunnels:remove",
     start: "tunnels:start",
     stop: "tunnels:stop",
+    setAutoStart: "tunnels:set-auto-start",
+    statuses: "tunnels:statuses",
     onState: "tunnels:state",
   },
   window: {
@@ -454,6 +476,9 @@ export const IPC = {
     openExternal: "shell:open-external",
     openLogsFolder: "shell:open-logs-folder",
   },
+  secrets: {
+    status: "secrets:status",
+  },
   update: {
     check: "update:check",
     getVersion: "update:get-version",
@@ -462,6 +487,12 @@ export const IPC = {
     setAutoCheck: "update:set-auto-check",
     /** Main -> renderer: the launch-time check found a newer release. */
     onAvailable: "update:available",
+    canSelfUpdate: "update:can-self-update",
+    selfUpdateState: "update:self-update-state",
+    downloadUpdate: "update:download",
+    installUpdate: "update:install",
+    /** Main -> renderer: the in-place update moved to a new phase, or made progress. */
+    onSelfUpdateState: "update:self-update-state-changed",
   },
   backup: {
     export: "backup:export",

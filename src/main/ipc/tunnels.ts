@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { IPC, type TunnelInput, type TunnelRecord } from "../../shared/types";
+import { IPC, type TunnelInput, type TunnelRecord, type TunnelStateEvent } from "../../shared/types";
 import * as tunnelManager from "../services/tunnelManager";
 
 export function registerTunnelsIpc(): void {
@@ -12,4 +12,10 @@ export function registerTunnelsIpc(): void {
   ipcMain.handle(IPC.tunnels.start, (_event, tunnelId: string): Promise<void> => tunnelManager.start(tunnelId));
 
   ipcMain.handle(IPC.tunnels.stop, (_event, tunnelId: string): void => tunnelManager.stop(tunnelId));
+
+  ipcMain.handle(IPC.tunnels.setAutoStart, (_event, tunnelId: string, enabled: boolean): void =>
+    tunnelManager.setAutoStart(tunnelId, enabled),
+  );
+
+  ipcMain.handle(IPC.tunnels.statuses, (): TunnelStateEvent[] => tunnelManager.statuses());
 }

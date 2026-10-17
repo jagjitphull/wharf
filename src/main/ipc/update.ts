@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, net } from "electron";
 import log from "electron-log/main";
-import { IPC, type UpdateCheckResult } from "../../shared/types";
+import { IPC, type SelfUpdateState, type UpdateCheckResult } from "../../shared/types";
 import { getUpdateCheckEnabled, setUpdateCheckEnabled } from "../services/store";
+import { canSelfUpdate, downloadUpdate, installUpdate, selfUpdateState } from "../services/selfUpdate";
 import { checkForUpdate } from "../services/updateCheck";
 
 // Chromium's network stack (rather than Node's bundled fetch) so the user's
@@ -20,6 +21,10 @@ export function registerUpdateIpc(): void {
   ipcMain.handle(IPC.update.setAutoCheck, (_event, enabled: boolean): void => {
     setUpdateCheckEnabled(enabled);
   });
+  ipcMain.handle(IPC.update.canSelfUpdate, (): boolean => canSelfUpdate());
+  ipcMain.handle(IPC.update.selfUpdateState, (): SelfUpdateState => selfUpdateState());
+  ipcMain.handle(IPC.update.downloadUpdate, (): Promise<void> => downloadUpdate());
+  ipcMain.handle(IPC.update.installUpdate, (): void => installUpdate());
 }
 
 /** One quiet background check shortly after launch. Packaged builds only (a
