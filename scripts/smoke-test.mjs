@@ -1,6 +1,8 @@
 // Launch smoke test for a packaged (or unpacked) Wharf build.
 //
-//   xvfb-run -a node scripts/smoke-test.mjs [path/to/wharf-executable]
+//   xvfb-run -a node scripts/smoke-test.mjs [path/to/wharf-executable]     (Linux: needs a display)
+//   node scripts/smoke-test.mjs release/win-unpacked/Wharf.exe              (Windows)
+//   node scripts/smoke-test.mjs release/mac-arm64/Wharf.app/Contents/MacOS/Wharf   (macOS)
 //
 // Unit and integration tests run on plain Node, so they can't notice a broken
 // preload bridge, a file missing from the asar, or node-pty failing to load in
@@ -15,23 +17,33 @@
 //   - the app quits cleanly when asked
 //
 // Environment:
-//   SMOKE_NO_SANDBOX=1    pass --no-sandbox (needed when the unpacked chrome-sandbox
-//                         isn't setuid root, e.g. CI runners and containers; also
-//                         applied automatically when running as root)
+//   SMOKE_NO_SANDBOX=1    Linux only: pass --no-sandbox (needed when the unpacked
+//                         chrome-sandbox isn't setuid root, e.g. CI runners and
+//                         containers; also applied automatically when running as root)
 //   SMOKE_SCREENSHOT=path save a PNG of the window once the checks have run
 //   SMOKE_TIMEOUT_MS=n    per-step timeout (default 30000)
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { connect, createServer } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const expectedVersion = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
-const executable = path.resolve(process.argv[2] ?? path.join(root, "release", "linux-unpacked", "wharf"));
+const isWindows = process.platform === "win32";
+const isMac = process.platform === "darwin";
+const defaultExecutable = isWindows
+  ? path.join(root, "release", "win-unpacked", "Wharf.exe")
+  : isMac
+    ? path.join(root, "release", "mac-arm64", "Wharf.app", "Contents", "MacOS", "Wharf")
+    : path.join(root, "release", "linux-unpacked", "wharf");
+const executable = path.resolve(process.argv[2] ?? defaultExecutable);
+/** The .app bundle on macOS (what the fuse reader wants), the executable elsewhere. */
+const fuseTarget = isMac ? executable.slice(0, executable.indexOf(".app") + 4) : executable;
+const useSandboxFlag = !isWindows && !isMac && (process.env.SMOKE_NO_SANDBOX === "1" || process.getuid?.() === 0);
 const stepTimeout = Number(process.env.SMOKE_TIMEOUT_MS ?? 30_000);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,11 +53,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * clears the throwaway profile. Cleanup is best-effort: a leftover temp
  * directory is harmless, a failed check run because of one is not. */
 async function killAndClean(child, dir) {
-  for (const target of [-child.pid, child.pid]) {
-    try {
-      process.kill(target, "SIGKILL");
-    } catch {
-      /* already gone */
+  if (isWindows) {
+    // /T takes the whole process tree; there are no process groups to signal.
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    for (const target of [-child.pid, child.pid]) {
+      try {
+        process.kill(target, "SIGKILL");
+      } catch {
+        /* already gone */
+      }
     }
   }
   await sleep(300);
@@ -141,12 +158,12 @@ async function probeLaunch({ args = [], env = {}, ms = 6_000, afterMs, bare = fa
   mkdirSync(path.join(dir, "home"), { recursive: true });
   // `bare` passes exactly `args`: with the RunAsNode fuse on, the binary
   // behaves as Node.js, which rejects Chromium switches like --no-sandbox.
-  const probeArgs = bare ? args : ["--disable-gpu", ...args];
-  if (!bare && (process.env.SMOKE_NO_SANDBOX === "1" || process.getuid?.() === 0)) probeArgs.push("--no-sandbox");
+  const probeArgs = bare ? args : ["--disable-gpu", `--user-data-dir=${path.join(dir, "userData")}`, ...args];
+  if (!bare && useSandboxFlag) probeArgs.push("--no-sandbox");
   const child = spawn(executable, probeArgs, {
-    env: { ...process.env, HOME: path.join(dir, "home"), XDG_CONFIG_HOME: path.join(dir, "config"), ...env },
+    env: { ...process.env, HOME: path.join(dir, "home"), ...env },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: true, // its own process group, so killAndClean can take the helpers with it
+    detached: !isWindows, // its own process group, so killAndClean can take the helpers with it
   });
   const chunks = [];
   child.stdout.on("data", (c) => chunks.push(c.toString()));
@@ -215,7 +232,7 @@ async function main() {
     // the behavior of the riskiest ones; this covers the rest (NODE_OPTIONS
     // can't be probed reliably from outside).
     const { getCurrentFuseWire, FuseV1Options } = (await import("@electron/fuses")).default;
-    const wire = await getCurrentFuseWire(executable);
+    const wire = await getCurrentFuseWire(fuseTarget);
     const expected = {
       RunAsNode: false,
       EnableNodeOptionsEnvironmentVariable: false,
@@ -229,22 +246,24 @@ async function main() {
     if (wrong.length > 0) throw new Error(wrong.join(", "));
   });
 
-  // A throwaway profile: XDG_CONFIG_HOME decides where Electron puts userData
-  // (and so the data file and logs), HOME is what the local shell starts in.
+  // A throwaway profile: --user-data-dir decides where Electron puts userData
+  // (the data file, and the logs everywhere but macOS), HOME is what a POSIX
+  // local shell starts in.
   const sandboxDir = mkdtempSync(path.join(tmpdir(), "wharf-smoke-"));
   const home = path.join(sandboxDir, "home");
-  const configHome = path.join(sandboxDir, "config");
-  mkdirSync(home, { recursive: true }); // the local shell starts here
+  const userData = path.join(sandboxDir, "userData");
+  mkdirSync(home, { recursive: true });
   const port = await freePort();
-  const args = [`--remote-debugging-port=${port}`, "--disable-gpu"];
-  if (process.env.SMOKE_NO_SANDBOX === "1" || process.getuid?.() === 0) args.push("--no-sandbox");
+  const args = [`--remote-debugging-port=${port}`, "--disable-gpu", `--user-data-dir=${userData}`];
+  if (useSandboxFlag) args.push("--no-sandbox");
 
   console.log(`Launching ${executable}`);
   const output = [];
   const child = spawn(executable, args, {
-    env: { ...process.env, HOME: home, XDG_CONFIG_HOME: configHome, ELECTRON_ENABLE_LOGGING: "1" },
+    // WHARF_SMOKE lets the local-shell check tell a command's output from the echo of what was typed.
+    env: { ...process.env, HOME: home, WHARF_SMOKE: "42", ELECTRON_ENABLE_LOGGING: "1" },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
+    detached: !isWindows,
   });
   const capture = (chunk) => output.push(chunk.toString());
   child.stdout.on("data", capture);
@@ -328,8 +347,10 @@ async function main() {
     });
 
     await check("local shell (node-pty) runs a command", async () => {
-      // 6*7 is evaluated by the shell, so "wharf-smoke-42" can only appear in
-      // the command's output, never in the echo of what was typed.
+      // The shell expands $WHARF_SMOKE (%WHARF_SMOKE% in cmd.exe, Windows' default
+      // shell), so "wharf-smoke-42" can only appear in the command's output,
+      // never in the echo of what was typed.
+      const command = isWindows ? "echo wharf-smoke-%WHARF_SMOKE%" : "echo wharf-smoke-$WHARF_SMOKE";
       const output = await evaluate(
         page,
         `(async () => {
@@ -339,7 +360,7 @@ async function main() {
           const started = await window.wharf.localShell.connect(80, 24);
           const id = started.sessionId;
           sessions.add(id);
-          window.wharf.ssh.write(id, "echo wharf-smoke-$((6*7))\\r");
+          window.wharf.ssh.write(id, ${JSON.stringify(command)} + "\\r");
           const deadline = Date.now() + ${stepTimeout};
           while (!text.includes("wharf-smoke-42") && Date.now() < deadline) {
             await new Promise((r) => setTimeout(r, 100));
@@ -371,7 +392,8 @@ async function main() {
     await check("data file and its directory are owner-only", async () => {
       // The store library creates its file world-readable; that file holds
       // every saved host (and, without a keyring, the saved passwords).
-      const userData = path.join(configHome, "Wharf");
+      // Windows files have no Unix permission bits to check.
+      if (isWindows) return "skipped on Windows (no Unix permission bits)";
       const dataFile = path.join(userData, "wharf-data.json");
       await until("the data file", () => existsSync(dataFile));
       const modes = {
@@ -386,7 +408,8 @@ async function main() {
     });
 
     await check("log file was written", async () => {
-      const logFile = path.join(configHome, "Wharf", "logs", "main.log");
+      // electron-log writes to <userData>/logs, except on macOS where it is ~/Library/Logs/<app>.
+      const logFile = isMac ? path.join(homedir(), "Library", "Logs", "Wharf", "main.log") : path.join(userData, "logs", "main.log");
       const size = await until(`${logFile}`, () => existsSync(logFile) && statSync(logFile).size > 0 && statSync(logFile).size);
       return `${size} bytes`;
     });

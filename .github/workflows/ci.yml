@@ -141,3 +141,21 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run package
+
+      # Launches the unpacked build the package step just produced (the default
+      # path for each platform) and drives it, as on Linux: the UI mounts,
+      # preload/IPC works, a local shell runs a command, nothing throws, it
+      # quits cleanly.
+      - name: Smoke test the packaged app
+        env:
+          SMOKE_SCREENSHOT: ${{ runner.temp }}/smoke-screenshot.png
+        run: npm run smoke
+
+      - name: Upload smoke-test screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshot-${{ matrix.name }}-${{ github.sha }}
+          path: ${{ runner.temp }}/smoke-screenshot.png
+          if-no-files-found: ignore
+          retention-days: 7
