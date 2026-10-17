@@ -341,12 +341,12 @@ Linux, Windows and macOS in parallel (each runs the same audit, lint, format, ty
 then `npm run package` and the launch smoke test on the packaged build), and only if all three pass does
 one job publish a single GitHub Release containing:
 
-| Platform | Files |
-| -------- | ----- |
-| Linux | `Wharf-x.y.z.AppImage`, the `.deb`, `latest-linux.yml` |
-| Windows | `Wharf-Setup-x.y.z.exe`, `latest.yml` |
-| macOS | `Wharf-x.y.z-arm64.dmg` (Apple Silicon), `Wharf-x.y.z.dmg` (Intel), `latest-mac.yml` |
-| All | `SHA256SUMS` |
+| Platform | Files                                                                                |
+| -------- | ------------------------------------------------------------------------------------ |
+| Linux    | `Wharf-x.y.z.AppImage`, the `.deb`, `latest-linux.yml`                               |
+| Windows  | `Wharf-Setup-x.y.z.exe`, `latest.yml`                                                |
+| macOS    | `Wharf-x.y.z-arm64.dmg` (Apple Silicon), `Wharf-x.y.z.dmg` (Intel), `latest-mac.yml` |
+| All      | `SHA256SUMS`                                                                         |
 
 ```bash
 npm version 0.2.0 --no-git-tag-version   # bumps package.json and the lockfile
@@ -370,11 +370,11 @@ The workflow signs automatically once these exist. Store them as secrets of a Gi
 [Environment](https://docs.github.com/actions/deployment/targeting-different-environments) named
 `release` (tag builds run in it, so you can require reviewers; rehearsals can't reach them):
 
-| Secret | What |
-| ------ | ---- |
-| `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD` | Windows Authenticode certificate (`.pfx`, base64-encoded) and its password |
-| `CSC_LINK`, `CSC_KEY_PASSWORD` | macOS "Developer ID Application" certificate (`.p12`, base64-encoded) and its password |
-| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Notarization (needs the Apple Developer Program) |
+| Secret                                                     | What                                                                                   |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`                     | Windows Authenticode certificate (`.pfx`, base64-encoded) and its password             |
+| `CSC_LINK`, `CSC_KEY_PASSWORD`                             | macOS "Developer ID Application" certificate (`.p12`, base64-encoded) and its password |
+| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Notarization (needs the Apple Developer Program)                                       |
 
 A signed build is then verified (`codesign`/`spctl` on macOS, `Get-AuthenticodeSignature` on Windows) and
 the job fails if the signature isn't valid. macOS is notarized when the `APPLE_*` secrets are present; the
