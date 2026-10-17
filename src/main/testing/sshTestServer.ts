@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { generateKeyPairSync } from "node:crypto";
 import { Server, utils, type Connection, type SFTPWrapper } from "ssh2";
@@ -217,7 +218,7 @@ function serveSftp(sftp: SFTPWrapper, root: string): void {
 }
 
 export async function startTestSshServer(): Promise<TestSshServer> {
-  const root = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR ?? "/tmp"), "wharf-sshtest-"));
+  const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "wharf-sshtest-"));
   const hostKey = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs1", format: "pem" },
