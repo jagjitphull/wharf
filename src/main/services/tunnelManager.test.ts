@@ -7,6 +7,8 @@ const h = vi.hoisted(() => ({
   hosts: [] as HostRecord[],
   tunnels: [] as TunnelRecord[],
   sent: [] as { channel: string; payload: any }[],
+  /** Awaited inside the host-key check, so a test can hold a connection attempt open. */
+  gate: Promise.resolve() as Promise<void>,
 }));
 vi.mock("electron", () => ({
   BrowserWindow: {
