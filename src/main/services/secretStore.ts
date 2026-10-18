@@ -2,6 +2,8 @@ import { safeStorage } from "electron";
 import { randomUUID } from "node:crypto";
 import log from "electron-log/main";
 import { store } from "./store";
+import type { MasterPasswordState } from "../../shared/types";
+import { createConfig, keyFor, MIN_PASSWORD_LENGTH, open, SEALED_PREFIX, seal } from "./masterKey";
 
 /**
  * Stores host passwords / private-key passphrases encrypted at rest using
@@ -11,6 +13,16 @@ import { store } from "./store";
  * transiently in the main process and in-flight over IPC when the user
  * enters or reveals a secret.
  */
+/** The key derived from the master password, held only while unlocked. */
+let masterKey: Buffer | null = null;
+
+const LOCKED_MESSAGE = "Saved passwords are locked. Unlock them with your master password in Settings, or when Wharf starts.";
+
+export function masterPasswordState(): MasterPasswordState {
+  if (!store.get("masterPassword")) return "none";
+  return masterKey ? "unlocked" : "locked";
+}
+
 export function saveSecret(plaintext: string): string {
   const id = randomUUID();
   const secrets = store.get("secrets");
@@ -58,7 +70,8 @@ export function countUnencryptedSecrets(): number {
  * entry that can't be read is left exactly as it was.
  */
 export function upgradeUnencryptedSecrets(): number {
-  if (!safeStorage.isEncryptionAvailable()) return 0;
+  // With a master password every entry is already sealed with it.
+  if (store.get("masterPassword") || !safeStorage.isEncryptionAvailable()) return 0;
   const secrets = { ...store.get("secrets") };
   let upgraded = 0;
   for (const [id, stored] of Object.entries(secrets)) {
@@ -75,6 +88,10 @@ export function upgradeUnencryptedSecrets(): number {
 }
 
 function encrypt(plaintext: string): string {
+  if (store.get("masterPassword")) {
+    if (!masterKey) throw new Error(LOCKED_MESSAGE);
+    return seal(masterKey, plaintext);
+  }
   if (!safeStorage.isEncryptionAvailable()) {
     // Fall back to storing base64 rather than plaintext so the format stays
     // consistent; this path only hits on Linux systems with no secret
@@ -85,6 +102,10 @@ function encrypt(plaintext: string): string {
 }
 
 function decrypt(stored: string): string {
+  if (stored.startsWith(SEALED_PREFIX)) {
+    if (!masterKey) throw new Error(LOCKED_MESSAGE);
+    return open(masterKey, stored);
+  }
   if (stored.startsWith("plain:")) {
     return Buffer.from(stored.slice("plain:".length), "base64").toString("utf8");
   }
@@ -108,4 +129,97 @@ function decrypt(stored: string): string {
   }
   // Legacy/unexpected format.
   return "";
+}
+
+// ---------------------------------------------------------------------------
+// Master password
+// ---------------------------------------------------------------------------
+
+function requireValidPassword(password: string): void {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`The master password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+  }
+}
+
+/** Every stored secret re-encoded by `convert`; entries it can't read (their
+ * keyring entry is gone) are carried over untouched rather than lost. */
+function reencryptAll(read: (stored: string) => string, write: (plaintext: string) => string): Record<string, string> {
+  const next: Record<string, string> = {};
+  for (const [id, stored] of Object.entries(store.get("secrets"))) {
+    try {
+      next[id] = write(read(stored));
+    } catch (err) {
+      log.warn(`Leaving secret ${id} as it was while changing the master password:`, err);
+      next[id] = stored;
+    }
+  }
+  return next;
+}
+
+function requireConfig() {
+  const config = store.get("masterPassword");
+  if (!config) throw new Error("No master password is set.");
+  return config;
+}
+
+function checkedKey(password: string): Buffer {
+  const key = keyFor(password, requireConfig());
+  if (!key) throw new Error("Wrong master password.");
+  return key;
+}
+
+/** Turns the master password on: every saved secret is re-encrypted under it, and Wharf is unlocked for this run. */
+export function enableMasterPassword(password: string): void {
+  if (store.get("masterPassword")) throw new Error("A master password is already set. Change or remove it instead.");
+  requireValidPassword(password);
+  const { config, key } = createConfig(password);
+  const secrets = reencryptAll(decrypt, (plaintext) => seal(key, plaintext));
+  store.set("secrets", secrets);
+  store.set("masterPassword", config);
+  masterKey = key;
+}
+
+/** Checks the password and unlocks saved secrets for this run. Throws "Wrong master password." otherwise. */
+export function unlock(password: string): void {
+  masterKey = checkedKey(password);
+}
+
+/** Forgets the key; saved secrets stay unreadable until unlock(). */
+export function lock(): void {
+  masterKey = null;
+}
+
+export function changeMasterPassword(current: string, next: string): void {
+  const oldKey = checkedKey(current);
+  requireValidPassword(next);
+  const { config, key } = createConfig(next);
+  const secrets = reencryptAll(
+    (stored) => (stored.startsWith(SEALED_PREFIX) ? open(oldKey, stored) : decrypt(stored)),
+    (plaintext) => seal(key, plaintext),
+  );
+  store.set("secrets", secrets);
+  store.set("masterPassword", config);
+  masterKey = key;
+}
+
+/** Turns the master password off, returning secrets to keyring storage (or, on a machine without one, the base64 fallback). */
+export function removeMasterPassword(password: string): void {
+  const key = checkedKey(password);
+  const secrets = reencryptAll(
+    (stored) => (stored.startsWith(SEALED_PREFIX) ? open(key, stored) : decrypt(stored)),
+    (plaintext) =>
+      safeStorage.isEncryptionAvailable()
+        ? `enc:${safeStorage.encryptString(plaintext).toString("base64")}`
+        : `plain:${Buffer.from(plaintext, "utf8").toString("base64")}`,
+  );
+  store.set("secrets", secrets);
+  store.set("masterPassword", null);
+  masterKey = null;
+}
+
+/** The way out when the password is forgotten: erases every saved secret and the master password. Hosts and their settings stay; passwords must be entered again. */
+export function resetSecrets(): void {
+  store.set("secrets", {});
+  store.set("masterPassword", null);
+  masterKey = null;
 }

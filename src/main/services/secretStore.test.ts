@@ -30,15 +30,22 @@ vi.mock("electron", () => ({
 }));
 
 let secrets: Record<string, string>;
+let masterPassword: unknown = null;
 let mod: typeof import("./secretStore");
 
 beforeEach(async () => {
   secrets = {};
+  masterPassword = null;
   mockStoreGet.mockReset().mockImplementation((key: string) => {
+    if (key === "masterPassword") return masterPassword;
     if (key !== "secrets") throw new Error(`unexpected store.get(${key})`);
     return secrets;
   });
   mockStoreSet.mockReset().mockImplementation((key: string, value: unknown) => {
+    if (key === "masterPassword") {
+      masterPassword = value;
+      return;
+    }
     if (key !== "secrets") throw new Error(`unexpected store.set(${key})`);
     secrets = value as Record<string, string>;
   });
@@ -191,5 +198,144 @@ describe("isEncryptionAvailable", () => {
     expect(mod.isEncryptionAvailable()).toBe(true);
     mockIsEncryptionAvailable.mockReturnValue(false);
     expect(mod.isEncryptionAvailable()).toBe(false);
+  });
+});
+
+describe("master password", () => {
+  beforeEach(async () => {
+    const { kdf } = await import("./masterKey");
+    kdf.cost = 2 ** 10;
+  });
+
+  it("enabling it re-encrypts every saved secret and leaves Wharf unlocked", () => {
+    const a = mod.saveSecret("alpha-password");
+    const b = mod.saveSecret("beta-passphrase");
+    expect(mod.masterPasswordState()).toBe("none");
+    mod.enableMasterPassword("correct horse battery");
+    expect(mod.masterPasswordState()).toBe("unlocked");
+    expect(secrets[a]).toMatch(/^mp:/);
+    expect(secrets[b]).toMatch(/^mp:/);
+    expect(mod.readSecret(a)).toBe("alpha-password");
+    expect(mod.readSecret(b)).toBe("beta-passphrase");
+    expect(JSON.stringify({ secrets, masterPassword })).not.toContain("correct horse battery");
+  });
+
+  it("also takes over secrets stored in the no-keyring fallback", () => {
+    mockIsEncryptionAvailable.mockReturnValue(false);
+    const id = mod.saveSecret("was-base64");
+    expect(secrets[id]).toMatch(/^plain:/);
+    mod.enableMasterPassword("correct horse battery");
+    expect(secrets[id]).toMatch(/^mp:/);
+    expect(mod.countUnencryptedSecrets()).toBe(0);
+    expect(mod.readSecret(id)).toBe("was-base64");
+  });
+
+  it("new secrets are sealed with it, even when a keyring exists", () => {
+    mod.enableMasterPassword("correct horse battery");
+    const id = mod.saveSecret("new one");
+    expect(secrets[id]).toMatch(/^mp:/);
+    expect(mockEncryptString).not.toHaveBeenCalled();
+    mod.updateSecret(id, "changed");
+    expect(mod.readSecret(id)).toBe("changed");
+  });
+
+  it("locks: secrets can't be read or written until the right password is entered", () => {
+    const id = mod.saveSecret("locked away");
+    mod.enableMasterPassword("correct horse battery");
+    mod.lock();
+    expect(mod.masterPasswordState()).toBe("locked");
+    expect(() => mod.readSecret(id)).toThrow(/locked/i);
+    expect(() => mod.saveSecret("x")).toThrow(/locked/i);
+    expect(() => mod.unlock("wrong password")).toThrow(/Wrong master password/);
+    expect(mod.masterPasswordState()).toBe("locked");
+    mod.unlock("correct horse battery");
+    expect(mod.masterPasswordState()).toBe("unlocked");
+    expect(mod.readSecret(id)).toBe("locked away");
+  });
+
+  it("is locked again after a restart (the key lives only in memory)", async () => {
+    const id = mod.saveSecret("persisted");
+    mod.enableMasterPassword("correct horse battery");
+    vi.resetModules();
+    mod = await import("./secretStore");
+    expect(mod.masterPasswordState()).toBe("locked");
+    expect(() => mod.readSecret(id)).toThrow(/locked/i);
+    mod.unlock("correct horse battery");
+    expect(mod.readSecret(id)).toBe("persisted");
+  });
+
+  it("readSecret still treats a missing id as no secret, even while locked", () => {
+    mod.enableMasterPassword("correct horse battery");
+    mod.lock();
+    expect(mod.readSecret(null)).toBeNull();
+    expect(mod.readSecret("never-saved")).toBeNull();
+  });
+
+  it("rejects a short password and a second enable", () => {
+    expect(() => mod.enableMasterPassword("short")).toThrow(/at least 8/);
+    expect(mod.masterPasswordState()).toBe("none");
+    mod.enableMasterPassword("correct horse battery");
+    expect(() => mod.enableMasterPassword("another password")).toThrow(/already set/);
+  });
+
+  it("changing the password re-encrypts under the new one and needs the old one", () => {
+    const id = mod.saveSecret("keep me");
+    mod.enableMasterPassword("old password 1");
+    expect(() => mod.changeMasterPassword("not the old one", "new password 2")).toThrow(/Wrong master password/);
+    expect(() => mod.changeMasterPassword("old password 1", "short")).toThrow(/at least 8/);
+    expect(mod.readSecret(id)).toBe("keep me"); // a refused change touched nothing
+    mod.changeMasterPassword("old password 1", "new password 2");
+    mod.lock();
+    expect(() => mod.unlock("old password 1")).toThrow(/Wrong/);
+    mod.unlock("new password 2");
+    expect(mod.readSecret(id)).toBe("keep me");
+  });
+
+  it("removing it returns secrets to keyring storage", () => {
+    const id = mod.saveSecret("back to the keyring");
+    mod.enableMasterPassword("correct horse battery");
+    expect(() => mod.removeMasterPassword("wrong password")).toThrow(/Wrong/);
+    expect(mod.masterPasswordState()).toBe("unlocked");
+    mod.removeMasterPassword("correct horse battery");
+    expect(mod.masterPasswordState()).toBe("none");
+    expect(secrets[id]).toMatch(/^enc:/);
+    expect(mod.readSecret(id)).toBe("back to the keyring");
+  });
+
+  it("removing it without a keyring falls back to the marked base64 form", () => {
+    const id = mod.saveSecret("fallback");
+    mod.enableMasterPassword("correct horse battery");
+    mockIsEncryptionAvailable.mockReturnValue(false);
+    mod.removeMasterPassword("correct horse battery");
+    expect(secrets[id]).toMatch(/^plain:/);
+    expect(mod.readSecret(id)).toBe("fallback");
+  });
+
+  it("a secret that was already unreadable is carried over, not lost, when the password is enabled", () => {
+    secrets.broken = "enc:" + Buffer.from("x").toString("base64");
+    mockDecryptString.mockImplementation((buf: Buffer) => {
+      if (buf.toString() === "x") throw new Error("keychain entry gone");
+      return buf.toString("utf8");
+    });
+    const good = mod.saveSecret("fine");
+    mod.enableMasterPassword("correct horse battery");
+    expect(secrets.broken).toMatch(/^enc:/);
+    expect(mod.readSecret(good)).toBe("fine");
+  });
+
+  it("reset erases every secret and the master password", () => {
+    mod.saveSecret("gone soon");
+    mod.enableMasterPassword("correct horse battery");
+    mod.lock();
+    mod.resetSecrets();
+    expect(secrets).toEqual({});
+    expect(mod.masterPasswordState()).toBe("none");
+    const id = mod.saveSecret("fresh start");
+    expect(mod.readSecret(id)).toBe("fresh start");
+  });
+
+  it("the no-keyring upgrade never touches entries once a master password is set", () => {
+    mod.enableMasterPassword("correct horse battery");
+    expect(mod.upgradeUnencryptedSecrets()).toBe(0);
   });
 });

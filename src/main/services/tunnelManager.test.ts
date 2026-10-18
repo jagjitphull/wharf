@@ -102,6 +102,8 @@ beforeEach(async () => {
   tunnels = await import("./tunnelManager");
   ssh = await import("./sshManager");
   pool = await import("./connectionPool");
+  tunnels.reconnectPolicy.baseMs = 40;
+  tunnels.reconnectPolicy.maxMs = 160;
 });
 afterEach(async () => {
   tunnels.stopAll();
@@ -183,13 +185,14 @@ describe("local forwarding", () => {
     expect((await exchange(t.srcPort, "again")).toString()).toBe("again");
   });
 
-  it("can be started again after the SSH connection dropped underneath it", async () => {
+  it("comes back by itself after the SSH connection dropped underneath it", async () => {
     const t = await makeTunnel({ srcPort: await freePort() });
     await tunnels.start(t.id);
     server.dropConnections();
-    await until(() => statesOf(t.id).at(-1) === "stopped", "the tunnel to notice the drop");
-    await tunnels.start(t.id);
+    await until(() => statesOf(t.id).includes("reconnecting"), "the tunnel to notice the drop");
+    await until(() => tunnels.isRunning(t.id), "the tunnel to reconnect");
     expect((await exchange(t.srcPort, "after the drop")).toString()).toBe("after the drop");
+    expect(statesOf(t.id).at(-1)).toBe("running");
   });
 });
 
@@ -360,6 +363,102 @@ describe("management", () => {
     tunnels.stopAll();
     expect(tunnels.isRunning(a.id) || tunnels.isRunning(b.id)).toBe(false);
     await until(() => server.stats.open === 0, "the shared connection to close");
+  });
+});
+
+describe("reconnecting", () => {
+  it("keeps retrying while the host is unreachable, then recovers", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    const realPort = h.hosts[0].port;
+    h.hosts = [{ ...h.hosts[0], port: await freePort() }]; // nothing listens there
+    server.dropConnections();
+    await until(() => statesOf(t.id).filter((x) => x === "reconnecting").length >= 3, "several failed attempts");
+    expect(tunnels.isRunning(t.id)).toBe(false);
+    expect(tunnels.statuses().find((s) => s.tunnelId === t.id)!.error).toMatch(/Couldn't reconnect/);
+    h.hosts = [{ ...h.hosts[0], port: realPort }];
+    await until(() => tunnels.isRunning(t.id), "the tunnel to recover");
+    expect((await exchange(t.srcPort, "back")).toString()).toBe("back");
+  });
+
+  it("backs off between attempts, up to the cap", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    h.hosts = [{ ...h.hosts[0], port: await freePort() }];
+    server.dropConnections();
+    await until(() => statesOf(t.id).filter((x) => x === "reconnecting").length >= 5, "five attempts");
+    const waits = h.sent
+      .filter((e) => e.channel === IPC.tunnels.onState && e.payload.status === "reconnecting")
+      .map((e) => /Retrying in (\d+)s/.exec(e.payload.error)![1]);
+    expect(waits.length).toBeGreaterThanOrEqual(5);
+    tunnels.stop(t.id);
+  });
+
+  it("stops retrying when the user stops the tunnel", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    h.hosts = [{ ...h.hosts[0], port: await freePort() }];
+    server.dropConnections();
+    await until(() => tunnels.isReconnecting(t.id), "the retry to be scheduled");
+    tunnels.stop(t.id);
+    expect(tunnels.isReconnecting(t.id)).toBe(false);
+    expect(statesOf(t.id).at(-1)).toBe("stopped");
+    const before = h.sent.length;
+    await new Promise((r) => setTimeout(r, 400));
+    expect(h.sent.length).toBe(before); // nothing more happened
+    expect(tunnels.isRunning(t.id)).toBe(false);
+  });
+
+  it("a stop that lands while an attempt is in flight doesn't leave the tunnel running", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    tunnels.reconnectPolicy.baseMs = 1;
+    server.dropConnections();
+    await until(() => tunnels.isReconnecting(t.id), "the retry to be scheduled");
+    tunnels.stop(t.id);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(tunnels.isRunning(t.id)).toBe(false);
+    expect(await canConnect(t.srcPort)).toBe(false);
+  });
+
+  it("a manual start while waiting replaces the pending retry", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    tunnels.reconnectPolicy.baseMs = 60_000;
+    tunnels.reconnectPolicy.maxMs = 60_000;
+    server.dropConnections();
+    await until(() => tunnels.isReconnecting(t.id), "the retry to be scheduled");
+    await tunnels.start(t.id);
+    expect(tunnels.isReconnecting(t.id)).toBe(false);
+    expect(tunnels.isRunning(t.id)).toBe(true);
+    expect((await exchange(t.srcPort, "manual")).toString()).toBe("manual");
+  });
+
+  it("gives up when the login is refused, rather than hammering the server", async () => {
+    const t = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(t.id);
+    h.hosts = [{ ...h.hosts[0], secretId: "wrong" }];
+    server.dropConnections();
+    await until(() => statesOf(t.id).at(-1) === "error", "the failed login to be reported");
+    const attempts = server.stats.total;
+    await new Promise((r) => setTimeout(r, 400));
+    expect(server.stats.total).toBe(attempts);
+    expect(tunnels.isReconnecting(t.id)).toBe(false);
+    expect(tunnels.statuses().find((s) => s.tunnelId === t.id)!.error).toMatch(/authentication/i);
+  });
+
+  it("every tunnel on a dropped shared connection comes back, over one new connection", async () => {
+    const a = await makeTunnel({ srcPort: await freePort() });
+    const b = await makeTunnel({ srcPort: await freePort() });
+    await tunnels.start(a.id);
+    await tunnels.start(b.id);
+    const before = server.stats.total;
+    server.dropConnections();
+    await until(() => statesOf(a.id).includes("reconnecting") && statesOf(b.id).includes("reconnecting"), "both to notice the drop");
+    await until(() => tunnels.isRunning(a.id) && tunnels.isRunning(b.id), "both tunnels to reconnect");
+    expect(server.stats.total - before).toBe(1);
+    expect((await exchange(a.srcPort, "a")).toString()).toBe("a");
+    expect((await exchange(b.srcPort, "b")).toString()).toBe("b");
   });
 });
 

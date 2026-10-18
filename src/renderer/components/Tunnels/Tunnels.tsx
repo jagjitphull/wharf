@@ -156,7 +156,7 @@ export function Tunnels() {
       <div className="tunnel-list">
         {tunnels.map((t) => {
           const state = statuses[t.id];
-          const running = state?.status === "running" || state?.status === "starting";
+          const running = state?.status === "running" || state?.status === "starting" || state?.status === "reconnecting";
           return (
             <div key={t.id} className="tunnel-row">
               <div className="tunnel-info">
@@ -168,7 +168,7 @@ export function Tunnels() {
                       ? `dynamic (SOCKS5) · listening on ${t.srcHost}:${t.srcPort}`
                       : `${t.type} · ${t.srcHost}:${t.srcPort} → ${t.dstHost}:${t.dstPort}`}
                   </div>
-                  {state?.error && <div className="tunnel-error">{state.error}</div>}
+                  {state?.error && <div className={state.status === "reconnecting" ? "tunnel-note" : "tunnel-error"}>{state.error}</div>}
                 </div>
               </div>
               <div className="tunnel-actions">

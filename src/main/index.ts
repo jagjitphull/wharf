@@ -21,7 +21,7 @@ import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
 import { registerUpdateIpc, scheduleLaunchUpdateCheck } from "./ipc/update";
 import { registerSecretsIpc } from "./ipc/secrets";
-import { upgradeUnencryptedSecrets } from "./services/secretStore";
+import { masterPasswordState, upgradeUnencryptedSecrets } from "./services/secretStore";
 import { startAutoStartTunnels, stopAll as stopAllTunnels } from "./services/tunnelManager";
 import { closeAllSftp } from "./services/sftpManager";
 import { stopAll as stopAllHostStats } from "./services/hostStats";
@@ -303,7 +303,14 @@ app.whenReady().then(() => {
   // A keyring that wasn't there when these were saved may be now.
   const upgraded = upgradeUnencryptedSecrets();
   if (upgraded > 0) log.info(`Moved ${upgraded} saved password(s) from base64 to keyring-encrypted storage`);
-  registerSecretsIpc();
+  // Tunnels set to start at launch need saved passwords; with a master password
+  // set they wait until it is entered (once — a later lock/unlock doesn't restart tunnels stopped by hand).
+  let autoStartDeferred = false;
+  registerSecretsIpc(() => {
+    if (!autoStartDeferred) return;
+    autoStartDeferred = false;
+    void startAutoStartTunnels();
+  });
   registerHostsIpc();
   registerGroupsIpc();
   registerSshIpc();
@@ -332,7 +339,8 @@ app.whenReady().then(() => {
   createWindow(true);
   // Host-key prompts for these use native dialogs, so they don't depend on the
   // renderer having finished loading.
-  void startAutoStartTunnels();
+  if (masterPasswordState() === "locked") autoStartDeferred = true;
+  else void startAutoStartTunnels();
   scheduleLaunchUpdateCheck();
 
   if (recoveredFromCorruptDataFile) {
