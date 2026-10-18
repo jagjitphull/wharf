@@ -25,7 +25,12 @@ vi.mock("./secretStore", async () => {
   const { TEST_PASSWORD } = await import("../testing/sshTestServer");
   return { readSecret: (id: string | null) => (id === "pw" ? TEST_PASSWORD : null) };
 });
-vi.mock("./knownHosts", () => ({ verifyHostKeyInteractive: async () => true }));
+vi.mock("./knownHosts", () => ({
+  verifyHostKeyInteractive: async () => {
+    await h.gate;
+    return true;
+  },
+}));
 vi.mock("electron-log/main", () => ({ default: { warn: () => {}, error: () => {}, info: () => {} } }));
 
 let server: TestSshServer;
@@ -94,6 +99,7 @@ beforeEach(async () => {
   h.hosts = [testHost(server.port, { id: "a" })];
   h.tunnels = [];
   h.sent = [];
+  h.gate = Promise.resolve();
   echo.stats.connections = 0;
   server.stats.forwards.length = 0;
   server.stats.forwardRequests.length = 0;
@@ -412,13 +418,19 @@ describe("reconnecting", () => {
   it("a stop that lands while an attempt is in flight doesn't leave the tunnel running", async () => {
     const t = await makeTunnel({ srcPort: await freePort() });
     await tunnels.start(t.id);
-    tunnels.reconnectPolicy.baseMs = 1;
+    // Hold the next connection attempt open at the host-key check.
+    let release!: () => void;
+    h.gate = new Promise<void>((resolve) => (release = resolve));
     server.dropConnections();
-    await until(() => tunnels.isReconnecting(t.id), "the retry to be scheduled");
+    await until(() => statesOf(t.id).filter((x) => x === "starting").length >= 2, "the retry to be in flight");
     tunnels.stop(t.id);
+    release();
+    h.gate = Promise.resolve();
     await new Promise((r) => setTimeout(r, 400));
     expect(tunnels.isRunning(t.id)).toBe(false);
+    expect(tunnels.isReconnecting(t.id)).toBe(false);
     expect(await canConnect(t.srcPort)).toBe(false);
+    expect(statesOf(t.id).at(-1)).toBe("stopped");
   });
 
   it("a manual start while waiting replaces the pending retry", async () => {
