@@ -52,6 +52,9 @@ win:
   icon: resources/icon.ico
   target:
     - nsis
+  # Hyphens, not spaces: GitHub rewrites spaces in uploaded file names, which
+  # would leave latest.yml pointing at a name that doesn't exist.
+  artifactName: ${productName}-Setup-${version}.${ext}
 linux:
   target:
     - AppImage
