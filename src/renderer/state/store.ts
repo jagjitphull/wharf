@@ -135,6 +135,14 @@ function splitNode(node: PaneNode, targetSessionId: string, newSessionId: string
   return { ...node, children: node.children.map((c) => splitNode(c, targetSessionId, newSessionId, direction)) };
 }
 
+/** Swaps the leaf for `oldSessionId` with one for `newSessionId`, keeping
+ * its exact place (and sizes) in the tree. Returns the node unchanged if the
+ * old session isn't there. */
+export function replaceLeaf(node: PaneNode, oldSessionId: string, newSessionId: string): PaneNode {
+  if (node.type === "leaf") return node.sessionId === oldSessionId ? { type: "leaf", sessionId: newSessionId } : node;
+  return { ...node, children: node.children.map((c) => replaceLeaf(c, oldSessionId, newSessionId)) };
+}
+
 /** Removes a leaf. A split left with exactly one remaining child collapses
  * into that child directly (so closing back down to one pane leaves a
  * plain leaf, not a pointless 1-child split). Returns null if the whole
@@ -222,6 +230,13 @@ interface AppState {
   /** Closes every pane in a tab and removes the tab. */
   closeTab(tabId: string): Promise<void>;
   duplicateTab(tabId: string): Promise<void>;
+  /** Replaces each of `sessionIds` (panes of `tabId`) with a fresh session to
+   * the same host (or a new local shell), in the same place in the layout.
+   * What was on screen stays above a marker line, so a dropped session can be
+   * resumed without losing its history. Panes are done one after another; one
+   * that can't reconnect keeps its old (closed) session and the rest still
+   * go ahead. Rejects afterwards, naming each failure, if any did. */
+  reconnectPanes(tabId: string, sessionIds: string[]): Promise<void>;
   reorderTab(tabId: string, beforeTabId: string): void;
   /** Creates a new tab group containing just `tabId`, with a freshly-picked
    * color (round-robins TAB_GROUP_COLORS by how many groups already exist,
@@ -544,6 +559,50 @@ export const useAppStore = create<AppState>((set, get) => ({
     const host = get().hosts.find((h) => h.id === meta.hostId);
     if (!host) return;
     await get().openTerminal(host, meta.themeId);
+  },
+
+  async reconnectPanes(tabId, sessionIds) {
+    const failures: string[] = [];
+    for (const oldId of sessionIds) {
+      const meta = get().paneMeta[oldId];
+      if (!meta) continue;
+      try {
+        const host = meta.hostId === null ? null : (get().hosts.find((h) => h.id === meta.hostId) ?? null);
+        if (meta.hostId !== null && !host) throw new Error("this host was deleted");
+        // Read before the swap: the old terminal unregisters its scrollback source when it unmounts.
+        const scrollback = getScrollback(oldId);
+        const { sessionId: newId, meta: fresh } = await connectSession(host, meta.themeId, 0);
+        const stillThere = get().tabs.some((t) => t.tabId === tabId && flattenPanes(t.layout).includes(oldId));
+        if (!stillThere) {
+          // The pane was closed while we were connecting; don't leave an orphan session behind.
+          await wharf.ssh.disconnect(newId).catch(() => {});
+          continue;
+        }
+        set((s) => {
+          const paneMeta = { ...s.paneMeta };
+          delete paneMeta[oldId];
+          paneMeta[newId] = {
+            ...fresh,
+            title: meta.title,
+            restoredScrollback: scrollback,
+            restoredScrollbackCapturedAt: scrollback ? Date.now() : undefined,
+            restoreNotice: `Reconnected to ${meta.title}`,
+          };
+          return {
+            paneMeta,
+            tabs: s.tabs.map((t) =>
+              t.tabId === tabId
+                ? { ...t, layout: replaceLeaf(t.layout, oldId, newId), activePaneId: t.activePaneId === oldId ? newId : t.activePaneId }
+                : t,
+            ),
+          };
+        });
+        await wharf.ssh.disconnect(oldId).catch(() => {});
+      } catch (err) {
+        failures.push(`${meta.title}: ${ipcErrorMessage(err)}`);
+      }
+    }
+    if (failures.length > 0) throw new Error(failures.join("\n"));
   },
 
   reorderTab(tabId, beforeTabId) {
