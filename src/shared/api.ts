@@ -150,6 +150,16 @@ export interface WharfApi {
   secrets: {
     /** Whether saved passwords and key passphrases are encrypted with the OS keyring, or (on a machine without one) only base64-encoded. */
     status(): Promise<SecretStorageStatus>;
+    /** Protects every saved secret with a master password (at least 8 characters) and leaves Wharf unlocked for this run. */
+    setMasterPassword(password: string): Promise<void>;
+    changeMasterPassword(current: string, next: string): Promise<void>;
+    /** Turns the master password off; secrets go back to the system keyring. */
+    removeMasterPassword(password: string): Promise<void>;
+    /** Throws "Wrong master password." if it doesn't match. Starts any tunnels set to start at launch. */
+    unlock(password: string): Promise<void>;
+    lock(): Promise<void>;
+    /** Forgotten password: erases every saved secret and the master password. */
+    reset(): Promise<void>;
   };
   update: {
     /** Asks GitHub whether a newer release exists. Never rejects — failures come back in `error`. */

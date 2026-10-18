@@ -119,6 +119,62 @@ function broadcastState(tunnelId: string, status: TunnelStatus, error?: string):
   }
 }
 
+/**
+ * Automatic reconnection. A tunnel the user started that loses its SSH
+ * connection (network change, laptop sleep, server restart) keeps trying to
+ * come back, with a growing pause between attempts, until the user stops it.
+ * It gives up early only for failures that retrying won't fix and could do
+ * harm: repeated bad logins can lock an account, and a changed host key is
+ * something to look at, not to retry past.
+ */
+export const reconnectPolicy = { baseMs: 2_000, maxMs: 60_000 };
+
+interface Retry {
+  timer?: NodeJS.Timeout;
+}
+const retries = new Map<string, Retry>();
+
+function reconnectDelay(attempt: number): number {
+  return Math.min(reconnectPolicy.baseMs * 2 ** attempt, reconnectPolicy.maxMs);
+}
+
+function isPermanentFailure(message: string): boolean {
+  return /authentication|permission denied|host key|not found|passwords are locked/i.test(message);
+}
+
+function cancelRetry(tunnelId: string): boolean {
+  const retry = retries.get(tunnelId);
+  if (!retry) return false;
+  if (retry.timer) clearTimeout(retry.timer);
+  retries.delete(tunnelId);
+  return true;
+}
+
+function scheduleReconnect(tunnelId: string, attempt: number, retry: Retry, reason: string): void {
+  const delay = reconnectDelay(attempt);
+  broadcastState(tunnelId, "reconnecting", `${reason} Retrying in ${Math.round(delay / 1000)}s.`);
+  retry.timer = setTimeout(() => {
+    retry.timer = undefined;
+    void connect(tunnelId).then(
+      () => {
+        // Stopped while the attempt was in flight: it just registered a running tunnel nobody wants.
+        if (retries.get(tunnelId) !== retry) stop(tunnelId);
+        else retries.delete(tunnelId);
+      },
+      (err: unknown) => {
+        if (retries.get(tunnelId) !== retry) return;
+        const message = err instanceof Error ? err.message : String(err);
+        if (isPermanentFailure(message)) {
+          retries.delete(tunnelId);
+          log.warn(`Tunnel ${tunnelId} stopped reconnecting: ${message}`);
+          return; // connect() already reported the error state
+        }
+        scheduleReconnect(tunnelId, attempt + 1, retry, `Couldn't reconnect: ${message}.`);
+      },
+    );
+  }, delay);
+}
+
 export function list(): TunnelRecord[] {
   return getTunnels();
 }
@@ -163,6 +219,11 @@ export async function startAutoStartTunnels(): Promise<void> {
 }
 
 export async function start(tunnelId: string): Promise<void> {
+  cancelRetry(tunnelId); // starting by hand replaces any pending automatic retry
+  await connect(tunnelId);
+}
+
+async function connect(tunnelId: string): Promise<void> {
   if (running.has(tunnelId)) return;
 
   const tunnel = getTunnels().find((t) => t.id === tunnelId);
@@ -249,7 +310,10 @@ export async function start(tunnelId: string): Promise<void> {
       // the tunnel again fails with EADDRINUSE.
       entry.server?.close();
       running.delete(tunnelId);
-      broadcastState(tunnelId, "stopped");
+      cancelRetry(tunnelId);
+      const retry: Retry = {};
+      retries.set(tunnelId, retry);
+      scheduleReconnect(tunnelId, 0, retry, "Connection lost.");
     };
     client.on("close", onClose);
 
@@ -272,8 +336,12 @@ export async function start(tunnelId: string): Promise<void> {
 }
 
 export function stop(tunnelId: string): void {
+  const wasRetrying = cancelRetry(tunnelId);
   const entry = running.get(tunnelId);
-  if (!entry) return;
+  if (!entry) {
+    if (wasRetrying) broadcastState(tunnelId, "stopped");
+    return;
+  }
   entry.server?.close();
   entry.detach();
   running.delete(tunnelId);
@@ -285,7 +353,11 @@ export function stop(tunnelId: string): void {
 }
 
 export function stopAll(): void {
-  for (const id of [...running.keys()]) stop(id);
+  for (const id of new Set([...running.keys(), ...retries.keys()])) stop(id);
+}
+
+export function isReconnecting(tunnelId: string): boolean {
+  return retries.has(tunnelId);
 }
 
 export function isRunning(tunnelId: string): boolean {

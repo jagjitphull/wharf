@@ -8,7 +8,8 @@ import { useAppStore } from "./state/store";
 import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
 import { useUiPrefsStore } from "./state/uiPrefsStore";
 import { useRestoreTabsPrefsStore } from "./state/restoreTabsPrefsStore";
-import { ipcErrorMessage } from "./api/wharf";
+import { ipcErrorMessage, wharf } from "./api/wharf";
+import { LockScreen } from "./components/LockScreen/LockScreen";
 
 // Lazy: each is its own chunk, fetched only the first time its view/modal
 // is actually opened, rather than all bundled into the one chunk the whole
@@ -43,7 +44,18 @@ export default function App() {
   // guard correct regardless of which of the two overlapping loadAll()
   // calls' .then() happens to resolve first.
   const restoredRef = useRef(false);
+  // Restoring tabs reconnects hosts, which needs saved passwords, so with a
+  // master password set it waits for the lock screen to be answered.
+  const [lock, setLock] = useState<"checking" | "locked" | "open">("checking");
   useEffect(() => {
+    wharf.secrets
+      .status()
+      .then((s) => setLock(s.masterPassword === "locked" ? "locked" : "open"))
+      .catch(() => setLock("open"));
+  }, []);
+
+  useEffect(() => {
+    if (lock === "checking" || lock === "locked") return;
     void loadAll().then(() => {
       if (restoredRef.current) return;
       restoredRef.current = true;
@@ -54,7 +66,7 @@ export default function App() {
         void useAppStore.getState().restoreLastSession();
       }
     });
-  }, [loadAll]);
+  }, [loadAll, lock]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -139,6 +151,7 @@ export default function App() {
   return (
     <div className="app-root">
       <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} />
+      {lock === "locked" && <LockScreen onDone={() => setLock("open")} />}
       <div className="app-shell">
         {!sidebarCollapsed && (
           <>

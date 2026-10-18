@@ -3,6 +3,7 @@ import { app } from "electron";
 import Store from "electron-store";
 import { moveAsideIfCorrupt } from "./dataFileRecovery";
 import { restrictToOwner } from "./dataFilePermissions";
+import type { MasterPasswordConfig } from "./masterKey";
 import type {
   AiProvider,
   AiProviderConfig,
@@ -36,6 +37,8 @@ interface Schema {
   commandHistory: CommandHistoryEntry[];
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
+  /** Set when a master password protects `secrets`: the salt/cost it was derived with and a check value. Never the password or key. */
+  masterPassword: MasterPasswordConfig | null;
   /** Which AI autocomplete backend is active. */
   aiProvider: AiProvider;
   /** Per-cloud-provider API key id in `secrets` (same encrypted-at-rest storage as host passwords) — Ollama has no key, so it never appears here. */
@@ -58,6 +61,7 @@ const defaults: Schema = {
   lastSessionTabs: [],
   commandHistory: [],
   secrets: {},
+  masterPassword: null,
   aiProvider: "claude",
   aiApiKeySecretIds: {},
   aiProviderConfig: {},

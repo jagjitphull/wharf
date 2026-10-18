@@ -74,7 +74,15 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Port forwarding — local, remote & dynamic (SOCKS5) SSH tunnels, managed
   from a Tunnels panel. Tick **On launch** on a tunnel and Wharf starts it by itself every time
   the app opens (one that can't start, say because the port is taken, shows its error in the panel
-  and doesn't hold up the others; tunnels to the same host share one connection).
+  and doesn't hold up the others; tunnels to the same host share one connection). A running tunnel
+  whose SSH connection drops (network change, sleep, server restart) reconnects by itself, waiting
+  2s, 4s, 8s … up to 60s between attempts, until you stop it. It gives up at once if the login is
+  refused or the host key changed, since retrying a bad password can lock an account.
+- Optional master password (Settings → saved passwords) that encrypts saved passwords and key
+  passphrases with a key derived from it (scrypt, AES-256-GCM) instead of relying on the OS keyring,
+  which is the way to protect them on a Linux machine that has none. Wharf asks for it at launch
+  (or you can carry on without unlocking: hosts using an agent or an unprotected key still work);
+  it can be changed, removed, or locked on demand.
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
@@ -274,8 +282,9 @@ The SSH stack is tested end to end against a **real SSH server running inside th
 (shell sessions, resize, wrong password, rejected host key, one connection shared by several
 sessions, jump hosts, reconnect after a dropped connection), `sftpManager.test.ts` (listing, editing,
 file operations, upload/download with progress, server-to-server copy, search limits) and
-`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, restart after a drop,
-starting marked tunnels at launch).
+`tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, automatic reconnection
+after a drop, starting marked tunnels at launch) and `masterKey.test.ts` / `secretStore.test.ts`
+(the master password's cryptography, locking, changing and removing it).
 Only Electron's windows, the saved-host and secret stores and the interactive host-key prompt are
 stubbed. Test files and the test server are excluded from the packaged app, but `npm run typecheck`
 still type-checks them.
@@ -481,8 +490,12 @@ scripts/
   This is no longer silent: Settings shows a warning (and the host dialog a note next to the
   password field) whenever it applies, `wharf-data.json` and its folder are owner-only, and the
   next launch after you install and unlock a keyring re-encrypts what was saved. What Wharf
-  doesn't have is a master password for machines that will never have a keyring; an SSH agent or
-  a key without a passphrase avoids storing anything.
+  also offers is an optional master password (Settings) for machines that will never have a
+  keyring. It has to be entered at every launch, there is no recovery if it is forgotten (the only
+  way out is erasing the saved passwords from the lock screen or Settings), it doesn't lock
+  automatically after a period of inactivity, and a master password set while the keyring is
+  available replaces the keyring for those secrets. An SSH agent or a key without a passphrase
+  avoids storing anything.
 - `knownHosts.ts` supports exact-host and `*`/`?` glob patterns (including
   `!negation`), `[host]:port`, hashed (`HashKnownHosts`) entries, and `@revoked`
   (a revoked key is always refused, with no "trust anyway" option, even if
@@ -594,7 +607,10 @@ scripts/
   relative imports left to resolve at runtime.
 - Host passwords and key passphrases are never written to disk in
   plaintext; only their `secretId` reference lives on the `HostRecord`. Without an OS keyring they
-  are only base64-encoded, and Wharf says so in Settings (see Known limitations).
+  are only base64-encoded, and Wharf says so in Settings (see Known limitations). With a master
+  password each secret is `mp:` + base64(nonce, tag, ciphertext) under a key from scrypt
+  (N=2^17, r=8, p=1, random salt) that exists in memory only while unlocked; the data file holds
+  just the salt, the cost and a sealed check value, never the password or the key.
 - The data file is created owner-only (mode 600, folder 700). The store library's default is
   world-readable, which would have exposed every saved host (and any base64-stored password) to
   other users of the machine and let them rewrite it. The launch smoke test fails if the packaged

@@ -355,14 +355,21 @@ export interface SelfUpdateState {
   error?: string;
 }
 
+/** The optional master password: not set, set but not entered yet this run, or entered. */
+export type MasterPasswordState = "none" | "locked" | "unlocked";
+
 export interface SecretStorageStatus {
-  /** True when saved passwords and key passphrases are encrypted with the OS keyring. */
+  /** True when saved passwords and key passphrases are encrypted: with the OS keyring, or with the master password. */
   encrypted: boolean;
+  masterPassword: MasterPasswordState;
+  /** True when this machine has an OS keyring, so removing the master password returns secrets to it rather than to base64. */
+  keyringAvailable: boolean;
   /** How many saved secrets are currently stored only base64-encoded. */
   unencryptedCount: number;
 }
 
-export type TunnelStatus = "stopped" | "starting" | "running" | "error";
+/** "reconnecting": the SSH connection dropped and Wharf is retrying; `error` says why and when. */
+export type TunnelStatus = "stopped" | "starting" | "running" | "reconnecting" | "error";
 
 export interface TunnelStateEvent {
   tunnelId: string;
@@ -478,6 +485,12 @@ export const IPC = {
   },
   secrets: {
     status: "secrets:status",
+    setMasterPassword: "secrets:set-master-password",
+    changeMasterPassword: "secrets:change-master-password",
+    removeMasterPassword: "secrets:remove-master-password",
+    unlock: "secrets:unlock",
+    lock: "secrets:lock",
+    reset: "secrets:reset",
   },
   update: {
     check: "update:check",

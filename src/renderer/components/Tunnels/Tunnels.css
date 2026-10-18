@@ -84,6 +84,17 @@
   background: var(--accent);
 }
 
+.tunnel-dot.reconnecting {
+  background: var(--accent);
+  animation: tunnel-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tunnel-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .tunnel-dot.error {
   background: var(--danger-text);
 }
@@ -101,6 +112,11 @@
 .tunnel-error {
   font-size: 11px;
   color: var(--danger-text);
+}
+
+.tunnel-note {
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 .tunnel-actions {

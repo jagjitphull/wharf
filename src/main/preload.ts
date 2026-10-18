@@ -96,6 +96,12 @@ const api: WharfApi = {
   },
   secrets: {
     status: () => ipcRenderer.invoke(IPC.secrets.status),
+    setMasterPassword: (password) => ipcRenderer.invoke(IPC.secrets.setMasterPassword, password),
+    changeMasterPassword: (current, next) => ipcRenderer.invoke(IPC.secrets.changeMasterPassword, current, next),
+    removeMasterPassword: (password) => ipcRenderer.invoke(IPC.secrets.removeMasterPassword, password),
+    unlock: (password) => ipcRenderer.invoke(IPC.secrets.unlock, password),
+    lock: () => ipcRenderer.invoke(IPC.secrets.lock),
+    reset: () => ipcRenderer.invoke(IPC.secrets.reset),
   },
   update: {
     check: () => ipcRenderer.invoke(IPC.update.check),
