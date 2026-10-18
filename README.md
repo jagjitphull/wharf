@@ -18,6 +18,12 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Multiple concurrent terminal sessions (tabbed) — duplicate a tab, drag to
   reorder, switch with `Ctrl/Cmd+1..9` or `Ctrl/Cmd+Tab`, and open multiple
   independent app windows (each with their own tabs)
+- Right-click a tab → **Reconnect** to bring a dropped session back: each closed pane in the tab is
+  replaced by a fresh connection to the same host (or a new local shell) in the same place, with
+  what was on screen kept above a marker line. When nothing has dropped the item reads
+  **Reconnect…** and, after asking, restarts the active pane (e.g. a hung connection). Anything
+  that was running in the old session is gone; a pane that can't reconnect stays as it was and the
+  error is shown.
 - Chrome-style tab groups — right-click a tab → New Tab Group… (or "Add to
   ⟨name⟩" once one exists) to cluster tabs under a named, colored label;
   click the label to collapse/expand the group, right-click it to rename,
@@ -283,7 +289,8 @@ The SSH stack is tested end to end against a **real SSH server running inside th
 sessions, jump hosts, reconnect after a dropped connection), `sftpManager.test.ts` (listing, editing,
 file operations, upload/download with progress, server-to-server copy, search limits) and
 `tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, automatic reconnection
-after a drop, starting marked tunnels at launch) and `masterKey.test.ts` / `secretStore.test.ts`
+after a drop, starting marked tunnels at launch) and `store.reconnect.test.ts` (tab reconnect: layout, history, failures, a pane closed mid-connect),
+`masterKey.test.ts` / `secretStore.test.ts`
 (the master password's cryptography, locking, changing and removing it).
 Only Electron's windows, the saved-host and secret stores and the interactive host-key prompt are
 stubbed. Test files and the test server are excluded from the packaged app, but `npm run typecheck`

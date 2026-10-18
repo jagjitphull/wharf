@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { useAppStore, TAB_GROUP_COLORS, type PaneNode, type TabGroup, type TerminalTab } from "../../state/store";
+import { useAppStore, flattenPanes, TAB_GROUP_COLORS, type PaneNode, type TabGroup, type TerminalTab } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
-import { wharf } from "../../api/wharf";
+import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
@@ -197,6 +197,7 @@ export function TerminalPanel({ hidden }: Props) {
     setActiveTab,
     closeTab,
     duplicateTab,
+    reconnectPanes,
     reorderTab,
     setPaneThemeId,
     setPaneLogPath,
@@ -225,6 +226,24 @@ export function TerminalPanel({ hidden }: Props) {
 
   async function closeAll() {
     for (const tab of tabs) await closeTab(tab.tabId);
+  }
+
+  /** Reconnects the tab's dropped panes; with none dropped, the active pane
+   * (after asking, since that ends whatever is running in it). */
+  async function reconnectTab(tab: TerminalTab) {
+    const panes = flattenPanes(tab.layout);
+    const dropped = panes.filter((id) => paneMeta[id]?.closed);
+    const targets = dropped.length > 0 ? dropped : [tab.activePaneId];
+    if (dropped.length === 0) {
+      const title = paneMeta[tab.activePaneId]?.title ?? "this session";
+      if (!confirm(`"${title}" is still connected. Reconnecting ends whatever is running in it and starts a new session. Continue?`))
+        return;
+    }
+    try {
+      await reconnectPanes(tab.tabId, targets);
+    } catch (err) {
+      alert(`Couldn't reconnect:\n${ipcErrorMessage(err)}`);
+    }
   }
 
   async function toggleLogging(sessionId: string, currentLogPath: string | undefined) {
@@ -267,6 +286,7 @@ export function TerminalPanel({ hidden }: Props) {
         title={activeMeta?.title ?? "…"}
         hostId={activeMeta?.hostId ?? null}
         closed={activeMeta?.closed ?? false}
+        anyPaneClosed={flattenPanes(tab.layout).some((id) => paneMeta[id]?.closed)}
         closeError={activeMeta?.closeError}
         logPath={activeMeta?.logPath}
         themeId={activeMeta?.themeId}
@@ -291,6 +311,7 @@ export function TerminalPanel({ hidden }: Props) {
         }}
         onClick={() => setActiveTab(tab.tabId)}
         onDuplicate={() => duplicateTab(tab.tabId)}
+        onReconnect={() => reconnectTab(tab)}
         onClose={() => closeTab(tab.tabId)}
         onCloseOthers={() => closeOthers(tab.tabId)}
         onCloseAll={closeAll}
@@ -429,6 +450,8 @@ interface TabButtonProps {
   title: string;
   hostId: string | null;
   closed: boolean;
+  /** Any pane of this tab (not just the active one) has dropped. */
+  anyPaneClosed: boolean;
   closeError?: string;
   logPath?: string;
   themeId?: string;
@@ -446,6 +469,7 @@ interface TabButtonProps {
   onDrop(): void;
   onClick(): void;
   onDuplicate(): void;
+  onReconnect(): void;
   onClose(): void;
   onCloseOthers(): void;
   onCloseAll(): void;
@@ -525,6 +549,7 @@ function TabButton(p: TabButtonProps) {
       onClick={p.onClick}
       onContextMenu={(e) =>
         p.openMenu(e, [
+          { label: p.anyPaneClosed ? "Reconnect" : "Reconnect…", onClick: p.onReconnect },
           { label: "Duplicate", onClick: p.onDuplicate },
           { separator: true },
           { label: "Close", onClick: p.onClose },
