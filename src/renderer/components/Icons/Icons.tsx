@@ -193,6 +193,14 @@ export function IconDuplicate({ size = 14 }: IconProps) {
   );
 }
 
+export function IconPin({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M9.6 2.2 13.8 6.4l-1.5.5-2.2 2.2.3 2.6-1 1-2.4-2.4-3.2 3.2-.7-.7 3.2-3.2-2.4-2.4 1-1 2.6.3 2.2-2.2z" />
+    </svg>
+  );
+}
+
 export function IconBroadcast({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" {...common}>

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useAppStore, flattenPanes, TAB_GROUP_COLORS, type PaneNode, type TabGroup, type TerminalTab } from "../../state/store";
+import { useAppStore, flattenPanes, TAB_COLORS, TAB_GROUP_COLORS, type PaneNode, type TabGroup, type TerminalTab } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
@@ -7,7 +7,7 @@ import { TerminalView } from "./Terminal";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
 import { PromptDialog } from "../PromptDialog/PromptDialog";
-import { IconBroadcast, IconChevronDown, IconChevronUp, IconClose, IconDuplicate, IconTerminal } from "../Icons/Icons";
+import { IconBroadcast, IconChevronDown, IconChevronUp, IconClose, IconDuplicate, IconPin, IconTerminal } from "../Icons/Icons";
 import { EmptyState } from "../EmptyState/EmptyState";
 import "./TerminalPanel.css";
 
@@ -198,6 +198,13 @@ export function TerminalPanel({ hidden }: Props) {
     closeTab,
     duplicateTab,
     reconnectPanes,
+    setTabPinned,
+    renameTab,
+    renamePane,
+    moveTab,
+    closeTabsToRight,
+    setTabColor,
+    saveCurrentAsWorkspace,
     reorderTab,
     setPaneThemeId,
     setPaneLogPath,
@@ -217,15 +224,21 @@ export function TerminalPanel({ hidden }: Props) {
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [newGroupTabId, setNewGroupTabId] = useState<string | null>(null);
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
+  const [renamingPaneTabId, setRenamingPaneTabId] = useState<string | null>(null);
+  const [savingTabId, setSavingTabId] = useState<string | null>(null);
 
+  // Pinned tabs survive the bulk closes; they're closed one at a time, on purpose.
   async function closeOthers(tabId: string) {
     for (const tab of tabs) {
-      if (tab.tabId !== tabId) await closeTab(tab.tabId);
+      if (tab.tabId !== tabId && !tab.pinned) await closeTab(tab.tabId);
     }
   }
 
   async function closeAll() {
-    for (const tab of tabs) await closeTab(tab.tabId);
+    for (const tab of tabs) {
+      if (!tab.pinned) await closeTab(tab.tabId);
+    }
   }
 
   /** Reconnects the tab's dropped panes; with none dropped, the active pane
@@ -272,6 +285,12 @@ export function TerminalPanel({ hidden }: Props) {
     );
   }
 
+  /** Whether the tab has a neighbour in that direction within its own (pinned or unpinned) block. */
+  function canMove(tab: TerminalTab, delta: -1 | 1): boolean {
+    const neighbour = tabs[tabs.indexOf(tab) + delta];
+    return !!neighbour && !!neighbour.pinned === !!tab.pinned;
+  }
+
   function renderTabButton(tab: TerminalTab) {
     const activeMeta = paneMeta[tab.activePaneId];
     // Position in the flat tab order, 1-based — matches exactly what
@@ -283,7 +302,13 @@ export function TerminalPanel({ hidden }: Props) {
         key={tab.tabId}
         tabId={tab.tabId}
         tabNumber={tabNumber}
-        title={activeMeta?.title ?? "…"}
+        title={tab.customTitle ?? activeMeta?.title ?? "…"}
+        pinned={!!tab.pinned}
+        color={tab.color}
+        isSplit={tab.layout.type === "split"}
+        canMoveLeft={canMove(tab, -1)}
+        canMoveRight={canMove(tab, 1)}
+        hasTabsToClose={tabs.slice(tabs.indexOf(tab) + 1).some((t) => !t.pinned)}
         hostId={activeMeta?.hostId ?? null}
         closed={activeMeta?.closed ?? false}
         anyPaneClosed={flattenPanes(tab.layout).some((id) => paneMeta[id]?.closed)}
@@ -312,6 +337,14 @@ export function TerminalPanel({ hidden }: Props) {
         onClick={() => setActiveTab(tab.tabId)}
         onDuplicate={() => duplicateTab(tab.tabId)}
         onReconnect={() => reconnectTab(tab)}
+        onRename={() => setRenamingTabId(tab.tabId)}
+        onRenamePane={() => setRenamingPaneTabId(tab.tabId)}
+        onTogglePin={() => setTabPinned(tab.tabId, !tab.pinned)}
+        onMove={(dir) => moveTab(tab.tabId, dir)}
+        onCopyTitle={() => void wharf.clipboard.writeText(tab.customTitle ?? activeMeta?.title ?? "")}
+        onSaveWorkspace={() => setSavingTabId(tab.tabId)}
+        onCloseRight={() => closeTabsToRight(tab.tabId)}
+        onSetColor={(c) => setTabColor(tab.tabId, c)}
         onClose={() => closeTab(tab.tabId)}
         onCloseOthers={() => closeOthers(tab.tabId)}
         onCloseAll={closeAll}
@@ -427,6 +460,55 @@ export function TerminalPanel({ hidden }: Props) {
           }}
         />
       )}
+      {renamingTabId && (
+        <PromptDialog
+          title="Rename tab"
+          label="Name (leave empty to use the session's own name)"
+          defaultValue={
+            tabs.find((t) => t.tabId === renamingTabId)?.customTitle ??
+            paneMeta[tabs.find((t) => t.tabId === renamingTabId)?.activePaneId ?? ""]?.title
+          }
+          confirmLabel="Rename"
+          onCancel={() => setRenamingTabId(null)}
+          onSubmit={(name) => {
+            renameTab(renamingTabId, name);
+            setRenamingTabId(null);
+          }}
+        />
+      )}
+      {renamingPaneTabId && (
+        <PromptDialog
+          title="Rename active pane"
+          label="Name"
+          defaultValue={paneMeta[tabs.find((t) => t.tabId === renamingPaneTabId)?.activePaneId ?? ""]?.title}
+          confirmLabel="Rename"
+          onCancel={() => setRenamingPaneTabId(null)}
+          onSubmit={(name) => {
+            const pane = tabs.find((t) => t.tabId === renamingPaneTabId)?.activePaneId;
+            if (pane) renamePane(pane, name);
+            setRenamingPaneTabId(null);
+          }}
+        />
+      )}
+      {savingTabId && (
+        <PromptDialog
+          title="Save tab as workspace"
+          label="Workspace name"
+          defaultValue={
+            tabs.find((t) => t.tabId === savingTabId)?.customTitle ??
+            paneMeta[tabs.find((t) => t.tabId === savingTabId)?.activePaneId ?? ""]?.title
+          }
+          confirmLabel="Save"
+          onCancel={() => setSavingTabId(null)}
+          onSubmit={(name) => {
+            const tabId = savingTabId;
+            setSavingTabId(null);
+            if (name.trim()) {
+              saveCurrentAsWorkspace(name.trim(), [tabId]).catch((err) => alert(`Couldn't save the workspace:\n${ipcErrorMessage(err)}`));
+            }
+          }}
+        />
+      )}
       {renamingGroupId && (
         <PromptDialog
           title="Rename tab group"
@@ -470,6 +552,22 @@ interface TabButtonProps {
   onClick(): void;
   onDuplicate(): void;
   onReconnect(): void;
+  pinned: boolean;
+  color?: string;
+  /** The tab has several panes (so "Rename pane" means something). */
+  isSplit: boolean;
+  canMoveLeft: boolean;
+  canMoveRight: boolean;
+  /** There is at least one unpinned tab to this tab's right. */
+  hasTabsToClose: boolean;
+  onRename(): void;
+  onRenamePane(): void;
+  onTogglePin(): void;
+  onMove(direction: "left" | "right"): void;
+  onCopyTitle(): void;
+  onSaveWorkspace(): void;
+  onCloseRight(): void;
+  onSetColor(color: string | undefined): void;
   onClose(): void;
   onCloseOthers(): void;
   onCloseAll(): void;
@@ -483,7 +581,8 @@ interface TabButtonProps {
 
 function TabButton(p: TabButtonProps) {
   const hosts = useAppStore((s) => s.hosts);
-  const hostColor = hosts.find((h) => h.id === p.hostId)?.color;
+  // A color picked for this tab wins over its host's.
+  const hostColor = p.color ?? hosts.find((h) => h.id === p.hostId)?.color;
   // undefined for the "Match App Theme" preset (the default for every tab
   // until someone deliberately picks one from the tab's right-click menu),
   // so tabs nobody has assigned a color theme to keep the plain look below
@@ -505,7 +604,7 @@ function TabButton(p: TabButtonProps) {
         e.preventDefault();
         p.onDrop();
       }}
-      className={`tab ${p.isActive ? "active" : ""} ${p.closed ? "closed" : ""} ${
+      className={`tab ${p.isActive ? "active" : ""} ${p.closed ? "closed" : ""} ${p.pinned ? "pinned" : ""} ${
         p.tabId === p.draggingId ? "dragging" : ""
       } ${p.tabId === p.dropTargetId ? "drop-target" : ""}`}
       // A host color used to draw the exact same top bar whether or not the tab
@@ -552,19 +651,62 @@ function TabButton(p: TabButtonProps) {
           { label: p.anyPaneClosed ? "Reconnect" : "Reconnect…", onClick: p.onReconnect },
           { label: "Duplicate", onClick: p.onDuplicate },
           { separator: true },
+          { label: "Rename Tab…", onClick: p.onRename },
+          ...(p.isSplit ? [{ label: "Rename Active Pane…", onClick: p.onRenamePane }] : []),
+          { label: p.pinned ? "Unpin Tab" : "Pin Tab", onClick: p.onTogglePin },
+          { label: "Move Tab Left", disabled: !p.canMoveLeft, onClick: () => p.onMove("left") },
+          { label: "Move Tab Right", disabled: !p.canMoveRight, onClick: () => p.onMove("right") },
+          { separator: true },
+          { label: "Copy Tab Title", onClick: p.onCopyTitle },
+          { label: "Save Tab as Workspace…", onClick: p.onSaveWorkspace },
+          { separator: true },
           { label: "Close", onClick: p.onClose },
           { label: "Close Others", disabled: p.tabCount < 2, onClick: p.onCloseOthers },
+          { label: "Close Tabs to the Right", disabled: !p.hasTabsToClose, onClick: p.onCloseRight },
           { label: "Close All", onClick: p.onCloseAll },
           { separator: true },
           { label: p.logPath ? "Stop Logging" : "Start Logging…", onClick: p.onToggleLogging },
           ...buildTerminalThemeMenuItems(p.themeId ?? p.globalTerminalThemeId, p.onSetTheme),
           { separator: true },
-          ...(p.groupId
-            ? [{ label: "Remove from group", onClick: p.onRemoveFromGroup }]
-            : [
-                ...p.tabGroups.map((g) => ({ label: `Add to "${g.name}"`, onClick: () => p.onAddToGroup(g.id) })),
-                { label: "New Tab Group…", onClick: p.onNewGroup },
-              ]),
+          // A pinned tab doesn't belong to a group (pinning takes it out of one).
+          ...(p.pinned
+            ? []
+            : p.groupId
+              ? [{ label: "Remove from group", onClick: p.onRemoveFromGroup }]
+              : [
+                  ...p.tabGroups.map((g) => ({ label: `Add to "${g.name}"`, onClick: () => p.onAddToGroup(g.id) })),
+                  { label: "New Tab Group…", onClick: p.onNewGroup },
+                ]),
+          { separator: true },
+          {
+            custom: (close) => (
+              <div className="term-theme-swatches">
+                <div className="term-theme-swatches-label">Tab color</div>
+                <div className="term-theme-swatches-grid">
+                  <button
+                    className={`term-theme-swatch-dot tab-color-none ${p.color ? "" : "active"}`}
+                    title="No color"
+                    onClick={() => {
+                      p.onSetColor(undefined);
+                      close();
+                    }}
+                  />
+                  {TAB_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`term-theme-swatch-dot ${p.color === c ? "active" : ""}`}
+                      style={{ background: c }}
+                      title={c}
+                      onClick={() => {
+                        p.onSetColor(c);
+                        close();
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ),
+          },
         ])
       }
       title={p.closeError}
@@ -585,6 +727,11 @@ function TabButton(p: TabButtonProps) {
           title={`Color theme: ${getTerminalThemePreset(p.themeId).name}`}
           style={{ background: getTerminalThemePreset(p.themeId).theme?.background ?? "var(--term-bg)" }}
         />
+      )}
+      {p.pinned && (
+        <span className="tab-pin" title="Pinned">
+          <IconPin size={11} />
+        </span>
       )}
       <span className="tab-title">{p.title}</span>
       {p.closed && <span className="tab-dot" />}

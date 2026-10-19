@@ -88,6 +88,13 @@ export interface TerminalTab {
    * than needing special-cased drag handling to keep it contiguous; they
    * re-merge visually the moment they're adjacent again. */
   groupId?: string;
+  /** Pinned tabs sit at the left, can't be closed by "Close Others/All/To the
+   * Right", and have no close button. Session-only, like the tab itself. */
+  pinned?: boolean;
+  /** A name the user gave this tab; shown instead of the active pane's title. */
+  customTitle?: string;
+  /** One of TAB_COLORS (or any CSS color): tints the tab's top bar. */
+  color?: string;
 }
 
 /** A named, colored cluster of tabs in the tab bar (Chrome/Edge-style tab
@@ -115,6 +122,33 @@ export const TAB_GROUP_COLORS = [
   "#8b6cef", // purple
   "#e0619f", // pink
 ] as const;
+
+/** Colors offered for an individual tab (the group palette minus its two
+ * least distinguishable entries, so the menu row stays a single short line). */
+export const TAB_COLORS = TAB_GROUP_COLORS.filter((c) => c !== "#2bb3a3" && c !== "#e0619f");
+
+/** Moves `tabId` to the end of the pinned block (pinning) or to just after it
+ * (unpinning), and takes a pinned tab out of its tab group. Returns the new
+ * order; the input is untouched. */
+export function reorderForPin(tabs: TerminalTab[], tabId: string, pinned: boolean): TerminalTab[] {
+  const tab = tabs.find((t) => t.tabId === tabId);
+  if (!tab) return tabs;
+  const rest = tabs.filter((t) => t.tabId !== tabId);
+  const updated: TerminalTab = pinned ? { ...tab, pinned: true, groupId: undefined } : { ...tab, pinned: undefined };
+  rest.splice(rest.filter((t) => t.pinned).length, 0, updated);
+  return rest;
+}
+
+/** Swaps a tab with its neighbour (`-1` left, `1` right), unless that would
+ * carry it across the pinned/unpinned boundary or off either end. */
+export function moveTabBy(tabs: TerminalTab[], tabId: string, delta: -1 | 1): TerminalTab[] {
+  const from = tabs.findIndex((t) => t.tabId === tabId);
+  const to = from + delta;
+  if (from === -1 || to < 0 || to >= tabs.length || !!tabs[from].pinned !== !!tabs[to].pinned) return tabs;
+  const next = [...tabs];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
 
 export type ActiveView = "hosts" | "sftp" | "tunnels" | "history" | "settings" | "workspaces";
 
@@ -204,7 +238,7 @@ interface AppState {
   /** Saves the currently open tabs (and each one's split layout) as a named
    * workspace — each pane is stored as a reference to its host (or null for
    * a local shell), not its live session, so it can be reopened fresh. */
-  saveCurrentAsWorkspace(name: string): Promise<void>;
+  saveCurrentAsWorkspace(name: string, tabIds?: string[]): Promise<void>;
   /** Reconnects every pane of every tab in a saved workspace and opens them
    * as new tabs alongside whatever's already open (existing tabs/sessions
    * are left alone). */
@@ -230,6 +264,18 @@ interface AppState {
   /** Closes every pane in a tab and removes the tab. */
   closeTab(tabId: string): Promise<void>;
   duplicateTab(tabId: string): Promise<void>;
+  /** Pins/unpins a tab (see TerminalTab.pinned). */
+  setTabPinned(tabId: string, pinned: boolean): void;
+  /** Gives a tab its own name; blank goes back to the active pane's title. */
+  renameTab(tabId: string, title: string): void;
+  /** Renames one pane (what the tab and status bar show when the tab has no name of its own). Blank is ignored. */
+  renamePane(sessionId: string, title: string): void;
+  /** Moves a tab one place left or right, within the pinned or unpinned block. */
+  moveTab(tabId: string, direction: "left" | "right"): void;
+  /** Closes every unpinned tab to the right of `tabId`. */
+  closeTabsToRight(tabId: string): Promise<void>;
+  /** Sets (or with undefined clears) a tab's color. */
+  setTabColor(tabId: string, color: string | undefined): void;
   /** Replaces each of `sessionIds` (panes of `tabId`) with a fresh session to
    * the same host (or a new local shell), in the same place in the layout.
    * What was on screen stays above a marker line, so a dropped session can be
@@ -434,9 +480,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ workspaces: await wharf.workspaces.list() });
   },
 
-  async saveCurrentAsWorkspace(name) {
+  async saveCurrentAsWorkspace(name, tabIds) {
     const { tabs, paneMeta } = get();
-    const workspaceTabs: WorkspaceTab[] = tabs.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta) }));
+    const chosen = tabIds ? tabs.filter((t) => tabIds.includes(t.tabId)) : tabs;
+    const workspaceTabs: WorkspaceTab[] = chosen.map((t) => ({ layout: paneNodeToWorkspaceNode(t.layout, paneMeta) }));
     await wharf.workspaces.create({ name, tabs: workspaceTabs });
     await get().refreshWorkspaces();
   },
@@ -561,6 +608,52 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().openTerminal(host, meta.themeId);
   },
 
+  setTabPinned(tabId, pinned) {
+    set((s) => {
+      const before = s.tabs.find((t) => t.tabId === tabId);
+      if (!before || !!before.pinned === pinned) return {};
+      const tabs = reorderForPin(s.tabs, tabId, pinned);
+      // A tab pinned out of its group may have been the group's last member.
+      const gid = before.groupId;
+      const tabGroups = pinned && gid && !tabs.some((t) => t.groupId === gid) ? s.tabGroups.filter((g) => g.id !== gid) : s.tabGroups;
+      return { tabs, tabGroups };
+    });
+  },
+
+  renameTab(tabId, title) {
+    const customTitle = title.trim() || undefined;
+    set((s) => ({ tabs: s.tabs.map((t) => (t.tabId === tabId ? { ...t, customTitle } : t)) }));
+  },
+
+  renamePane(sessionId, title) {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    set((s) => {
+      const meta = s.paneMeta[sessionId];
+      return meta ? { paneMeta: { ...s.paneMeta, [sessionId]: { ...meta, title: trimmed } } } : {};
+    });
+  },
+
+  moveTab(tabId, direction) {
+    set((s) => {
+      const tabs = moveTabBy(s.tabs, tabId, direction === "left" ? -1 : 1);
+      return tabs === s.tabs ? {} : { tabs };
+    });
+  },
+
+  async closeTabsToRight(tabId) {
+    const { tabs } = get();
+    const idx = tabs.findIndex((t) => t.tabId === tabId);
+    if (idx === -1) return;
+    for (const tab of tabs.slice(idx + 1)) {
+      if (!tab.pinned) await get().closeTab(tab.tabId);
+    }
+  },
+
+  setTabColor(tabId, color) {
+    set((s) => ({ tabs: s.tabs.map((t) => (t.tabId === tabId ? { ...t, color } : t)) }));
+  },
+
   async reconnectPanes(tabId, sessionIds) {
     const failures: string[] = [];
     for (const oldId of sessionIds) {
@@ -612,6 +705,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const fromIdx = tabs.findIndex((t) => t.tabId === tabId);
       const toIdx = tabs.findIndex((t) => t.tabId === beforeTabId);
       if (fromIdx === -1 || toIdx === -1) return {};
+      // Pinned tabs stay in front of unpinned ones, so a drag can't cross that line.
+      if (!!tabs[fromIdx].pinned !== !!tabs[toIdx].pinned) return {};
       const [moved] = tabs.splice(fromIdx, 1);
       tabs.splice(toIdx, 0, moved);
       return { tabs };
