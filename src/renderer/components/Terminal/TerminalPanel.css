@@ -86,7 +86,9 @@
   font-size: 12.5px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .tab:hover:not(.active) {
@@ -198,7 +200,9 @@
   opacity: 0.6;
   border-radius: 4px;
   padding: 3px;
-  transition: background-color 0.12s ease, opacity 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    opacity 0.12s ease;
 }
 
 .tab-close:hover,
@@ -330,7 +334,9 @@
   cursor: pointer;
   opacity: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: opacity 0.12s ease, color 0.12s ease;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease;
 }
 
 .pane-leaf:hover .pane-close-btn {
@@ -370,3 +376,27 @@
   background: var(--accent);
 }
 
+/* Pinned tabs: marked with a pin, no close/duplicate buttons, a shorter title. */
+.tab.pinned .tab-close,
+.tab.pinned .tab-duplicate {
+  display: none;
+}
+
+.tab.pinned .tab-title {
+  max-width: 96px;
+}
+
+.tab-pin {
+  display: inline-flex;
+  color: var(--text-dim);
+  flex: none;
+}
+
+.tab.active .tab-pin {
+  color: var(--accent);
+}
+
+/* "No color" swatch in the tab color row: an empty ring crossed by a slash. */
+.term-theme-swatch-dot.tab-color-none {
+  background: linear-gradient(135deg, transparent 45%, var(--text-dim) 45%, var(--text-dim) 55%, transparent 55%);
+}

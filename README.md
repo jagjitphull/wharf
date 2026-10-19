@@ -18,6 +18,11 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Multiple concurrent terminal sessions (tabbed) — duplicate a tab, drag to
   reorder, switch with `Ctrl/Cmd+1..9` or `Ctrl/Cmd+Tab`, and open multiple
   independent app windows (each with their own tabs)
+- Tab right-click menu: **Rename Tab…** (and **Rename Active Pane…** in a split tab), **Pin Tab**
+  (pinned tabs sit at the left, lose their close button and survive Close Others / Close All /
+  Close Tabs to the Right), **Move Tab Left/Right**, **Copy Tab Title**, **Save Tab as Workspace…**,
+  **Close Tabs to the Right** and a per-tab color. Names, pins and colors last for the session; they
+  aren't restored on the next launch.
 - Right-click a tab → **Reconnect** to bring a dropped session back: each closed pane in the tab is
   replaced by a fresh connection to the same host (or a new local shell) in the same place, with
   what was on screen kept above a marker line. When nothing has dropped the item reads
@@ -290,6 +295,7 @@ sessions, jump hosts, reconnect after a dropped connection), `sftpManager.test.t
 file operations, upload/download with progress, server-to-server copy, search limits) and
 `tunnelManager.test.ts` (local, remote and SOCKS5 forwarding, port conflicts, automatic reconnection
 after a drop, starting marked tunnels at launch) and `store.reconnect.test.ts` (tab reconnect: layout, history, failures, a pane closed mid-connect),
+`store.tabs.test.ts` (pin/move/rename/close-to-the-right/color and saving one tab as a workspace),
 `masterKey.test.ts` / `secretStore.test.ts`
 (the master password's cryptography, locking, changing and removing it).
 Only Electron's windows, the saved-host and secret stores and the interactive host-key prompt are
