@@ -2,7 +2,7 @@
   "name": "wharf",
   "productName": "Wharf",
   "desktopName": "wharf.desktop",
-  "version": "0.2.0-rc.4",
+  "version": "0.2.0-rc.5",
   "description": "A personal SSH/SFTP terminal client.",
   "author": "Wharf",
   "license": "UNLICENSED",
