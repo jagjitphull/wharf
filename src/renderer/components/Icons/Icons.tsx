@@ -66,6 +66,31 @@ export function IconPlus({ size = 14 }: IconProps) {
   );
 }
 
+export function IconCopy({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.4" />
+      <path d="M10.5 5.5V3.9a1.4 1.4 0 0 0-1.4-1.4H3.9a1.4 1.4 0 0 0-1.4 1.4v5.2a1.4 1.4 0 0 0 1.4 1.4h1.6" />
+    </svg>
+  );
+}
+
+export function IconCheck({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M3.2 8.4l3 3 6.6-6.8" />
+    </svg>
+  );
+}
+
+export function IconMinus({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M3 8h10" />
+    </svg>
+  );
+}
+
 export function IconFile({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" {...common}>

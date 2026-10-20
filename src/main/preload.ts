@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import { IPC } from "../shared/types";
 import type { WharfApi } from "../shared/api";
 
@@ -6,6 +6,22 @@ function on(channel: string, cb: (...args: unknown[]) => void) {
   const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => cb(payload);
   ipcRenderer.on(channel, listener);
   return () => ipcRenderer.removeListener(channel, listener);
+}
+
+// Interface size is real browser zoom (so menus, dialogs and every popup scale
+// and position correctly, with nothing to counter-zoom). It is applied here,
+// before the page's own scripts run, from the value the renderer stores, so
+// there is no flash of default-size chrome on launch.
+const UI_ZOOM_KEY = "wharf-ui-zoom";
+const UI_ZOOM_RANGE = { min: 0.5, max: 2 };
+function applyUiZoom(zoom: number): void {
+  if (zoom >= UI_ZOOM_RANGE.min && zoom <= UI_ZOOM_RANGE.max) webFrame.setZoomFactor(zoom);
+}
+try {
+  const stored = Number(localStorage.getItem(UI_ZOOM_KEY));
+  if (stored) applyUiZoom(stored);
+} catch {
+  /* localStorage unavailable: stay at 100% */
 }
 
 const api: WharfApi = {
@@ -85,6 +101,7 @@ const api: WharfApi = {
     newWindow: () => ipcRenderer.send(IPC.window.newWindow),
     onMaximizedChange: (cb) => on(IPC.window.onMaximizedChange, cb as (...args: unknown[]) => void),
     reload: () => ipcRenderer.send(IPC.window.reload),
+    setZoomFactor: (zoom) => applyUiZoom(zoom),
   },
   clipboard: {
     writeText: (text) => ipcRenderer.send(IPC.clipboard.writeText, text),

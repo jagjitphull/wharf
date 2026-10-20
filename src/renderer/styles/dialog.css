@@ -1,7 +1,8 @@
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11,8 +12,8 @@
 .dialog {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
+  border-radius: var(--radius-lg);
+  padding: 22px;
   width: 420px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 32px);
@@ -20,7 +21,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .dialog h2 {
@@ -51,7 +52,7 @@
 
 .dialog input,
 .dialog select {
-  background: var(--bg-input);
+  background-color: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
@@ -61,8 +62,7 @@
 
 .dialog input:focus,
 .dialog select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  outline: none;
 }
 
 .dialog-error {

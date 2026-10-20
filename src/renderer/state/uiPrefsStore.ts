@@ -1,3 +1,4 @@
+import { wharf } from "../api/wharf";
 import { create } from "zustand";
 
 const SIDEBAR_COLLAPSED_KEY = "wharf-sidebar-collapsed";
@@ -8,8 +9,8 @@ const COLLAPSED_GROUPS_KEY = "wharf-collapsed-groups";
 
 export const DEFAULT_UI_ZOOM = 1;
 export const MIN_UI_ZOOM = 0.85;
-export const MAX_UI_ZOOM = 1.4;
-const UI_ZOOM_STEP = 0.1;
+export const MAX_UI_ZOOM = 1.5;
+const UI_ZOOM_STEP = 0.05;
 
 export const DEFAULT_SIDEBAR_WIDTH = 280;
 export const MIN_SIDEBAR_WIDTH = 200;
@@ -66,21 +67,12 @@ function readStoredUiZoom(): number {
   return DEFAULT_UI_ZOOM;
 }
 
-// Everything but the terminal's own pane content (title bar, sidebar, tab
-// bar, dialogs, Settings/SFTP/Tunnels/History) lives under .app-root and
-// scales with it; .tab-pane-container carries the inverse zoom in
-// TerminalPanel.css specifically to cancel this back out, so a session's
-// actual terminal size/rendering is never affected — only the app's own
-// chrome text/controls.
+// Interface size is the page's real zoom (see preload.ts, which also applies
+// the stored value before first paint). A zoomed page makes the terminal's
+// own text bigger too, so Terminal.tsx divides its font size by this zoom to
+// keep a session looking exactly as the separate Terminal font size says.
 function applyToDocument(zoom: number): void {
-  document.documentElement.style.setProperty("--ui-zoom", String(zoom));
-  // .tab-pane-container only pays for the counter-zoom's extra width/height
-  // calc() (and the zoom property itself, which forces its own compositing
-  // layer) while a non-default interface size is actually in effect — see
-  // the .ui-zoom-active rule in TerminalPanel.css. At the default 1x most
-  // users never touch, this keeps that element on the plainer, better-worn
-  // `inset: 0` box it always used pre-Interface Size.
-  document.documentElement.classList.toggle("ui-zoom-active", zoom !== DEFAULT_UI_ZOOM);
+  wharf.window.setZoomFactor(zoom);
 }
 
 interface UiPrefsState {
@@ -112,9 +104,6 @@ interface UiPrefsState {
 }
 
 const initialUiZoom = readStoredUiZoom();
-// Applied synchronously at module load (before React renders), same as
-// themeStore's theme/accent — avoids a flash of default-size chrome.
-applyToDocument(initialUiZoom);
 
 export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
   sidebarCollapsed: readStoredCollapsed(),

@@ -6,6 +6,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
+import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { resolveXtermTheme } from "../../state/terminalThemes";
 import { flattenPanes, useAppStore } from "../../state/store";
@@ -126,6 +127,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const accent = useThemeStore((s) => s.accent);
   const fontSize = useTerminalPrefsStore((s) => s.fontSize);
+  // The page itself is zoomed by Interface size, which would scale the terminal's text with it;
+  // dividing it back out keeps a terminal exactly as big as its own font-size setting says.
+  const uiZoom = useUiPrefsStore((s) => s.uiZoom);
   const fontFamily = useTerminalPrefsStore((s) => s.fontFamily);
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const setPaneThemeId = useAppStore((s) => s.setPaneThemeId);
@@ -482,7 +486,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     const initialTheme = resolveXtermTheme(terminalThemeId);
     const term = new XTerm({
       fontFamily: useTerminalPrefsStore.getState().fontFamily,
-      fontSize: useTerminalPrefsStore.getState().fontSize,
+      fontSize: useTerminalPrefsStore.getState().fontSize / useUiPrefsStore.getState().uiZoom,
       cursorBlink: true,
       theme: initialTheme,
       // registerMarker/registerDecoration (used for keyword highlighting)
@@ -851,7 +855,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     const term = termRef.current;
     if (!term) return;
     term.options.fontFamily = fontFamily;
-    term.options.fontSize = fontSize;
+    term.options.fontSize = fontSize / uiZoom;
     const wasAtBottom = containerRef.current ? isScrolledToBottom(containerRef.current) : true;
     // Same reasoning as refit()'s own disposeGhostSuggestion() — a font/size
     // change resizes the cell grid a showing suggestion was positioned for.
@@ -859,7 +863,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     fitRef.current?.fit();
     if (wasAtBottom) term.scrollToBottom();
     wharf.ssh.resize(sessionId, term.cols, term.rows);
-  }, [fontSize, fontFamily, sessionId]);
+  }, [fontSize, uiZoom, fontFamily, sessionId]);
 
   useEffect(() => {
     if (visible) {

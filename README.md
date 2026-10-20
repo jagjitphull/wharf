@@ -101,9 +101,12 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Custom title bar with working minimize/maximize/close on every platform;
   remembers window size and position between launches
 - Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)
-- Light/dark/system theme with an accent-color picker, plus an interface
-  size control (Settings → Appearance) that scales the app's own chrome —
-  sidebar, tabs, every panel — independently of terminal font size
+- Light/dark/system theme with an accent-color picker (native controls,
+  scrollbars and select menus follow the theme), plus an interface size
+  slider, 85–150% (Settings → Appearance), that scales everything — sidebar,
+  tabs, panels, menus and dialogs — through real page zoom, independently of
+  the terminal font size, which is divided back out so terminals look exactly
+  as their own setting says
 - Terminal font size/family controls — 8 real coding fonts (JetBrains Mono,
   Fira Code, Cascadia Code, IBM Plex Mono, Source Code Pro, Roboto Mono,
   Inconsolata, Space Mono) are bundled directly rather than just named in
