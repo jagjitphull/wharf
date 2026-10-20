@@ -15,8 +15,8 @@
   max-height: 60vh;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;

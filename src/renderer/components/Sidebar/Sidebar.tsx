@@ -15,7 +15,7 @@ import "./Sidebar.css";
 const ROOT_NODE_ID = "__root__";
 
 interface Props {
-  onOpenQuickConnect(): void;
+  onOpenPalette(): void;
 }
 
 function hostMatchesFilter(host: HostRecord, filter: string): boolean {
@@ -28,7 +28,7 @@ function hostMatchesFilter(host: HostRecord, filter: string): boolean {
  * drop target right now" for dropTargetGroupId. */
 const UNGROUPED = "__ungrouped__";
 
-export function Sidebar({ onOpenQuickConnect }: Props) {
+export function Sidebar({ onOpenPalette }: Props) {
   const { hosts, groups, setActiveView, contextHostId, setContextHostId, openTerminal, openLocalShell, loadAll, moveHostToGroup } =
     useAppStore();
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
@@ -240,7 +240,7 @@ export function Sidebar({ onOpenQuickConnect }: Props) {
     <aside className="sidebar" style={{ width: sidebarWidth }}>
       <div className="sidebar-search">
         <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter hosts…" />
-        <button className="quick-connect-hint-btn" title="Quick Connect" onClick={onOpenQuickConnect}>
+        <button className="quick-connect-hint-btn" title="Command palette (Ctrl/Cmd+K)" onClick={onOpenPalette}>
           ⌘K
         </button>
       </div>

@@ -7,6 +7,17 @@
  * Fonts, all SIL Open Font License / Apache 2.0 — free to redistribute.
  */
 
+/* The interface font: Inter, one variable file (Latin subset, weights 100-900;
+   SIL Open Font License, see assets/fonts/inter-LICENSE.txt), so the app looks
+   the same on every platform instead of falling back to whatever the system has. */
+@font-face {
+  font-family: "Inter";
+  src: url("../assets/fonts/inter-latin-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @font-face {
   font-family: "JetBrains Mono";
   src: url("../assets/fonts/jetbrains-mono-400.woff2") format("woff2");

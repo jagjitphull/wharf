@@ -23,7 +23,7 @@ export const GROUPS: Group[] = [
   {
     title: "Global",
     shortcuts: [
-      { keys: `${MOD}+K`, description: "Quick Connect — jump to a host from anywhere" },
+      { keys: `${MOD}+K`, description: "Command palette — jump to a host or run an action" },
       { keys: `${MOD}+B`, description: "Show/hide the sidebar" },
       { keys: `${MOD}+1 … ${MOD}+9`, description: "Switch to tab 1 through 9" },
       { keys: `${MOD}+Tab`, description: "Next tab" },
@@ -54,7 +54,7 @@ export const GROUPS: Group[] = [
     ],
   },
   {
-    title: "Pickers (Quick Connect, snippets, etc.)",
+    title: "Pickers (command palette, snippets, etc.)",
     shortcuts: [
       { keys: "↑ / ↓", description: "Move the selection" },
       { keys: "Enter", description: "Choose the selected item" },

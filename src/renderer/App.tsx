@@ -1,14 +1,19 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { SidebarResizeHandle } from "./components/Sidebar/SidebarResizeHandle";
 import { TerminalPanel } from "./components/Terminal/TerminalPanel";
 import { StatusBar } from "./components/StatusBar/StatusBar";
+import { IconRail } from "./components/IconRail/IconRail";
+import { HomeView } from "./components/Home/HomeView";
 import { useAppStore } from "./state/store";
 import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
 import { useUiPrefsStore } from "./state/uiPrefsStore";
 import { useRestoreTabsPrefsStore } from "./state/restoreTabsPrefsStore";
 import { ipcErrorMessage, wharf } from "./api/wharf";
+import { buildPaletteActions } from "./components/CommandPalette/actions";
+import { Toaster } from "./components/Toaster/Toaster";
+import { toast } from "./state/toastStore";
 import { LockScreen } from "./components/LockScreen/LockScreen";
 
 // Lazy: each is its own chunk, fetched only the first time its view/modal
@@ -24,7 +29,7 @@ const Tunnels = lazy(() => import("./components/Tunnels/Tunnels").then((m) => ({
 const CommandHistory = lazy(() => import("./components/CommandHistory/CommandHistory").then((m) => ({ default: m.CommandHistory })));
 const Workspaces = lazy(() => import("./components/Workspaces/Workspaces").then((m) => ({ default: m.Workspaces })));
 const Settings = lazy(() => import("./components/Settings/Settings").then((m) => ({ default: m.Settings })));
-const QuickConnect = lazy(() => import("./components/QuickConnect/QuickConnect").then((m) => ({ default: m.QuickConnect })));
+const CommandPalette = lazy(() => import("./components/CommandPalette/CommandPalette").then((m) => ({ default: m.CommandPalette })));
 const KeyboardShortcuts = lazy(() =>
   import("./components/KeyboardShortcuts/KeyboardShortcuts").then((m) => ({ default: m.KeyboardShortcuts })),
 );
@@ -32,8 +37,14 @@ const KeyboardShortcuts = lazy(() =>
 export default function App() {
   const { activeView, hosts, groups, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
-  const [quickConnectOpen, setQuickConnectOpen] = useState(false);
+  const tabCount = useAppStore((s) => s.tabs.length);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Rebuilt each time the palette opens, so tab-dependent actions reflect the tabs that exist then.
+  const paletteActions = useMemo(
+    () => (paletteOpen ? buildPaletteActions({ openShortcuts: () => setShortcutsOpen(true) }) : []),
+    [paletteOpen],
+  );
 
   // Guards restoreLastSession() against React 18 StrictMode's dev-only
   // double-invoke of mount effects: unlike loadAll()'s refreshX calls
@@ -68,6 +79,11 @@ export default function App() {
     });
   }, [loadAll, lock]);
 
+  // Closing the last terminal leaves nothing to show on the terminal view; Home is the landing page.
+  useEffect(() => {
+    if (tabCount === 0 && activeView === "hosts") setActiveView("home");
+  }, [tabCount, activeView, setActiveView]);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
@@ -75,7 +91,7 @@ export default function App() {
 
       if (e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setQuickConnectOpen(true);
+        setPaletteOpen(true);
         return;
       }
 
@@ -136,26 +152,27 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [setActiveView]);
 
-  async function handleQuickConnect(host: (typeof hosts)[number]) {
-    setQuickConnectOpen(false);
+  async function handlePaletteConnect(host: (typeof hosts)[number]) {
+    setPaletteOpen(false);
     setContextHostId(host.id);
     try {
       await openTerminal(host);
     } catch (err) {
-      // Quick Connect has no inline error surface of its own; a native
-      // alert is acceptable for this rare failure path (e.g. bad host key).
-      alert(ipcErrorMessage(err));
+      // The palette has already closed, so there's no inline place for this.
+      toast.error(ipcErrorMessage(err));
     }
   }
 
   return (
     <div className="app-root">
-      <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} />
+      <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
       {lock === "locked" && <LockScreen onDone={() => setLock("open")} />}
       <div className="app-shell">
-        {!sidebarCollapsed && (
+        <IconRail />
+        {/* Home lists every host as a card, so the tree beside it would only repeat it. */}
+        {!sidebarCollapsed && activeView !== "home" && (
           <>
-            <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />
+            <Sidebar onOpenPalette={() => setPaletteOpen(true)} />
             <SidebarResizeHandle />
           </>
         )}
@@ -166,24 +183,53 @@ export default function App() {
               Kept outside the Suspense below on purpose: a lazy view's
               chunk loading must never hide an already-open terminal. */}
           <TerminalPanel hidden={activeView !== "hosts"} />
+          {activeView === "home" && <HomeView />}
           <Suspense fallback={<ViewLoadingFallback />}>
-            {activeView === "sftp" && <SftpBrowser />}
-            {activeView === "tunnels" && <Tunnels />}
-            {activeView === "history" && <CommandHistory />}
-            {activeView === "workspaces" && <Workspaces />}
-            {activeView === "settings" && <Settings />}
+            {/* Keyed by view so each one eases in when you switch to it. */}
+            {activeView === "sftp" && (
+              <div className="view-enter" key="sftp">
+                <SftpBrowser />
+              </div>
+            )}
+            {activeView === "tunnels" && (
+              <div className="view-enter" key="tunnels">
+                <Tunnels />
+              </div>
+            )}
+            {activeView === "history" && (
+              <div className="view-enter" key="history">
+                <CommandHistory />
+              </div>
+            )}
+            {activeView === "workspaces" && (
+              <div className="view-enter" key="workspaces">
+                <Workspaces />
+              </div>
+            )}
+            {activeView === "settings" && (
+              <div className="view-enter" key="settings">
+                <Settings />
+              </div>
+            )}
           </Suspense>
         </main>
       </div>
       <StatusBar />
+      <Toaster />
 
       {/* Independent fallback={null}: these pop in, each on its own
           chunk — a one-frame delay before a modal appears isn't worth a
           visible loading state, and each needs its own boundary since
           both can in principle be open at once. */}
-      {quickConnectOpen && (
+      {paletteOpen && (
         <Suspense fallback={null}>
-          <QuickConnect hosts={hosts} groups={groups} onClose={() => setQuickConnectOpen(false)} onConnect={handleQuickConnect} />
+          <CommandPalette
+            hosts={hosts}
+            groups={groups}
+            actions={paletteActions}
+            onClose={() => setPaletteOpen(false)}
+            onConnect={handlePaletteConnect}
+          />
         </Suspense>
       )}
 

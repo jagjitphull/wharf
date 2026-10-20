@@ -25,6 +25,8 @@ export interface CommandBlock {
   /** null while the command is still running, or if shell integration never reported one (a next command started before a ;D was seen — bash's DEBUG-trap approach can occasionally do this for compound commands). */
   exitCode: number | null;
   timestamp: number;
+  /** When the shell reported the exit status (;D); null while running or never reported. */
+  endedAt: number | null;
   bookmarked: boolean;
 }
 
@@ -107,6 +109,7 @@ export function handleOsc133(term: XTerm, state: CommandBlocksState, payload: st
       endMarker: null,
       exitCode: null,
       timestamp: Date.now(),
+      endedAt: null,
       bookmarked: false,
     };
     state.pendingCommand = null;
@@ -133,6 +136,7 @@ export function handleOsc133(term: XTerm, state: CommandBlocksState, payload: st
     const updated: CommandBlock = {
       ...state.blocks[idx],
       endMarker: term.registerMarker(0),
+      endedAt: Date.now(),
       exitCode: Number.isNaN(exitCode) ? null : exitCode,
     };
     state.blocks = [...state.blocks.slice(0, idx), updated, ...state.blocks.slice(idx + 1)];

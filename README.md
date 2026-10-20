@@ -39,7 +39,7 @@ A personal SSH/SFTP terminal client, Termius-style.
   splitting again), click a pane to focus it; drag the divider between two
   panes to resize them, or hit the × in a pane's corner (or right-click →
   Close Pane) to close just that one and collapse the split back down
-- Quick Connect (`Ctrl/Cmd+K`) — jump straight to a host from anywhere;
+- Command palette (`Ctrl/Cmd+K`) — jump straight to a host, or run an action (reconnect, duplicate, go to a view, toggle theme…; type `>` for actions only);
   the sidebar also has an inline filter box. Each row shows a live
   online/offline dot (a raw TCP probe against that host's port, no SSH
   handshake) so you can see what's actually reachable before connecting
@@ -101,8 +101,11 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Custom title bar with working minimize/maximize/close on every platform;
   remembers window size and position between launches
 - Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)
-- Light/dark/system theme with an accent-color picker (native controls,
-  scrollbars and select menus follow the theme), plus an interface size
+- Two house themes — **Harbor Night** (dark, deep navy with a teal beacon) and
+  **Sea Glass** (light, cool grey-green) — set to light/dark/system, in the
+  bundled Inter typeface, with an accent-color picker whose six colors each
+  have a tuned dark and light variant (native controls, scrollbars and select
+  menus follow the theme; text and accent contrast are checked by tests), plus an interface size
   slider, 85–150% (Settings → Appearance), that scales everything — sidebar,
   tabs, panels, menus and dialogs — through real page zoom, independently of
   the terminal font size, which is divided back out so terminals look exactly
@@ -156,9 +159,11 @@ A personal SSH/SFTP terminal client, Termius-style.
   Nothing is sent until you trigger a suggestion, and each request includes
   only the current line, recent command history, the host name, and your
   OS — never full command output
-- Command Blocks — each command you run gets grouped with its own output as
-  a distinct block in a right-side panel (right-click a terminal → Show
-  Command Blocks), color-coded by real exit code (green/red), with a
+- Command Blocks — each command you run is marked in the terminal itself
+  (a status rail down its left edge, a faint red tint on a failure, and a
+  pill with the exit code and how long it ran) and grouped with its own
+  output as a distinct block in a right-side panel (right-click a terminal →
+  Show Command Blocks), color-coded by real exit code (green/red), with a
   timestamp and a per-block menu: copy the command, copy just its output,
   re-run it, bookmark it, or (on a failed command) "Explain & Fix…". Driven
   by a small, standard shell-integration script (OSC 133, the same protocol
@@ -233,7 +238,7 @@ The full list is also available in-app: click the **?** icon in the title bar, o
 
 | Shortcut                    | Action                                                                  |
 | --------------------------- | ----------------------------------------------------------------------- |
-| `Ctrl/Cmd+K`                | Quick Connect — jump to a host from anywhere                            |
+| `Ctrl/Cmd+K`                | Command palette — jump to a host or run an action                       |
 | `Ctrl/Cmd+B`                | Show/hide the sidebar                                                   |
 | `Ctrl/Cmd+1` … `Ctrl/Cmd+9` | Switch to tab 1 through 9                                               |
 | `Ctrl/Cmd+Tab`              | Next tab                                                                |
@@ -251,7 +256,7 @@ The full list is also available in-app: click the **?** icon in the title bar, o
 | Right-click (terminal)      | Copy/paste/select all/clear, split pane, insert snippet, theme, logging |
 | `Ctrl/Cmd+S` (file editor)  | Save the file                                                           |
 | `Esc` (file editor)         | Close (asks first if there are unsaved changes)                         |
-| `↑` / `↓` (pickers)         | Move the selection in Quick Connect, snippets, etc.                     |
+| `↑` / `↓` (pickers)         | Move the selection in the palette, snippets, etc.                       |
 
 All of these work the same whether focus is on the sidebar or inside a terminal — a handful of these key combinations (e.g. `Ctrl+3` through `Ctrl+8`, `Ctrl+K`) are also real terminal control characters that `xterm.js` would otherwise send straight to the shell, so Wharf explicitly intercepts them before that happens.
 
@@ -473,7 +478,7 @@ src/
   renderer/               React UI (Vite)
     testing/               fakeXterm.ts, a test-only stand-in for xterm.js's Terminal
     components/            TitleBar, Sidebar, HostDialog, GroupDialog, Terminal, SftpBrowser,
-                            Tunnels, Settings, QuickConnect, ContextMenu, SnippetPicker,
+                            Tunnels, Settings, CommandPalette, ContextMenu, SnippetPicker,
                             ErrorBoundary, StatusBar, Icons, ...
     state/
       store.ts              zustand store (hosts, groups, tunnels, snippets, open terminal tabs)

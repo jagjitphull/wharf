@@ -1,21 +1,13 @@
 import { create } from "zustand";
+import { ACCENT_PRESETS, accentFor, normalizeAccent, type ResolvedTheme } from "./accentColors";
 
 export type ThemeMode = "light" | "dark" | "system";
-export type ResolvedTheme = "light" | "dark";
+export type { ResolvedTheme };
 
 const MODE_KEY = "wharf-theme-mode";
 const ACCENT_KEY = "wharf-accent-color";
 
-export const ACCENT_PRESETS = [
-  { name: "Blue", value: "#5b8def" },
-  { name: "Teal", value: "#2bb3a3" },
-  { name: "Purple", value: "#8b6cef" },
-  { name: "Green", value: "#35c76e" },
-  { name: "Orange", value: "#e08a3c" },
-  { name: "Pink", value: "#e0619f" },
-] as const;
-
-const DEFAULT_ACCENT = ACCENT_PRESETS[0].value;
+export { ACCENT_PRESETS };
 
 function readStoredMode(): ThemeMode {
   try {
@@ -29,9 +21,9 @@ function readStoredMode(): ThemeMode {
 
 function readStoredAccent(): string {
   try {
-    return localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT;
+    return normalizeAccent(localStorage.getItem(ACCENT_KEY));
   } catch {
-    return DEFAULT_ACCENT;
+    return normalizeAccent(null);
   }
 }
 
@@ -45,7 +37,7 @@ function resolve(mode: ThemeMode): ResolvedTheme {
 
 function applyToDocument(resolved: ResolvedTheme, accent: string): void {
   document.documentElement.dataset.theme = resolved;
-  document.documentElement.style.setProperty("--accent-color", accent);
+  document.documentElement.style.setProperty("--accent-color", accentFor(resolved, accent));
 }
 
 interface ThemeState {
