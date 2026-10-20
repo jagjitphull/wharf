@@ -111,18 +111,28 @@ export async function list(hostId: string, remotePath: string): Promise<SftpEntr
 // accidentally loading a multi-hundred-MB file into a renderer string.
 const MAX_EDITABLE_FILE_SIZE = 2 * 1024 * 1024;
 
+function assertEditableSize(bytes: number): void {
+  if (bytes > MAX_EDITABLE_FILE_SIZE) {
+    const mb = (bytes / (1024 * 1024)).toFixed(1);
+    throw new Error(`File is too large to edit here (${mb} MB, limit 2 MB) — download it instead.`);
+  }
+}
+
 /** Reads a remote file's contents as UTF-8 text, for the built-in editor.
  * Throws if the file is larger than MAX_EDITABLE_FILE_SIZE — download it
  * instead of editing in-app past that size. */
 export async function readFile(hostId: string, remotePath: string): Promise<string> {
   const sftp = await getSftp(hostId);
+  // Check the size before downloading anything: reading first would pull a
+  // multi-hundred-MB file across the connection just to refuse it.
+  const { size } = await new Promise<{ size: number }>((resolve, reject) => {
+    sftp.stat(remotePath, (err, stats) => (err ? reject(err) : resolve(stats)));
+  });
+  assertEditableSize(size);
   const buf = await new Promise<Buffer>((resolve, reject) => {
     sftp.readFile(remotePath, (err, data) => (err ? reject(err) : resolve(data)));
   });
-  if (buf.length > MAX_EDITABLE_FILE_SIZE) {
-    const mb = (buf.length / (1024 * 1024)).toFixed(1);
-    throw new Error(`File is too large to edit here (${mb} MB, limit 2 MB) — download it instead.`);
-  }
+  assertEditableSize(buf.length); // it may have grown since the stat
   return buf.toString("utf8");
 }
 
