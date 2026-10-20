@@ -33,6 +33,23 @@ describe("feedCommandCapture", () => {
     expect(run("cd /tmp\npwd\nls\n")).toEqual(["cd /tmp", "pwd", "ls"]);
   });
 
+  it("joins backslash-continued lines into one command, as the shell does", () => {
+    const text =
+      'linuxops targets add rocky-bad \\\r--host 127.0.0.1 --port 2224 \\\r--identity "$PWD/keys/k" \\\r--known-hosts "$PWD/keys/kh"\r';
+    expect(run(text)).toEqual([
+      'linuxops targets add rocky-bad --host 127.0.0.1 --port 2224 --identity "$PWD/keys/k" --known-hosts "$PWD/keys/kh"',
+    ]);
+  });
+
+  it("keeps a continuation pending across chunks, and Ctrl+C abandons it", () => {
+    expect(run("echo a \\", "\r", "b\r")).toEqual(["echo a b"]);
+    expect(run("echo a \\\r", "\x03", "ls\r")).toEqual(["ls"]);
+  });
+
+  it("treats an escaped backslash (two in a row) as a complete line", () => {
+    expect(run("echo \\\\\r")).toEqual(["echo \\\\"]);
+  });
+
   it("keeps an unfinished line pending", () => {
     const state = createCommandCaptureState();
     expect(feedCommandCapture(state, "echo hi")).toEqual([]);

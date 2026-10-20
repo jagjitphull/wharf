@@ -26,40 +26,66 @@ import { app } from "electron";
  * buildRemoteBootstrapCommand() below.
  */
 
-// Defines the four hook functions and wires them into bash's prompt/trap
-// mechanism. DEBUG fires once per simple command (including extra times for
-// compound commands and the prompt's own $(...) substitution) — harmless,
-// since the "armed" guard only lets the first one after a prompt through.
-// $BASH_COMMAND at that point is bash's own idea of the command about to
-// run — accurate, but for a typed "cmd1 && cmd2" one-liner it's only
-// "cmd1" (DEBUG fires per simple command, and "armed" already disarms on
-// the first one): a real but narrower limitation than the keystroke
-// buffer's, which at least keeps the whole typed line intact for that case.
-// The base64 encoding (rather than sending $BASH_COMMAND's text raw) is
-// what makes this safe to embed in the OSC payload at all — it can contain
-// characters (;, control bytes, the BEL/ST that would otherwise terminate
-// the sequence early) the payload itself can't.
+// Defines the hook functions and wires them into bash's prompt/trap
+// mechanism. The DEBUG trap fires before every simple command bash runs —
+// including the ones in PROMPT_COMMAND and in a typed "a && b" — so what
+// keeps it from reporting those is the "armed" flag: it is raised only by
+// the last thing PROMPT_COMMAND does (so the next command to run is
+// necessarily the one the user just entered) and lowered by the first DEBUG
+// that reports it, or by the next prompt (an empty line runs no command).
+// The DEBUG that fires for our own hooks is skipped by name. (Raising it from the trap itself, as an earlier version
+// did, made the prompt hook's own "__wharf_cmd_end" the "command" of every
+// line, which then overwrote the real text in Command History.)
+//
+// The command text is the line's entry in bash's history when that is
+// trustworthy — it is the whole typed line, so "a && b" and backslash
+// continuations come through intact — and $BASH_COMMAND (only the first
+// simple command of the line) otherwise: when history is off, or
+// HISTCONTROL=ignorespace / a HISTIGNORE could have left the line out and
+// "history 1" would return an earlier command.
+// The base64 encoding (rather than sending the text raw) is what makes it
+// safe to embed in the OSC payload at all — it can contain characters (;,
+// control bytes, the BEL/ST that would otherwise terminate the sequence
+// early) the payload itself can't.
 const BASH_HOOKS = `
 __wharf_prompt_start() { printf '\\033]133;A\\007'; }
 __wharf_prompt_end() { printf '\\033]133;B\\007'; }
+__wharf_cmd_text() {
+  local h
+  case ":\${HISTCONTROL}:" in
+    *:ignorespace:*|*:ignoreboth:*) printf '%s' "$BASH_COMMAND"; return ;;
+  esac
+  if [ -n "$HISTIGNORE" ] || [ "\${HISTCMD:-0}" = 0 ] || ! h=$(HISTTIMEFORMAT= builtin history 1 2>/dev/null); then
+    printf '%s' "$BASH_COMMAND"
+    return
+  fi
+  h=\${h#"\${h%%[![:space:]]*}"}
+  h=\${h#*[[:space:]]}
+  h=\${h#"\${h%%[![:space:]]*}"}
+  printf '%s' "\${h:-$BASH_COMMAND}"
+}
 __wharf_cmd_start() {
+  case "$BASH_COMMAND" in __wharf_*) return ;; esac
   if [ "$__wharf_armed" = "1" ]; then
     __wharf_armed=0
-    printf '\\033]133;C;%s\\007' "$(printf '%s' "$BASH_COMMAND" | base64 | tr -d '\\n')"
+    __wharf_in_cmd=1
+    printf '\\033]133;C;%s\\007' "$(__wharf_cmd_text | base64 | tr -d '\\n')"
   fi
 }
 __wharf_cmd_end() {
   local ec=$?
+  __wharf_armed=0
   if [ "$__wharf_in_cmd" = "1" ]; then
     printf '\\033]133;D;%s\\007' "$ec"
     __wharf_in_cmd=0
   fi
-  __wharf_armed=0
   printf '\\033]133;A\\007'
+  return $ec
 }
-PROMPT_COMMAND='__wharf_cmd_end'"\${PROMPT_COMMAND:+; \$PROMPT_COMMAND}"
+__wharf_arm() { local ec=$?; __wharf_armed=1; return $ec; }
+PROMPT_COMMAND=$'__wharf_cmd_end\\n'"\${PROMPT_COMMAND:+\$PROMPT_COMMAND\$'\\n'}"$'__wharf_arm'
 PS1="\${PS1}"'\\[\$(__wharf_prompt_end)\\]'
-trap '__wharf_armed=1; __wharf_in_cmd=1; __wharf_cmd_start' DEBUG
+trap '__wharf_cmd_start' DEBUG
 `.trim();
 
 // zsh has native precmd/preexec hooks (add-zsh-hook), no DEBUG-trap hack

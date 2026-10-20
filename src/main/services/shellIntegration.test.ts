@@ -18,6 +18,7 @@ const hasPlainSh = spawnSync("sh", ["-c", 'test -z "$BASH_VERSION$ZSH_VERSION$FI
 // events interactively): util-linux's `script` provides one.
 const hasScript = spawnSync("script", ["--version"]).status === 0;
 const canRunFishInPty = hasFish && hasScript;
+const canRunBashInPty = hasBash && hasScript;
 
 const OSC_PROMPT_START = "\x1b]133;A\x07";
 const b64 = (s: string): string => Buffer.from(s, "utf8").toString("base64");
@@ -49,6 +50,19 @@ function runFishInPty(fishArgs: string[], lines: string[]): string {
     input: `${lines.join("\n")}\nexit\n`,
     encoding: "utf8",
     env: { PATH: process.env.PATH, TERM: "xterm", HOME: state.userData },
+    timeout: 20000,
+  });
+  return result.stdout.replace(/\r/g, "\n");
+}
+
+/** Same, for bash: `bashArgs` first, then an interactive shell reading `lines` from a pty. `home` is a
+ * directory to use as $HOME (so a test can give it a .bashrc); `env` adds environment variables. */
+function runBashInPty(bashArgs: string[], lines: string[], env: Record<string, string> = {}, home = state.userData): string {
+  const quoted = ["bash", ...bashArgs].map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(" ");
+  const result = spawnSync("script", ["-qfc", quoted, "/dev/null"], {
+    input: `${lines.join("\n")}\nexit\n`,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH, TERM: "xterm", HOME: home, ...env },
     timeout: 20000,
   });
   return result.stdout.replace(/\r/g, "\n");
@@ -106,19 +120,27 @@ describe("buildRemoteBootstrapCommand", () => {
   });
 
   it.skipIf(!hasBash)("makes bash emit a ;D;<exit code> marker followed by a fresh prompt-start marker", () => {
-    const out = execFileSync("bash", ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; false; __wharf_cmd_end`], {
-      encoding: "utf8",
-    });
+    const out = execFileSync(
+      "bash",
+      ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; __wharf_in_cmd=1; false; __wharf_cmd_end; true`],
+      {
+        encoding: "utf8",
+      },
+    );
     expect(out).toContain(`\x1b]133;D;1\x07${OSC_PROMPT_START}`);
   });
 
   it.skipIf(!hasBash)("reports a zero exit code too, not just failures", () => {
-    const out = execFileSync("bash", ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; true; __wharf_cmd_end`], { encoding: "utf8" });
+    const out = execFileSync("bash", ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; __wharf_in_cmd=1; true; __wharf_cmd_end`], {
+      encoding: "utf8",
+    });
     expect(out).toContain(`\x1b]133;D;0\x07${OSC_PROMPT_START}`);
   });
 
   it.skipIf(!hasBash)("makes bash emit the command text, base64-encoded, in a ;C marker", () => {
-    const out = execFileSync("bash", ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; echo 'a;b'`], { encoding: "utf8" });
+    const out = execFileSync("bash", ["--norc", "-c", `${mod.buildRemoteBootstrapCommand()}; __wharf_armed=1; echo 'a;b'`], {
+      encoding: "utf8",
+    });
     expect(out).toContain(`\x1b]133;C;${b64("echo 'a;b'")}\x07`);
   });
 
@@ -316,5 +338,77 @@ describe.skipIf(!canRunFishInPty)("fish integration, run for real in a pty", () 
     );
     expect(out).toContain("HOOKS-ABSENT");
     expect(markersOf(out)).toEqual(expect.not.arrayContaining(["C:echo x"]));
+  });
+});
+
+describe.skipIf(!canRunBashInPty)("bash integration, run for real in a pty", () => {
+  const hooks = () => mod.prepareLocalShellIntegration("bash")!;
+  const markers = (lines: string[], env: Record<string, string> = {}, home = state.userData) =>
+    markersOf(runBashInPty(hooks().args, lines, env, home));
+
+  it("reports each command once, with its text and exit code, in order", () => {
+    // (the trailing `exit` the helper types adds one more C/D pair after these)
+    expect(markers(["echo hi", "false", "sh -c 'exit 7'"]).slice(0, 6)).toEqual([
+      "C:echo hi",
+      "D:0",
+      "C:false",
+      "D:1",
+      "C:sh -c 'exit 7'",
+      "D:7",
+    ]);
+  });
+
+  it("never reports its own hook functions as a command", () => {
+    const all = markers(["echo a", "echo b", "true"]);
+    expect(all.filter((m) => m.startsWith("C:")).some((m) => m.includes("__wharf"))).toBe(false);
+  });
+
+  it("reports the whole typed line for a compound command, not just its first part", () => {
+    expect(markers(["echo a && echo b"]).slice(0, 2)).toEqual(["C:echo a && echo b", "D:0"]);
+  });
+
+  it("reports a backslash-continued command as one command", () => {
+    expect(markers(["echo one \\", "two"]).slice(0, 2)).toEqual(["C:echo one two", "D:0"]);
+  });
+
+  it("reports nothing for an empty line", () => {
+    expect(markers(["", "echo x"]).slice(0, 2)).toEqual(["C:echo x", "D:0"]);
+  });
+
+  it("keeps working when history ignores lines starting with a space (falls back to the command bash runs)", () => {
+    const c = markers(["echo first", " echo second"], { HISTCONTROL: "ignorespace" }).filter((m) => m.startsWith("C:"));
+    expect(c.slice(0, 2)).toEqual(["C:echo first", "C:echo second"]);
+  });
+
+  it("leaves the user's $? and PROMPT_COMMAND alone (even one ending in a semicolon)", () => {
+    const home = mkdtempSync(path.join(tmpdir(), "wharf-bashhome-"));
+    try {
+      writeFileSync(path.join(home, ".bashrc"), "PS1='[$?]> '\nPROMPT_COMMAND='export SEEN=1;'\n", "utf8");
+      const out = runBashInPty(hooks().args, ["false", "true", 'echo "seen=$SEEN"'], {}, home);
+      expect(out).toContain("[1]> ");
+      expect(out).toContain("[0]> ");
+      expect(out).toContain("seen=1");
+      expect(out).not.toMatch(/syntax error/i);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("brackets every prompt with prompt-start and prompt-end markers", () => {
+    const out = runBashInPty(hooks().args, ["true"]);
+    const a = out.match(/\x1b\]133;A\x07/g)?.length ?? 0;
+    const b = out.match(/\x1b\]133;B\x07/g)?.length ?? 0;
+    expect(a).toBeGreaterThanOrEqual(2);
+    expect(b).toBeGreaterThanOrEqual(2);
+  });
+
+  it("is loaded by the one-line remote bootstrap, typed into a plain bash session", () => {
+    const out = runBashInPty(["--norc", "--noprofile", "-i"], [mod.buildRemoteBootstrapCommand().trim(), "echo remote", "false"]);
+    const m = markersOf(out);
+    expect(m).toContain("C:echo remote");
+    expect(m).toContain("C:false");
+    expect(m).toContain("D:1");
+    expect(m.some((x) => x.includes("__wharf"))).toBe(false);
+    expect(out).not.toMatch(/syntax error|command not found/i);
   });
 });
