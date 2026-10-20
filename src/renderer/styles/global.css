@@ -2,19 +2,27 @@
    before first paint). The bare :root + media-query fallback below only
    covers the ~0ms window before that script runs. --accent-color is set
    separately (inline on the root element) from the user's accent choice;
-   --accent derives from it so every surface stays in sync. */
+   --accent derives from it so every surface stays in sync.
+
+   Two themes, named for the harbour: "Harbor Night" (dark: ink-navy surfaces
+   that get lighter as they rise, one teal beacon for the accent, amber kept
+   for things that need attention) and "Sea Glass" (light: cool grey-green
+   surfaces, never pure white except cards and inputs). Every text/background
+   pair here is checked for contrast by tokens.test.ts. */
 :root {
-  --accent-color: #5b8def;
+  --accent-color: #2dd4bf;
 
   /* One scale for corners, elevation and focus, so cards, menus, dialogs and
      buttons all read as parts of the same interface. */
-  --radius-sm: 5px;
-  --radius: 7px;
-  --radius-lg: 10px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.18);
   --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.32);
   --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
@@ -22,104 +30,119 @@
   /* Makes native controls (scrollbars, select popups, checkboxes, date
      pickers) follow the theme instead of staying light on a dark app. */
   color-scheme: dark;
-  --bg: #0d0f14;
-  --bg-sidebar: #14171e;
-  --bg-panel: #171a21;
-  --bg-input: #0d0f14;
-  --bg-hover: #1d212a;
-  --bg-active: #232833;
-  --border: #262b35;
-  --text: #e4e7ec;
-  --text-dim: #8a92a3;
+  --bg: #0a101c;
+  --bg-titlebar: #080d17;
+  --bg-sidebar: #0b1220;
+  --bg-panel: #101828;
+  --bg-input: #0a101c;
+  --bg-hover: #162036;
+  --bg-active: #1b2842;
+  --border: #1e2a42;
+  --text: #e7edf6;
+  --text-dim: #93a3be;
   --accent: var(--accent-color);
-  --accent-bg: color-mix(in srgb, var(--accent) 18%, transparent);
-  --accent-fg: #0a0e18;
-  --success: #35c76e;
-  --danger-bg: rgba(235, 87, 87, 0.15);
-  --danger-text: #ff6b6b;
+  --accent-bg: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-fg: #04201c;
+  --success: #3ddc97;
+  --warning: #f5b544;
+  --info: #5b9dff;
+  --danger-bg: rgba(255, 122, 112, 0.14);
+  --danger-text: #ff9a92;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
 
   /* Terminal (xterm.js) palette — read at runtime via getComputedStyle so
      JS never duplicates these hex values. */
-  --term-bg: #0d0f14;
-  --term-fg: #d8dee9;
-  --term-cursor: #d8dee9;
-  --term-selection: rgba(91, 141, 239, 0.35);
-  --term-black: #1c1f26;
-  --term-red: #e06c75;
-  --term-green: #98c379;
-  --term-yellow: #e5c07b;
-  --term-blue: #61afef;
-  --term-magenta: #c678dd;
-  --term-cyan: #56b6c2;
-  --term-white: #d8dee9;
-  --term-bright-black: #5c6370;
-  --term-bright-red: #e06c75;
-  --term-bright-green: #98c379;
-  --term-bright-yellow: #e5c07b;
-  --term-bright-blue: #61afef;
-  --term-bright-magenta: #c678dd;
-  --term-bright-cyan: #56b6c2;
+  --term-bg: #070b14;
+  --term-fg: #d7e0ee;
+  --term-cursor: #2dd4bf;
+  --term-selection: rgba(45, 212, 191, 0.28);
+  --term-black: #1b2236;
+  --term-red: #ff7a70;
+  --term-green: #3ddc97;
+  --term-yellow: #f5b544;
+  --term-blue: #5b9dff;
+  --term-magenta: #a78bfa;
+  --term-cyan: #2dd4bf;
+  --term-white: #d7e0ee;
+  --term-bright-black: #6b7a96;
+  --term-bright-red: #ff9a92;
+  --term-bright-green: #6eeab4;
+  --term-bright-yellow: #ffcb6b;
+  --term-bright-blue: #8ab8ff;
+  --term-bright-magenta: #c4b0ff;
+  --term-bright-cyan: #6ee7d8;
   --term-bright-white: #ffffff;
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #f6f7f9;
-  --bg-sidebar: #fbfbfc;
+  --bg: #f4f8f9;
+  --bg-titlebar: #e6eef0;
+  --bg-sidebar: #edf3f5;
   --bg-panel: #ffffff;
   --bg-input: #ffffff;
-  --bg-hover: #eef0f3;
-  --bg-active: #e6e9ed;
-  --border: #dde1e6;
-  --text: #1c1f26;
-  --text-dim: #667085;
+  --bg-hover: #e6eef0;
+  --bg-active: #dce7ea;
+  --border: #d0dce0;
+  --text: #0e1b26;
+  --text-dim: #55697a;
   --accent: var(--accent-color);
   --accent-bg: color-mix(in srgb, var(--accent) 12%, white);
   --accent-fg: #ffffff;
-  --success: #17874c;
-  --danger-bg: rgba(209, 55, 63, 0.1);
-  --danger-text: #c8323a;
+  --success: #0f7a50;
+  --warning: #9c6305;
+  --info: #2c68d8;
+  --danger-bg: rgba(201, 59, 48, 0.1);
+  --danger-text: #b8342a;
+  --shadow-sm: 0 1px 2px rgba(14, 27, 38, 0.06);
+  --shadow-md: 0 6px 18px rgba(14, 27, 38, 0.1);
+  --shadow-lg: 0 20px 50px rgba(14, 27, 38, 0.2);
 
   --term-bg: #ffffff;
-  --term-fg: #1c1f26;
-  --term-cursor: #1c1f26;
-  --term-selection: rgba(59, 111, 214, 0.25);
-  --term-black: #1c1f26;
-  --term-red: #d1373f;
-  --term-green: #17874c;
-  --term-yellow: #a36a00;
-  --term-blue: #3b6fd6;
-  --term-magenta: #8b3fa6;
-  --term-cyan: #0f8fa3;
-  --term-white: #e4e7ec;
-  --term-bright-black: #667085;
-  --term-bright-red: #e0575f;
-  --term-bright-green: #1f9d55;
+  --term-fg: #0e1b26;
+  --term-cursor: #0b7f74;
+  --term-selection: rgba(11, 127, 116, 0.22);
+  --term-black: #0e1b26;
+  --term-red: #c93b30;
+  --term-green: #0f7a50;
+  --term-yellow: #9c6305;
+  --term-blue: #2c68d8;
+  --term-magenta: #7b4fd6;
+  --term-cyan: #0b7f74;
+  --term-white: #dce7ea;
+  --term-bright-black: #55697a;
+  --term-bright-red: #e0574c;
+  --term-bright-green: #1f9d6a;
   --term-bright-yellow: #c78a12;
-  --term-bright-blue: #5b8def;
-  --term-bright-magenta: #a55fc4;
-  --term-bright-cyan: #2bb3c4;
-  --term-bright-white: #1c1f26;
+  --term-bright-blue: #4a86f0;
+  --term-bright-magenta: #9569ef;
+  --term-bright-cyan: #14a89a;
+  --term-bright-white: #0e1b26;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --bg: #0d0f14;
-    --bg-sidebar: #14171e;
-    --bg-panel: #171a21;
-    --bg-input: #0d0f14;
-    --bg-hover: #1d212a;
-    --bg-active: #232833;
-    --border: #262b35;
-    --text: #e4e7ec;
-    --text-dim: #8a92a3;
+    --bg: #0a101c;
+    --bg-titlebar: #080d17;
+    --bg-sidebar: #0b1220;
+    --bg-panel: #101828;
+    --bg-input: #0a101c;
+    --bg-hover: #162036;
+    --bg-active: #1b2842;
+    --border: #1e2a42;
+    --text: #e7edf6;
+    --text-dim: #93a3be;
     --accent: var(--accent-color);
-    --accent-bg: color-mix(in srgb, var(--accent) 18%, transparent);
-    --accent-fg: #0a0e18;
-    --success: #35c76e;
-    --danger-bg: rgba(235, 87, 87, 0.15);
-    --danger-text: #ff6b6b;
+    --accent-bg: color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-fg: #04201c;
+    --success: #3ddc97;
+    --warning: #f5b544;
+    --info: #5b9dff;
+    --danger-bg: rgba(255, 122, 112, 0.14);
+    --danger-text: #ff9a92;
   }
 }
 
@@ -137,8 +160,9 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
+  font-feature-settings: "cv11", "ss03";
   -webkit-font-smoothing: antialiased;
 }
 

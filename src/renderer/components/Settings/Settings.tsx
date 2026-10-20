@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { accentFor, normalizeAccent } from "../../state/accentColors";
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from "../../state/themeStore";
 import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { MAX_UI_ZOOM, MIN_UI_ZOOM, useUiPrefsStore } from "../../state/uiPrefsStore";
@@ -35,7 +36,7 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 ];
 
 export function Settings() {
-  const { mode, accent, setMode, setAccent } = useThemeStore();
+  const { mode, resolved, accent, setMode, setAccent } = useThemeStore();
   const { fontSize, fontFamily, terminalThemeId, increaseFontSize, decreaseFontSize, setFontFamily, setTerminalThemeId } =
     useTerminalPrefsStore();
   const { uiZoom, setUiZoom, increaseUiZoom, decreaseUiZoom, resetUiZoom } = useUiPrefsStore();
@@ -102,8 +103,8 @@ export function Settings() {
             {ACCENT_PRESETS.map((preset) => (
               <button
                 key={preset.value}
-                className={`accent-swatch ${accent === preset.value ? "active" : ""}`}
-                style={{ background: preset.value }}
+                className={`accent-swatch ${normalizeAccent(accent) === preset.value ? "active" : ""}`}
+                style={{ background: accentFor(resolved, preset.value) }}
                 title={preset.name}
                 onClick={() => setAccent(preset.value)}
               />

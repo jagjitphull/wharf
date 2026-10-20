@@ -16,7 +16,7 @@
   width: 100%;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 28px;
   -webkit-app-region: no-drag;
 }

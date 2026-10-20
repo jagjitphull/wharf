@@ -175,7 +175,7 @@
   display: flex;
   align-items: center;
   flex: none;
-  color: #e0a63c;
+  color: var(--warning);
 }
 
 @keyframes tab-logging-pulse {
@@ -235,7 +235,7 @@
      .pane-split's own opaque background, which fills this container
      edge-to-edge — completely invisible. outline always paints on top of
      a box's descendants regardless of offset, so it actually shows. */
-  outline: 2px solid #e0a63c;
+  outline: 2px solid var(--warning);
   outline-offset: -2px;
 }
 

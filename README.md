@@ -101,8 +101,11 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Custom title bar with working minimize/maximize/close on every platform;
   remembers window size and position between launches
 - Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)
-- Light/dark/system theme with an accent-color picker (native controls,
-  scrollbars and select menus follow the theme), plus an interface size
+- Two house themes — **Harbor Night** (dark, deep navy with a teal beacon) and
+  **Sea Glass** (light, cool grey-green) — set to light/dark/system, in the
+  bundled Inter typeface, with an accent-color picker whose six colors each
+  have a tuned dark and light variant (native controls, scrollbars and select
+  menus follow the theme; text and accent contrast are checked by tests), plus an interface size
   slider, 85–150% (Settings → Appearance), that scales everything — sidebar,
   tabs, panels, menus and dialogs — through real page zoom, independently of
   the terminal font size, which is divided back out so terminals look exactly
