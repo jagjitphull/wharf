@@ -47,6 +47,10 @@ import { app } from "electron";
 // safe to embed in the OSC payload at all — it can contain characters (;,
 // control bytes, the BEL/ST that would otherwise terminate the sequence
 // early) the payload itself can't.
+// Hooks that other startup files add to PROMPT_COMMAND *after* ours (systemd's
+// OSC-context script, VTE, direnv…) run with the DEBUG trap already armed, so
+// __wharf_is_prompt_hook skips a function named in PROMPT_COMMAND instead of
+// reporting it as a command the user typed.
 const BASH_HOOKS = `
 __wharf_prompt_start() { printf '\\033]133;A\\007'; }
 __wharf_prompt_end() { printf '\\033]133;B\\007'; }
@@ -64,9 +68,16 @@ __wharf_cmd_text() {
   h=\${h#"\${h%%[![:space:]]*}"}
   printf '%s' "\${h:-$BASH_COMMAND}"
 }
+__wharf_is_prompt_hook() {
+  local w=\${BASH_COMMAND%% *}
+  [ "$(type -t "$w" 2>/dev/null)" = function ] || return 1
+  case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in *"$w"*) return 0 ;; esac
+  return 1
+}
 __wharf_cmd_start() {
   case "$BASH_COMMAND" in __wharf_*) return ;; esac
   if [ "$__wharf_armed" = "1" ]; then
+    __wharf_is_prompt_hook && return
     __wharf_armed=0
     __wharf_in_cmd=1
     printf '\\033]133;C;%s\\007' "$(__wharf_cmd_text | base64 | tr -d '\\n')"

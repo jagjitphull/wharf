@@ -363,6 +363,13 @@ describe.skipIf(!canRunBashInPty)("bash integration, run for real in a pty", () 
     expect(all.filter((m) => m.startsWith("C:")).some((m) => m.includes("__wharf"))).toBe(false);
   });
 
+  it("ignores a prompt hook that something else adds after ours (e.g. systemd's OSC context script)", () => {
+    // The hook lands after __wharf_arm, so bash runs it with the DEBUG trap armed. It must not become a "command".
+    const add = "PROMPT_COMMAND+=$'\\n__late_hook'";
+    const c = markers(["__late_hook() { :; }", add, "echo a", "echo b"]).filter((m) => m.startsWith("C:"));
+    expect(c.slice(0, 3)).toEqual([`C:${add}`, "C:echo a", "C:echo b"]);
+  });
+
   it("reports the whole typed line for a compound command, not just its first part", () => {
     expect(markers(["echo a && echo b"]).slice(0, 2)).toEqual(["C:echo a && echo b", "D:0"]);
   });
