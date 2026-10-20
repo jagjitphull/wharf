@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
+import { toast } from "../../state/toastStore";
 import { useAppStore } from "../../state/store";
 import { IconAnchor, IconDuplicate, IconHome, IconKeyboard, IconMoon, IconPlus, IconSun } from "../Icons/Icons";
 import { TabStrip } from "../Tabs/TabStrip";
@@ -12,10 +13,10 @@ const isMac = wharf.window.platform === "darwin";
 
 interface Props {
   onOpenShortcuts(): void;
-  onOpenQuickConnect(): void;
+  onOpenPalette(): void;
 }
 
-export function TitleBar({ onOpenShortcuts, onOpenQuickConnect }: Props) {
+export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
   const [maximized, setMaximized] = useState(false);
   const resolvedTheme = useThemeStore((s) => s.resolved);
   const setMode = useThemeStore((s) => s.setMode);
@@ -61,10 +62,10 @@ export function TitleBar({ onOpenShortcuts, onOpenQuickConnect }: Props) {
               {
                 label: "New Local Shell",
                 onClick: () => {
-                  openLocalShell().catch((err) => alert(ipcErrorMessage(err)));
+                  openLocalShell().catch((err) => toast.error(ipcErrorMessage(err)));
                 },
               },
-              { label: "Connect to Host…", onClick: onOpenQuickConnect },
+              { label: "Command Palette…", onClick: onOpenPalette },
             ])
           }
         >

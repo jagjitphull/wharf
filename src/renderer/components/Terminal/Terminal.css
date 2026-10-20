@@ -22,6 +22,59 @@
   font-size: inherit;
 }
 
+/* Command Block marks (see blockDecorations.ts): a rail down the left edge of
+   a command and its output, a tint behind a failure, and an exit/duration pill
+   on the command's own row. xterm sizes and positions the element on the cell
+   grid; the width is forced so it keeps spanning the pane after a resize. */
+.cmd-block {
+  box-sizing: border-box;
+  width: 100% !important;
+  border-left: 3px solid var(--block-color);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--block-tint, transparent);
+  pointer-events: none;
+}
+
+.cmd-block.ok {
+  --block-color: color-mix(in srgb, var(--success) 70%, transparent);
+}
+
+.cmd-block.failed {
+  --block-color: var(--danger-text);
+  --block-tint: color-mix(in srgb, var(--danger-text) 7%, transparent);
+}
+
+.cmd-block.running {
+  --block-color: var(--warning);
+  animation: block-running 1.4s ease-in-out infinite;
+}
+
+.cmd-block-pill {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--block-color) 18%, var(--term-bg, var(--bg)));
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cmd-block.failed .cmd-block-pill {
+  color: var(--danger-text);
+}
+
+@keyframes block-running {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .terminal-search-bar {
   position: absolute;
   top: 10px;

@@ -3,6 +3,8 @@ import { useAppStore, flattenPanes, TAB_COLORS, TAB_GROUP_COLORS, type TabGroup,
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { reconnectTab } from "./tabActions";
+import { toast } from "../../state/toastStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "../Terminal/TerminalThemeSwatches";
 import { PromptDialog } from "../PromptDialog/PromptDialog";
@@ -26,7 +28,6 @@ export function TabStrip() {
     setActiveTab,
     closeTab,
     duplicateTab,
-    reconnectPanes,
     setTabPinned,
     renameTab,
     renamePane,
@@ -66,24 +67,6 @@ export function TabStrip() {
   async function closeAll() {
     for (const tab of tabs) {
       if (!tab.pinned) await closeTab(tab.tabId);
-    }
-  }
-
-  /** Reconnects the tab's dropped panes; with none dropped, the active pane
-   * (after asking, since that ends whatever is running in it). */
-  async function reconnectTab(tab: TerminalTab) {
-    const panes = flattenPanes(tab.layout);
-    const dropped = panes.filter((id) => paneMeta[id]?.closed);
-    const targets = dropped.length > 0 ? dropped : [tab.activePaneId];
-    if (dropped.length === 0) {
-      const title = paneMeta[tab.activePaneId]?.title ?? "this session";
-      if (!confirm(`"${title}" is still connected. Reconnecting ends whatever is running in it and starts a new session. Continue?`))
-        return;
-    }
-    try {
-      await reconnectPanes(tab.tabId, targets);
-    } catch (err) {
-      alert(`Couldn't reconnect:\n${ipcErrorMessage(err)}`);
     }
   }
 
@@ -151,12 +134,15 @@ export function TabStrip() {
           setActiveView("hosts");
         }}
         onDuplicate={() => duplicateTab(tab.tabId)}
-        onReconnect={() => reconnectTab(tab)}
+        onReconnect={() => reconnectTab(tab.tabId)}
         onRename={() => setRenamingTabId(tab.tabId)}
         onRenamePane={() => setRenamingPaneTabId(tab.tabId)}
         onTogglePin={() => setTabPinned(tab.tabId, !tab.pinned)}
         onMove={(dir) => moveTab(tab.tabId, dir)}
-        onCopyTitle={() => void wharf.clipboard.writeText(tab.customTitle ?? activeMeta?.title ?? "")}
+        onCopyTitle={() => {
+          void wharf.clipboard.writeText(tab.customTitle ?? activeMeta?.title ?? "");
+          toast.success("Tab title copied");
+        }}
         onSaveWorkspace={() => setSavingTabId(tab.tabId)}
         onCloseRight={() => closeTabsToRight(tab.tabId)}
         onSetColor={(c) => setTabColor(tab.tabId, c)}
@@ -302,7 +288,9 @@ export function TabStrip() {
             const tabId = savingTabId;
             setSavingTabId(null);
             if (name.trim()) {
-              saveCurrentAsWorkspace(name.trim(), [tabId]).catch((err) => alert(`Couldn't save the workspace:\n${ipcErrorMessage(err)}`));
+              saveCurrentAsWorkspace(name.trim(), [tabId])
+                .then(() => toast.success(`Saved workspace “${name.trim()}”`))
+                .catch((err) => toast.error(`Couldn't save the workspace: ${ipcErrorMessage(err)}`));
             }
           }}
         />

@@ -7,6 +7,7 @@ import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { IconFolder, IconPencil, IconPlus, IconSearch, IconServer, IconTerminal } from "../Icons/Icons";
+import { REACHABILITY_LABEL, useReachability } from "../../state/useReachability";
 import { buildSections, greeting, hostGlyph, type HomeFilter } from "./homeModel";
 import "./HomeView.css";
 
@@ -33,6 +34,7 @@ export function HomeView() {
     }
     return counts;
   }, [paneMeta]);
+  const reachability = useReachability(hosts);
   const connectedIds = useMemo(() => new Set(sessions.keys()), [sessions]);
   const sections = useMemo(
     () => buildSections(hosts, groups, { query, filter, connectedHostIds: connectedIds }),
@@ -71,6 +73,7 @@ export function HomeView() {
   function card(host: HostRecord) {
     const color = host.color ?? "var(--accent)";
     const live = sessions.get(host.id) ?? 0;
+    const reach = reachability[host.id] ?? "checking";
     return (
       <div
         key={host.id}
@@ -101,10 +104,15 @@ export function HomeView() {
               {host.username}@{host.hostname}:{host.port}
             </span>
           </span>
-          {live > 0 && (
+          {live > 0 ? (
             <span className="host-card-status">
               <span className="host-card-dot" />
               {live === 1 ? "connected" : `${live} sessions`}
+            </span>
+          ) : (
+            <span className={`host-card-reach ${reach}`} title={REACHABILITY_LABEL[reach]}>
+              <span className="host-card-dot" />
+              {reach === "online" ? "online" : reach === "offline" ? "offline" : ""}
             </span>
           )}
         </div>
@@ -133,7 +141,7 @@ export function HomeView() {
 
   const connectedCount = connectedIds.size;
   return (
-    <div className="home">
+    <div className="home view-enter">
       <div className="home-scroll">
         <header className="home-header">
           <div>

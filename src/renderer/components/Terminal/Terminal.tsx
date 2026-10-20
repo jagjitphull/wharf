@@ -26,6 +26,7 @@ import {
   scanAfterWrite,
   type CompiledRule,
 } from "./keywordHighlight";
+import { createBlockDecorator } from "./blockDecorations";
 import { createCommandCaptureState, feedCommandCapture } from "./commandCapture";
 import {
   createCommandBlocksState,
@@ -642,6 +643,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     // supports them — a session without integration just never fires this,
     // so blocks/exit codes are additive, never required for the terminal to
     // otherwise work normally.
+    const blockDecorator = createBlockDecorator(term);
     const oscDisposable = term.parser.registerOscHandler(133, (payload) => {
       // A ";C;<base64>" payload also carries the shell's own authoritative
       // text for the command it's about to run — arrives a beat after
@@ -661,7 +663,15 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         atPromptRef.current = true;
       }
       const updated = handleOsc133(term, commandBlocksRef.current, payload);
-      if (updated) setBlocks(updated);
+      if (updated) {
+        setBlocks(updated);
+        // "C" opens a block and "D" closes one; either way it's the newest entry
+        // (only one can be open at a time), so that's the one to draw.
+        const newest = updated[updated.length - 1];
+        if (newest && payload.startsWith("C")) blockDecorator.start(newest);
+        else if (newest && payload.startsWith("D")) blockDecorator.end(newest);
+        blockDecorator.prune(new Set(updated.map((b) => b.id)));
+      }
       // "D" always closes whatever block "C" most recently opened (only one
       // can be open at a time), so it's always the last entry once handled.
       if (updated && payload.startsWith("D")) {
@@ -801,6 +811,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       offReconnected();
       dataDisposable.dispose();
       oscDisposable.dispose();
+      blockDecorator.dispose();
       resizeObserver.disconnect();
       offMaximizedChange();
       // highlightStateRef's object identity never changes after the
