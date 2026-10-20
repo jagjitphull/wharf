@@ -135,6 +135,8 @@ export interface WharfApi {
     onMaximizedChange(cb: (maximized: boolean) => void): Unsubscribe;
     /** Main-process-initiated reload — see the IPC channel's own doc comment. */
     reload(): void;
+    /** Sets the page's zoom (the "Interface size" setting). Applied at launch by the preload itself from the stored value. */
+    setZoomFactor(zoom: number): void;
   };
   clipboard: {
     writeText(text: string): void;

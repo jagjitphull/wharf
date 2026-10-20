@@ -8,7 +8,10 @@
  *    itself is stripped (see ESCAPE_SEQ below) rather than captured.
  *  - Tab completion similarly expands text the shell fills in, not us.
  *  - A pasted multi-line block is treated as one command per embedded
- *    newline, same as if it had been typed.
+ *    newline, same as if it had been typed — except that a line ending in a
+ *    backslash continues onto the next, as the shell treats it. (Quoted
+ *    strings and heredocs that span lines still come out as one entry per
+ *    line here; with Command Blocks the shell's own text corrects the last.)
  * Good enough for "what did I run, and roughly when" on its own — an audit
  * trail, not a session recording. For bash/zsh with Command Blocks enabled,
  * though, this is only ever a same-tick placeholder: shellIntegration.ts's
@@ -42,6 +45,13 @@ export function feedCommandCapture(state: CommandCaptureState, rawData: string):
 
   for (const ch of data) {
     if (ch === "\r" || ch === "\n") {
+      // A line ending in an (unescaped) backslash continues on the next one:
+      // the shell joins the two, so this is still one command, not several.
+      const trailing = /\\+$/.exec(state.buffer)?.[0].length ?? 0;
+      if (trailing % 2 === 1) {
+        state.buffer = state.buffer.slice(0, -1);
+        continue;
+      }
       const command = state.buffer.trim();
       if (command) completed.push(command);
       state.buffer = "";

@@ -63,7 +63,7 @@
 
 .sftp-second-pane-picker select {
   margin-left: 6px;
-  background: var(--bg-input);
+  background-color: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 3px 6px;

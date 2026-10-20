@@ -192,21 +192,28 @@
   font-weight: 500;
 }
 
-.font-size-stepper {
+.font-size-stepper,
+.ui-size-control {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+.ui-size-slider {
+  width: 150px;
+  margin: 0 2px;
 }
 
 .font-size-value {
-  font-size: 13px;
-  font-family: monospace;
-  min-width: 34px;
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
   text-align: center;
 }
 
 .font-family-select {
-  background: var(--bg-input);
+  background-color: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 7px 9px;

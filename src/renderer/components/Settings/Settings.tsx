@@ -15,6 +15,7 @@ import { UpdateSettings } from "./UpdateSettings";
 import { SecretStorageSettings } from "./SecretStorageSettings";
 import { TerminalPreview } from "./TerminalPreview";
 import { GROUPS as SHORTCUT_GROUPS } from "../KeyboardShortcuts/KeyboardShortcuts";
+import { IconMinus, IconPlus } from "../Icons/Icons";
 import "../../styles/dialog.css";
 import "../KeyboardShortcuts/KeyboardShortcuts.css";
 import "./Settings.css";
@@ -37,7 +38,7 @@ export function Settings() {
   const { mode, accent, setMode, setAccent } = useThemeStore();
   const { fontSize, fontFamily, terminalThemeId, increaseFontSize, decreaseFontSize, setFontFamily, setTerminalThemeId } =
     useTerminalPrefsStore();
-  const { uiZoom, increaseUiZoom, decreaseUiZoom } = useUiPrefsStore();
+  const { uiZoom, setUiZoom, increaseUiZoom, decreaseUiZoom, resetUiZoom } = useUiPrefsStore();
   const { loadAll } = useAppStore();
   const { enabled: restoreTabsEnabled, setEnabled: setRestoreTabsEnabled } = useRestoreTabsPrefsStore();
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
@@ -112,19 +113,32 @@ export function Settings() {
 
         <div className="appearance-row">
           <span className="appearance-label">Interface size</span>
-          <div className="font-size-stepper">
-            <button className="btn ghost small" onClick={decreaseUiZoom} disabled={uiZoom <= MIN_UI_ZOOM}>
-              −
+          <div className="ui-size-control">
+            <button className="btn ghost small icon" title="Smaller" onClick={decreaseUiZoom} disabled={uiZoom <= MIN_UI_ZOOM}>
+              <IconMinus size={12} />
+            </button>
+            <input
+              className="ui-size-slider"
+              type="range"
+              min={MIN_UI_ZOOM}
+              max={MAX_UI_ZOOM}
+              step={0.05}
+              value={uiZoom}
+              aria-label="Interface size"
+              onChange={(e) => setUiZoom(Number(e.target.value))}
+            />
+            <button className="btn ghost small icon" title="Larger" onClick={increaseUiZoom} disabled={uiZoom >= MAX_UI_ZOOM}>
+              <IconPlus size={12} />
             </button>
             <span className="font-size-value">{Math.round(uiZoom * 100)}%</span>
-            <button className="btn ghost small" onClick={increaseUiZoom} disabled={uiZoom >= MAX_UI_ZOOM}>
-              +
+            <button className="btn ghost small" onClick={resetUiZoom} disabled={uiZoom === 1}>
+              Reset
             </button>
           </div>
         </div>
         <p className="hint">
-          Scales the app's own text and controls — sidebar, tabs, this settings screen. Dialogs and menus stay at a fixed comfortable size,
-          and terminal font size (below) is separate on purpose.
+          Scales the whole interface — text, icons, sidebar, tabs, menus and dialogs. The terminal's own font size (below) is separate and
+          is not affected.
         </p>
 
         <h2>Terminal</h2>
@@ -132,12 +146,12 @@ export function Settings() {
         <div className="appearance-row">
           <span className="appearance-label">Font size</span>
           <div className="font-size-stepper">
-            <button className="btn ghost small" onClick={decreaseFontSize} disabled={fontSize <= MIN_FONT_SIZE}>
-              −
+            <button className="btn ghost small icon" title="Smaller" onClick={decreaseFontSize} disabled={fontSize <= MIN_FONT_SIZE}>
+              <IconMinus size={12} />
             </button>
             <span className="font-size-value">{fontSize}px</span>
-            <button className="btn ghost small" onClick={increaseFontSize} disabled={fontSize >= MAX_FONT_SIZE}>
-              +
+            <button className="btn ghost small icon" title="Larger" onClick={increaseFontSize} disabled={fontSize >= MAX_FONT_SIZE}>
+              <IconPlus size={12} />
             </button>
           </div>
         </div>
