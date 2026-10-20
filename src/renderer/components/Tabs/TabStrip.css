@@ -1,0 +1,217 @@
+/* Lives in the title bar, so it sits on --bg-titlebar and the active tab
+   takes on the colour of the content below it, as if the page grew a tab. */
+.tab-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* A Chrome/Edge-style tab group: the label pill plus whichever tabs are
+   currently its consecutive run (see the segments computation in
+   TabStrip.tsx), wrapped in one flex row so they stay visually
+   clustered and share a colored underline. --tab-group-color is set inline
+   per-group since it's arbitrary (TAB_GROUP_COLORS), not one of the
+   theme's own CSS variables. */
+.tab-group {
+  display: flex;
+  align-items: flex-end;
+  flex: none;
+  gap: 4px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--tab-group-color);
+  border-radius: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.tab-group-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  align-self: center;
+  background: color-mix(in srgb, var(--tab-group-color) 20%, transparent);
+  color: var(--tab-group-color);
+  border: none;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab-group-label:hover {
+  background: color-mix(in srgb, var(--tab-group-color) 32%, transparent);
+}
+
+.tab-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.tab-group-count {
+  opacity: 0.8;
+}
+
+.tab {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  -webkit-app-region: no-drag;
+  /* --tab-theme-bg/-hover-bg/-active-bg are set inline per-tab (see
+     TabButton) only when that tab has its own color theme, so each state
+     below can pick up its themed tint instead of the plain default —
+     falling back to that default (transparent/var(--bg-hover)/the accent
+     mix) exactly as before for every tab nobody's themed. This has to be a
+     custom property rather than TabButton just setting `background`
+     directly: an inline style always wins over a stylesheet rule
+     regardless of specificity or pseudo-classes, which would permanently
+     defeat the :hover and .active rules below the moment a theme was set. */
+  background: var(--tab-theme-bg, transparent);
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tab:hover:not(.active) {
+  background: var(--tab-theme-hover-bg, var(--bg-hover));
+  color: var(--text);
+}
+
+.tab.active {
+  height: 36px;
+  /* Same surface as the content under it, so the tab and the page read as
+     one piece; the top accent/host-color line is set inline per-tab (see
+     TabButton) since it also depends on the tab's host color. */
+  background: var(--tab-theme-active-bg, var(--bg));
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tab.closed {
+  color: var(--danger-text);
+}
+
+.tab.dragging {
+  opacity: 0.5;
+}
+
+.tab.drop-target {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger-text);
+}
+
+.tab-number {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  opacity: 0.65;
+  min-width: 11px;
+  text-align: center;
+}
+
+.tab.active .tab-number {
+  opacity: 0.85;
+}
+
+.tab-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.tab-theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.tab-logging-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--danger-text);
+  animation: tab-logging-pulse 2s ease-in-out infinite;
+}
+
+.tab-broadcast-badge {
+  display: flex;
+  align-items: center;
+  flex: none;
+  color: var(--warning);
+}
+
+@keyframes tab-logging-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tab-close,
+.tab-duplicate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 4px;
+  padding: 3px;
+  transition:
+    background-color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.tab-close:hover,
+.tab-duplicate:hover {
+  opacity: 1;
+  background: var(--bg-active);
+}
+
+.tab-close:hover {
+  color: var(--danger-text);
+}

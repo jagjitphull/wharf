@@ -1,0 +1,61 @@
+.icon-rail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 64px;
+  padding: 14px 0;
+  box-sizing: border-box;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.rail-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.rail-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rail-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* The marker on the rail's left edge that says where you are. */
+.rail-btn.active::before {
+  content: "";
+  position: absolute;
+  left: -11px;
+  top: 11px;
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.rail-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

@@ -235,3 +235,84 @@ export function IconBroadcast({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+// The icon-rail and Home set. Drawn on a 24px grid (the design's native size)
+// with a slightly heavier stroke, since they're shown at 18–20px.
+const grid = { ...common, strokeWidth: 1.7 };
+
+export function IconHome({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <path d="M3 11l9-8 9 8M5 10v10h14V10" />
+    </svg>
+  );
+}
+
+export function IconServer({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zM3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3zM7 7.5h.01M7 16.5h.01" />
+    </svg>
+  );
+}
+
+export function IconTunnel({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <path d="M3 8h14l-3-3M21 16H7l3 3" />
+    </svg>
+  );
+}
+
+export function IconLayers({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5" />
+    </svg>
+  );
+}
+
+export function IconClock({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+export function IconSliders({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </svg>
+  );
+}
+
+export function IconKeyboard({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+      <path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7 14h10" />
+    </svg>
+  );
+}
+
+export function IconSun({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7L5.3 5.3" />
+    </svg>
+  );
+}
+
+export function IconMoon({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...grid}>
+      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />
+    </svg>
+  );
+}

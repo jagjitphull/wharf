@@ -4,6 +4,8 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { SidebarResizeHandle } from "./components/Sidebar/SidebarResizeHandle";
 import { TerminalPanel } from "./components/Terminal/TerminalPanel";
 import { StatusBar } from "./components/StatusBar/StatusBar";
+import { IconRail } from "./components/IconRail/IconRail";
+import { HomeView } from "./components/Home/HomeView";
 import { useAppStore } from "./state/store";
 import { useTerminalPrefsStore } from "./state/terminalPrefsStore";
 import { useUiPrefsStore } from "./state/uiPrefsStore";
@@ -32,6 +34,7 @@ const KeyboardShortcuts = lazy(() =>
 export default function App() {
   const { activeView, hosts, groups, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
+  const tabCount = useAppStore((s) => s.tabs.length);
   const [quickConnectOpen, setQuickConnectOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -67,6 +70,11 @@ export default function App() {
       }
     });
   }, [loadAll, lock]);
+
+  // Closing the last terminal leaves nothing to show on the terminal view; Home is the landing page.
+  useEffect(() => {
+    if (tabCount === 0 && activeView === "hosts") setActiveView("home");
+  }, [tabCount, activeView, setActiveView]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -150,10 +158,12 @@ export default function App() {
 
   return (
     <div className="app-root">
-      <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} />
+      <TitleBar onOpenShortcuts={() => setShortcutsOpen(true)} onOpenQuickConnect={() => setQuickConnectOpen(true)} />
       {lock === "locked" && <LockScreen onDone={() => setLock("open")} />}
       <div className="app-shell">
-        {!sidebarCollapsed && (
+        <IconRail />
+        {/* Home lists every host as a card, so the tree beside it would only repeat it. */}
+        {!sidebarCollapsed && activeView !== "home" && (
           <>
             <Sidebar onOpenQuickConnect={() => setQuickConnectOpen(true)} />
             <SidebarResizeHandle />
@@ -166,6 +176,7 @@ export default function App() {
               Kept outside the Suspense below on purpose: a lazy view's
               chunk loading must never hide an already-open terminal. */}
           <TerminalPanel hidden={activeView !== "hosts"} />
+          {activeView === "home" && <HomeView />}
           <Suspense fallback={<ViewLoadingFallback />}>
             {activeView === "sftp" && <SftpBrowser />}
             {activeView === "tunnels" && <Tunnels />}
