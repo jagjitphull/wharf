@@ -139,8 +139,9 @@ const api: WharfApi = {
     onSelfUpdateState: (cb) => on(IPC.update.onSelfUpdateState, cb as (...args: unknown[]) => void),
   },
   backup: {
-    export: () => ipcRenderer.invoke(IPC.backup.export),
-    import: () => ipcRenderer.invoke(IPC.backup.import),
+    export: (request) => ipcRenderer.invoke(IPC.backup.export, request),
+    pick: () => ipcRenderer.invoke(IPC.backup.pick),
+    apply: (token, options) => ipcRenderer.invoke(IPC.backup.apply, token, options),
   },
   snippets: {
     list: () => ipcRenderer.invoke(IPC.snippets.list),

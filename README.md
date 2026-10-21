@@ -105,7 +105,17 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
-- Export/import hosts & groups to/from a JSON file (secrets excluded)
+- Backup (Settings → Backup): export hosts and groups — plus, as you choose, tunnels, snippets,
+  workspaces and app settings (theme, fonts, history and recording choices) — to a JSON file and
+  import it into another Wharf. Passwords and key passphrases are left out unless you give the
+  backup its own passphrase, which seals them (scrypt, AES-256-GCM, separate from the master
+  password); terminal scrollback never goes in. Importing shows what the file holds first, merges
+  rather than replaces (a host with the same user@host:port, a group, tunnel, snippet or workspace
+  you already have is skipped, so importing twice adds nothing), gives everything new ids while
+  keeping jump-host, group, tunnel and workspace references intact, and treats the file as
+  untrusted: malformed entries are dropped and counted, and nothing security- or AI-related
+  (auto-lock, the master password, where AI requests go) is ever read from it. Reads files made
+  by earlier versions too
 - Custom title bar with working minimize/maximize/close on every platform;
   remembers window size and position between launches
 - Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)

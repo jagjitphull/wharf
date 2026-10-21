@@ -1,137 +1,140 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { dialog, ipcMain } from "electron";
-import { IPC, type AuthMethod, type BackupImportResult, type GroupRecord, type HostRecord } from "../../shared/types";
-import { getGroups, getHosts, setGroups, setHosts } from "../services/store";
+import { IPC, type BackupImportResult, type BackupPart, type BackupPreview } from "../../shared/types";
+import { countBackup, parseBackup, type ParsedBackup } from "../../shared/backupFormat";
+import { createBackup, type ExportOptions } from "../services/backup";
+import { readProtected, writeProtected } from "../services/protectedData";
+import { readSecret, saveSecret } from "../services/secretStore";
+import {
+  getCommandBlocksEnabled,
+  getGroups,
+  getHistorySettings,
+  getHosts,
+  getSnippets,
+  getTranscriptSettings,
+  getTunnels,
+  getUpdateCheckEnabled,
+  setCommandBlocksEnabled,
+  setGroups,
+  setHistorySettings,
+  setHosts,
+  setSnippets,
+  setTranscriptSettings,
+  setTunnels,
+  setUpdateCheckEnabled,
+} from "../services/store";
 
-/**
- * Portable (no-secrets) shape of a host/group for export/import. Secrets
- * are deliberately never written to the export file — passwords/key
- * passphrases must be re-entered after importing on another machine.
- */
-interface ExportedGroup {
-  id: string;
-  name: string;
-  parentId: string | null;
-  color?: string;
-}
+const backup = createBackup({
+  data: () => ({
+    groups: getGroups(),
+    hosts: getHosts(),
+    tunnels: getTunnels(),
+    snippets: getSnippets(),
+    workspaces: readProtected("workspaces"),
+  }),
+  save: (data) => {
+    if (!writeProtected("workspaces", data.workspaces)) throw new Error("Unlock Wharf with your master password first.");
+    setGroups(data.groups);
+    setHosts(data.hosts);
+    setTunnels(data.tunnels);
+    setSnippets(data.snippets);
+  },
+  settings: () => ({
+    historySettings: getHistorySettings(),
+    transcriptSettings: getTranscriptSettings(),
+    commandBlocksEnabled: getCommandBlocksEnabled(),
+    updateCheckEnabled: getUpdateCheckEnabled(),
+  }),
+  applySettings: (main) => {
+    if (main.historySettings) setHistorySettings(main.historySettings);
+    if (main.transcriptSettings) setTranscriptSettings(main.transcriptSettings);
+    if (main.commandBlocksEnabled !== undefined) setCommandBlocksEnabled(main.commandBlocksEnabled);
+    if (main.updateCheckEnabled !== undefined) setUpdateCheckEnabled(main.updateCheckEnabled);
+  },
+  readSecret,
+  saveSecret,
+  newId: randomUUID,
+  now: Date.now,
+});
 
-interface ExportedHost {
-  id: string;
-  name: string;
-  hostname: string;
-  port: number;
-  username: string;
-  groupId: string | null;
-  authMethod: AuthMethod;
-  privateKeyPath?: string;
-  color?: string;
-  tags?: string[];
-  jumpHostId?: string | null;
-}
+/** The file picked for import, held here between "pick" (which shows what it holds) and "apply". */
+let pending: { token: string; parsed: ParsedBackup; fileName: string } | null = null;
 
-interface ExportFile {
-  version: 1;
-  exportedAt: string;
-  groups: ExportedGroup[];
-  hosts: ExportedHost[];
-}
+// Only the end-to-end tests set this, to skip the native file dialogs they can't drive.
+const testFile = (): string | null => process.env.WHARF_E2E_BACKUP_FILE || null;
 
-function isExportFile(value: unknown): value is ExportFile {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return v.version === 1 && Array.isArray(v.groups) && Array.isArray(v.hosts);
+export interface BackupExportRequest extends ExportOptions {
+  parts: BackupPart[];
 }
 
 export function registerBackupIpc(): void {
-  ipcMain.handle(IPC.backup.export, async (): Promise<string | null> => {
-    const result = await dialog.showSaveDialog({
-      title: "Export Wharf hosts",
-      defaultPath: `wharf-hosts-${new Date().toISOString().slice(0, 10)}.json`,
-      filters: [{ name: "JSON", extensions: ["json"] }],
+  ipcMain.handle(IPC.backup.export, async (_event, request: BackupExportRequest): Promise<string | null> => {
+    let target = testFile();
+    if (!target) {
+      const result = await dialog.showSaveDialog({
+        title: "Export Wharf backup",
+        defaultPath: `wharf-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (result.canceled || !result.filePath) return null;
+      target = result.filePath;
+    }
+    const file = backup.build({
+      parts: request.parts,
+      passphrase: request.passphrase || undefined,
+      rendererSettings: request.rendererSettings,
     });
-    if (result.canceled || !result.filePath) return null;
-
-    const data: ExportFile = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      groups: getGroups().map((g) => ({ id: g.id, name: g.name, parentId: g.parentId, color: g.color })),
-      hosts: getHosts().map((h) => ({
-        id: h.id,
-        name: h.name,
-        hostname: h.hostname,
-        port: h.port,
-        username: h.username,
-        groupId: h.groupId,
-        authMethod: h.authMethod,
-        privateKeyPath: h.privateKeyPath,
-        color: h.color,
-        tags: h.tags,
-        jumpHostId: h.jumpHostId ?? null,
-      })),
-    };
-    writeFileSync(result.filePath, JSON.stringify(data, null, 2), "utf8");
-    return result.filePath;
+    // A backup can hold sealed passwords, so it is as private as the data file itself.
+    writeFileSync(target, JSON.stringify(file, null, 2), { encoding: "utf8", mode: 0o600 });
+    return target;
   });
 
-  ipcMain.handle(IPC.backup.import, async (): Promise<BackupImportResult | null> => {
-    const result = await dialog.showOpenDialog({
-      title: "Import Wharf hosts",
-      properties: ["openFile"],
-      filters: [{ name: "JSON", extensions: ["json"] }],
-    });
-    if (result.canceled || result.filePaths.length === 0) return null;
-
-    let parsed: unknown;
+  ipcMain.handle(IPC.backup.pick, async (): Promise<BackupPreview | null> => {
+    let source = testFile();
+    if (!source) {
+      const result = await dialog.showOpenDialog({
+        title: "Import Wharf backup",
+        properties: ["openFile"],
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (result.canceled || result.filePaths.length === 0) return null;
+      source = result.filePaths[0];
+    }
+    let raw: unknown;
     try {
-      parsed = JSON.parse(readFileSync(result.filePaths[0], "utf8"));
+      raw = JSON.parse(readFileSync(source, "utf8"));
     } catch {
-      throw new Error("Couldn't parse that file as JSON.");
+      throw new Error("Couldn't read that file as JSON.");
     }
-    if (!isExportFile(parsed)) {
-      throw new Error("This doesn't look like a Wharf export file.");
-    }
-
-    // New ids for everything (never collide with existing records), with a
-    // full id map built up front so parent/jump-host references resolve
-    // correctly regardless of array order.
-    const groupIdMap = new Map<string, string>();
-    for (const g of parsed.groups) groupIdMap.set(g.id, randomUUID());
-    const hostIdMap = new Map<string, string>();
-    for (const h of parsed.hosts) hostIdMap.set(h.id, randomUUID());
-
-    const now = Date.now();
-    const newGroups: GroupRecord[] = parsed.groups.map((g) => ({
-      id: groupIdMap.get(g.id)!,
-      name: g.name,
-      parentId: g.parentId ? (groupIdMap.get(g.parentId) ?? null) : null,
-      color: g.color,
-      createdAt: now,
-      updatedAt: now,
-    }));
-    const newHosts: HostRecord[] = parsed.hosts.map((h) => ({
-      id: hostIdMap.get(h.id)!,
-      name: h.name,
-      hostname: h.hostname,
-      port: h.port,
-      username: h.username,
-      groupId: h.groupId ? (groupIdMap.get(h.groupId) ?? null) : null,
-      authMethod: h.authMethod,
-      // Secrets are never in the export file — imported hosts start with
-      // none set; password/agent auth will prompt for a blank one until
-      // the user re-enters it via Edit.
-      secretId: null,
-      privateKeyPath: h.privateKeyPath,
-      color: h.color,
-      tags: h.tags,
-      jumpHostId: h.jumpHostId ? (hostIdMap.get(h.jumpHostId) ?? null) : null,
-      createdAt: now,
-      updatedAt: now,
-    }));
-
-    setGroups([...getGroups(), ...newGroups]);
-    setHosts([...getHosts(), ...newHosts]);
-
-    return { importedGroups: newGroups.length, importedHosts: newHosts.length };
+    const parsed = parseBackup(raw);
+    const token = randomUUID();
+    pending = { token, parsed, fileName: path.basename(source) };
+    return {
+      token,
+      fileName: pending.fileName,
+      exportedAt: parsed.file.exportedAt || null,
+      counts: countBackup(parsed.file),
+      hasSettings: !!parsed.file.settings,
+      hasSecrets: !!parsed.file.secrets && Object.keys(parsed.file.secrets.items).length > 0,
+      invalid: parsed.invalid,
+    };
   });
+
+  ipcMain.handle(
+    IPC.backup.apply,
+    (_event, token: string, options: { parts: BackupPart[]; passphrase?: string; skipSecrets?: boolean }): BackupImportResult => {
+      if (!pending || pending.token !== token) throw new Error("That import is no longer open; pick the file again.");
+      const result = backup.apply(
+        pending.parsed.file,
+        new Set(options.parts),
+        options.passphrase || undefined,
+        options.skipSecrets === true,
+      );
+      result.invalid += pending.parsed.invalid;
+      pending = null;
+      return result;
+    },
+  );
 }

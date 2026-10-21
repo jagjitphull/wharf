@@ -64,11 +64,7 @@ export interface GroupInput {
   color?: string;
 }
 
-/** Result of a successful backup:import; null return from the IPC call means the user canceled the file picker. */
-export interface BackupImportResult {
-  importedGroups: number;
-  importedHosts: number;
-}
+export type { BackupImportResult, BackupPart, BackupPreview } from "./backupFormat";
 
 // ---------------------------------------------------------------------------
 // Snippets
@@ -532,7 +528,8 @@ export const IPC = {
   },
   backup: {
     export: "backup:export",
-    import: "backup:import",
+    pick: "backup:pick",
+    apply: "backup:apply",
   },
   snippets: {
     list: "snippets:list",
