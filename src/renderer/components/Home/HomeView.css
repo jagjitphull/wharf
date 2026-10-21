@@ -282,6 +282,13 @@
   display: none;
 }
 
+.host-card-last {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
 .host-card-tag {
   padding: 2px 8px;
   border-radius: var(--radius-sm);

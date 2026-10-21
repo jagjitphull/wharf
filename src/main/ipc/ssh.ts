@@ -6,7 +6,7 @@ import { IPC, type SessionStartResult } from "../../shared/types";
 import * as sshManager from "../services/sshManager";
 import * as localShellManager from "../services/localShellManager";
 import * as moshManager from "../services/moshManager";
-import { getHosts } from "../services/store";
+import { getHosts, markHostConnected } from "../services/store";
 
 function defaultLogPath(name: string): string {
   const dir = join(homedir(), "Documents", "wharf-logs");
@@ -20,6 +20,7 @@ export function registerSshIpc(): void {
   ipcMain.handle(IPC.ssh.connect, async (_event, hostId: string, cols: number, rows: number): Promise<SessionStartResult> => {
     const host = getHosts().find((h) => h.id === hostId);
     const sessionId = host?.mosh ? moshManager.connect(hostId, cols, rows) : await sshManager.connect(hostId, cols, rows);
+    markHostConnected(hostId); // only reached when connecting didn't throw
     return { sessionId };
   });
 

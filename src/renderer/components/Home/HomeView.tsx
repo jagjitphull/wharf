@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { HostRecord } from "@shared/types";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
@@ -8,7 +8,7 @@ import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog"
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { IconFolder, IconPencil, IconPlus, IconSearch, IconServer, IconTerminal } from "../Icons/Icons";
 import { REACHABILITY_LABEL, useReachability } from "../../state/useReachability";
-import { buildSections, greeting, hostGlyph, type HomeFilter } from "./homeModel";
+import { buildSections, formatLastConnected, greeting, hostGlyph, type HomeFilter } from "./homeModel";
 import "./HomeView.css";
 
 /** Host colours are free hex values; a translucent tint of one makes the tile. */
@@ -17,8 +17,13 @@ function tint(color: string): string {
 }
 
 export function HomeView() {
-  const { hosts, groups, paneMeta, openTerminal, setContextHostId, setActiveView, loadAll } = useAppStore();
+  const { hosts, groups, paneMeta, openTerminal, setContextHostId, setActiveView, loadAll, refreshHosts } = useAppStore();
   const [query, setQuery] = useState("");
+  // Coming back to Home (from a terminal you just opened, say) should show the host as just connected.
+  useEffect(() => {
+    void refreshHosts();
+  }, [refreshHosts]);
+  const now = Date.now();
   const [filter, setFilter] = useState<HomeFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
@@ -123,6 +128,11 @@ export function HomeView() {
               {t}
             </span>
           ))}
+          {host.lastConnectedAt ? (
+            <span className="host-card-last" title={new Date(host.lastConnectedAt).toLocaleString()}>
+              {formatLastConnected(host.lastConnectedAt, now)}
+            </span>
+          ) : null}
         </div>
         <div className="host-card-actions" onClick={(e) => e.stopPropagation()}>
           <button className="primary" title="Open terminal" onClick={() => void connect(host)}>

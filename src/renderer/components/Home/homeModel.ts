@@ -20,6 +20,24 @@ export function hostMatches(host: HostRecord, query: string): boolean {
   return `${host.name} ${host.username} ${host.hostname} ${(host.tags ?? []).join(" ")}`.toLowerCase().includes(q);
 }
 
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** "just now", "5 min ago", "2 h ago", "yesterday", "3 d ago", then the date. */
+export function formatLastConnected(at: number, now: number): string {
+  const ago = Math.max(0, now - at);
+  if (ago < MINUTE) return "just now";
+  if (ago < HOUR) return `${Math.floor(ago / MINUTE)} min ago`;
+  if (ago < DAY) return `${Math.floor(ago / HOUR)} h ago`;
+  if (ago < 2 * DAY) return "yesterday";
+  if (ago < 14 * DAY) return `${Math.floor(ago / DAY)} d ago`;
+  return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** How many hosts Home's Recent row shows. */
+export const RECENT_COUNT = 4;
+
 export interface HomeSection {
   id: string;
   title: string;
@@ -31,8 +49,10 @@ export type HomeFilter = "all" | "connected" | string;
 
 /**
  * The Home screen's sections: hosts that are connected right now first (when
- * showing everything), then one section per group in the groups' own order,
- * then whatever has no group. Empty sections are dropped.
+ * showing everything), then the most recently connected ones (when not
+ * searching), then one section per group in the groups' own order, then
+ * whatever has no group. Empty sections are dropped. A host in the first two
+ * also appears in its group.
  */
 export function buildSections(
   hosts: HostRecord[],
@@ -52,6 +72,13 @@ export function buildSections(
   if (filter === "all") {
     const live = visible.filter((h) => connectedHostIds.has(h.id)).sort(byName);
     if (live.length) sections.push({ id: "connected", title: "Connected now", hosts: live });
+  }
+  if (filter === "all" && !query.trim()) {
+    const recent = visible
+      .filter((h) => (h.lastConnectedAt ?? 0) > 0 && !connectedHostIds.has(h.id))
+      .sort((a, b) => (b.lastConnectedAt ?? 0) - (a.lastConnectedAt ?? 0))
+      .slice(0, RECENT_COUNT);
+    if (recent.length) sections.push({ id: "recent", title: "Recent", hosts: recent });
   }
   for (const g of groups) {
     if (filter !== "all" && filter !== g.id) continue;
