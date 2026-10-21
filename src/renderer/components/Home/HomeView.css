@@ -297,6 +297,12 @@
   font-size: 11px;
 }
 
+.host-card-tunnels {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Quick actions float over the card's top-right edge on hover or focus. */
 .host-card-actions {
   position: absolute;

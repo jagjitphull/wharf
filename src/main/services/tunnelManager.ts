@@ -4,6 +4,7 @@ import type { AcceptConnection, Client, ClientChannel, TcpConnectionDetails } fr
 import { BrowserWindow } from "electron";
 import log from "electron-log/main";
 import { IPC, type TunnelInput, type TunnelRecord, type TunnelStateEvent, type TunnelStatus } from "../../shared/types";
+import { validateTunnelInput } from "../../shared/tunnelInput";
 import { getTunnels, setTunnels } from "./store";
 import { acquireClient, releaseClient } from "./connectionPool";
 
@@ -180,6 +181,8 @@ export function list(): TunnelRecord[] {
 }
 
 export function create(input: TunnelInput): TunnelRecord {
+  const problem = validateTunnelInput(input);
+  if (problem) throw new Error(problem);
   const record: TunnelRecord = { id: randomUUID(), ...input };
   setTunnels([...getTunnels(), record]);
   return record;

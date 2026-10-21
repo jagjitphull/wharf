@@ -1,7 +1,9 @@
 // A small SSH server for the e2e scenarios that need a real remote host: password
-// auth, a shell that prints a prompt and echoes what it is sent. The app is told to
+// auth, a shell that prints a prompt and echoes what it is sent, and local port
+// forwarding (direct-tcpip, to any port on this machine). The app is told to
 // trust its host key by writing the line `knownHostsLine()` into ~/.ssh/known_hosts.
 
+import net from "node:net";
 import ssh2 from "ssh2";
 
 const { Server, utils } = ssh2;
@@ -21,6 +23,14 @@ export async function startSshServer() {
       else ctx.reject(["password"]);
     });
     client.on("ready", () => {
+      client.on("tcpip", (accept, reject, info) => {
+        const upstream = net.connect(info.destPort, info.destIP, () => {
+          const channel = accept();
+          channel.pipe(upstream).pipe(channel);
+          channel.on("close", () => upstream.destroy());
+        });
+        upstream.on("error", () => reject());
+      });
       client.on("session", (accept) => {
         const session = accept();
         session.on("pty", (acceptPty) => acceptPty());
@@ -46,7 +56,7 @@ export async function startSshServer() {
     /** The line that makes the app trust this server's host key. */
     knownHostsLine: () => `[127.0.0.1]:${port} ssh-ed25519 ${blob.toString("base64")}\n`,
     async close() {
-      for (const s of sockets) s.destroy();
+      for (const s of sockets) typeof s.destroy === "function" ? s.destroy() : s.end(); // an ssh2 Connection ends, a socket is destroyed
       await new Promise((resolve) => server.close(resolve));
     },
   };

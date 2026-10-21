@@ -89,6 +89,10 @@ A personal SSH/SFTP terminal client, Termius-style.
   whose SSH connection drops (network change, sleep, server restart) reconnects by itself, waiting
   2s, 4s, 8s … up to 60s between attempts, until you stop it. It gives up at once if the login is
   refused or the host key changed, since retrying a bad password can lock an account.
+  From a host card on Home (**Port forward…** in its menu, or the ⇄ button), a dialog sets one up in
+  a few clicks: pick Local, Remote or SOCKS, tap a common service (PostgreSQL, MySQL, Redis, …) to fill
+  in its port — the listening port stays the same, or moves off a privileged one and past any
+  already used — and create and start it at once. Hosts with tunnels up show a ⇄ count on the card.
 - Optional master password (Settings → saved passwords) that encrypts saved passwords and key
   passphrases with a key derived from it (scrypt, AES-256-GCM) instead of relying on the OS keyring,
   which is the way to protect them on a Linux machine that has none. It also seals Command

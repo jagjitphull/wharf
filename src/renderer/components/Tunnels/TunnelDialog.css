@@ -1,0 +1,78 @@
+.tunnel-dialog {
+  width: 480px;
+}
+
+.tunnel-type {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+}
+
+.tunnel-type-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.tunnel-type-btn.active {
+  background: var(--bg-panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.tunnel-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tunnel-preset {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tunnel-preset span {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tunnel-preset:hover {
+  background: var(--bg-hover);
+}
+
+.tunnel-preset.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.tunnel-preset.active span {
+  color: inherit;
+}
+
+.tunnel-clash {
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+.dialog label.tunnel-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
