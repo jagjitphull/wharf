@@ -95,6 +95,17 @@ export async function run(t, start) {
     "a one-line output block spans two rows from its command row",
     !!helloRow && Math.abs(ok0[0].top - helloRow.top) < 2 && Math.abs(ok0[0].h - 2 * rowH) < 3,
   );
+  const railGap = await app.evJson(`(() => {
+    const mark = document.querySelector('.cmd-block').getBoundingClientRect();
+    const screen = document.querySelector('.tab-pane-container[style*="flex"] .xterm-screen').getBoundingClientRect();
+    const pane = document.querySelector('.tab-pane-container[style*="flex"] .terminal-pane').getBoundingClientRect();
+    return { railRight: mark.left + 3, textLeft: screen.left, markLeft: mark.left, paneLeft: pane.left };
+  })()`);
+  t.ok(
+    "the rail sits beside the first column, not over its text",
+    railGap.railRight <= railGap.textLeft + 0.5 && railGap.markLeft >= railGap.paneLeft,
+    JSON.stringify(railGap),
+  );
   t.ok("marks never intercept the mouse", await app.q(".cmd-block", "(e) => getComputedStyle(e).pointerEvents === 'none'"));
   await app.shot("block-marks");
 

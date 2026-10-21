@@ -51,8 +51,9 @@
 
 .title-bar-new-tab {
   align-self: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   margin-left: 2px;
   flex: none;
 }

@@ -1,4 +1,8 @@
 .context-menu {
+  /* Menus opened from the title bar (the tab menu, the + menu) are DOM children of its
+     drag region, and -webkit-app-region is inherited: without this every click on them
+     starts a window drag instead of reaching the item. */
+  -webkit-app-region: no-drag;
   position: fixed;
   z-index: 300;
   min-width: 180px;

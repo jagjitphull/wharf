@@ -66,7 +66,9 @@
 
 .tab {
   position: relative;
-  flex: none;
+  /* Tabs give up width (down to the minimum) before the strip has to scroll. */
+  flex: 0 1 auto;
+  min-width: 120px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -100,6 +102,7 @@
 }
 
 .tab.active {
+  flex-shrink: 0;
   height: 36px;
   /* Same surface as the content under it, so the tab and the page read as
      one piece; the top accent/host-color line is set inline per-tab (see
@@ -122,6 +125,8 @@
 }
 
 .tab-title {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 160px;
@@ -214,4 +219,10 @@
 
 .tab-close:hover {
   color: var(--danger-text);
+}
+
+/* Squeezed tabs keep room for their title: only the active tab carries the duplicate button
+   (Duplicate is also in the tab's menu and the command palette). */
+.tab:not(.active) .tab-duplicate {
+  display: none;
 }

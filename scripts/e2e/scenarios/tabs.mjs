@@ -119,4 +119,68 @@ export async function run(t, start) {
     "Unpin Tab brings the close button back",
     (await tabs()).every((x) => !x.pinned && x.hasClose),
   );
+
+  // --- popups opened from the title bar must not inherit its window-drag region (clicks would start
+  // dragging the window instead of reaching the item); -webkit-app-region is inherited.
+  await app.rightClick(".tab-strip .tab", 0);
+  t.ok(
+    "the tab menu is not a window-drag region",
+    (await app.q(".context-menu", "(e) => getComputedStyle(e).webkitAppRegion")) === "no-drag" &&
+      (await app.q(".context-menu-item", "(e) => getComputedStyle(e).webkitAppRegion")) === "no-drag",
+  );
+  const items0 = await app.evJson(
+    `[...document.querySelectorAll('.context-menu-item')].map((i) => { const b = i.getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!e?.closest('.context-menu-item'); })`,
+  );
+  t.ok("every menu item is the topmost thing at its own centre", items0.length > 5 && items0.every(Boolean));
+  await menuClick("Rename Tab…");
+  await app.until(() => app.q(".dialog-overlay"), 3000);
+  t.ok(
+    "a dialog opened from a tab is not a window-drag region either",
+    (await app.q(".dialog-overlay", "(e) => getComputedStyle(e).webkitAppRegion")) === "no-drag" &&
+      (await app.q(".dialog button.primary", "(e) => getComputedStyle(e).webkitAppRegion")) === "no-drag",
+  );
+  await app.press("Escape");
+  await app.ev(`document.querySelector('.dialog button:not(.primary)')?.click()`);
+  await app.until(async () => !(await app.q(".dialog")), 3000);
+  await app.click(".title-bar-new-tab");
+  await app.until(() => app.q(".context-menu"), 3000);
+  t.ok(
+    "the + menu is not a window-drag region",
+    (await app.q(".context-menu", "(e) => getComputedStyle(e).webkitAppRegion")) === "no-drag",
+  );
+  await app.press("Escape");
+
+  // --- many tabs: they shrink, the active one stays in view, and + stays whole
+  for (let i = 0; i < 9; i++) await app.newLocalShell();
+  const geometry = () =>
+    app.evJson(`(() => {
+      const strip = document.querySelector('.tab-strip');
+      const s = strip.getBoundingClientRect();
+      const active = document.querySelector('.tab-strip .tab.active').getBoundingClientRect();
+      const plus = document.querySelector('.title-bar-new-tab').getBoundingClientRect();
+      const actions = document.querySelector('.title-bar-actions').getBoundingClientRect();
+      const hit = document.elementFromPoint(plus.left + plus.width / 2, plus.top + plus.height / 2);
+      return {
+        activeInView: active.left >= s.left - 1 && active.right <= s.right + 1,
+        plusWhole: plus.right <= actions.left && plus.left >= s.right - 1 && plus.width >= 28,
+        plusOnTop: !!hit?.closest('.title-bar-new-tab'),
+        scrolls: strip.scrollWidth > strip.clientWidth + 1,
+        scrollLeft: strip.scrollLeft,
+      };
+    })()`);
+  const g = await geometry();
+  t.ok("a newly opened tab is scrolled into view", g.activeInView, JSON.stringify(g));
+  t.ok("the + button stays whole and clickable beside the tabs", g.plusWhole && g.plusOnTop, JSON.stringify(g));
+  await app.shot("many-tabs");
+  await app.click(".tab-strip .tab");
+  await app.until(async () => (await geometry()).activeInView, 3000);
+  const back = await geometry();
+  t.ok("switching to the first tab scrolls it into view", back.activeInView, JSON.stringify(back));
+  if (back.scrolls) {
+    await app.ev(
+      `document.querySelector('.tab-strip').dispatchEvent(new WheelEvent('wheel', { deltaY: 200, bubbles: true, cancelable: true }))`,
+    );
+    await app.sleep(200);
+    t.ok("the mouse wheel scrolls the tab strip sideways", (await geometry()).scrollLeft > back.scrollLeft);
+  }
 }
