@@ -29,6 +29,7 @@ import type { SnippetRecord } from "@shared/types";
 // exports and these don't need to be the exception.
 const SftpBrowser = lazy(() => import("./components/SftpBrowser/SftpBrowser").then((m) => ({ default: m.SftpBrowser })));
 const Tunnels = lazy(() => import("./components/Tunnels/Tunnels").then((m) => ({ default: m.Tunnels })));
+const SshKeys = lazy(() => import("./components/SshKeys/SshKeys").then((m) => ({ default: m.SshKeys })));
 const HistoryView = lazy(() => import("./components/CommandHistory/HistoryView").then((m) => ({ default: m.HistoryView })));
 const Workspaces = lazy(() => import("./components/Workspaces/Workspaces").then((m) => ({ default: m.Workspaces })));
 const Settings = lazy(() => import("./components/Settings/Settings").then((m) => ({ default: m.Settings })));
@@ -234,6 +235,11 @@ export default function App() {
             {activeView === "tunnels" && (
               <div className="view-enter" key="tunnels">
                 <Tunnels />
+              </div>
+            )}
+            {activeView === "keys" && (
+              <div className="view-enter" key="keys">
+                <SshKeys />
               </div>
             )}
             {activeView === "history" && (

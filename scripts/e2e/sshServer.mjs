@@ -1,9 +1,14 @@
 // A small SSH server for the e2e scenarios that need a real remote host: password
 // auth, a shell that prints a prompt and echoes what it is sent, and local port
-// forwarding (direct-tcpip, to any port on this machine). The app is told to
+// forwarding (direct-tcpip, to any port on this machine), and `exec` (run by sh with HOME
+// set to `server.home`, so nothing touches the real home). The app is told to
 // trust its host key by writing the line `knownHostsLine()` into ~/.ssh/known_hosts.
 
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import ssh2 from "ssh2";
 
 const { Server, utils } = ssh2;
@@ -16,6 +21,7 @@ export async function startSshServer() {
   const parsed = utils.parseKey(hostKey);
   const blob = (Array.isArray(parsed) ? parsed[0] : parsed).getPublicSSH();
   const sockets = new Set();
+  const home = mkdtempSync(path.join(tmpdir(), "wharf-e2e-remote-"));
 
   const server = new Server({ hostKeys: [hostKey] }, (client) => {
     client.on("authentication", (ctx) => {
@@ -33,6 +39,16 @@ export async function startSshServer() {
       });
       client.on("session", (accept) => {
         const session = accept();
+        session.on("exec", (acceptExec, _reject, info) => {
+          const stream = acceptExec();
+          const child = spawn("sh", ["-c", info.command], { cwd: home, env: { ...process.env, HOME: home } });
+          child.stdout.on("data", (d) => stream.write(d));
+          child.stderr.on("data", (d) => stream.stderr.write(d));
+          child.on("close", (code) => {
+            stream.exit(code ?? 1);
+            stream.end();
+          });
+        });
         session.on("pty", (acceptPty) => acceptPty());
         session.on("window-change", (acceptWindow) => acceptWindow?.());
         session.on("shell", (acceptShell) => {
@@ -53,11 +69,14 @@ export async function startSshServer() {
 
   return {
     port,
+    /** The remote side's home directory (where `exec` commands run). */
+    home,
     /** The line that makes the app trust this server's host key. */
     knownHostsLine: () => `[127.0.0.1]:${port} ssh-ed25519 ${blob.toString("base64")}\n`,
     async close() {
       for (const s of sockets) typeof s.destroy === "function" ? s.destroy() : s.end(); // an ssh2 Connection ends, a socket is destroyed
       await new Promise((resolve) => server.close(resolve));
+      rmSync(home, { recursive: true, force: true });
     },
   };
 }

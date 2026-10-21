@@ -18,6 +18,7 @@ import { registerHostStatsIpc } from "./ipc/hostStats";
 import { registerSshConfigIpc } from "./ipc/sshConfig";
 import { registerCommandHistoryIpc } from "./ipc/commandHistory";
 import { registerTranscriptsIpc } from "./ipc/transcripts";
+import { registerSshKeysIpc } from "./ipc/sshKeys";
 import { transcripts } from "./services/transcripts";
 import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
@@ -329,6 +330,7 @@ app.whenReady().then(() => {
   registerSshConfigIpc();
   registerCommandHistoryIpc();
   registerTranscriptsIpc();
+  registerSshKeysIpc();
   registerAiIpc();
   registerCommandBlocksIpc();
   registerUpdateIpc();

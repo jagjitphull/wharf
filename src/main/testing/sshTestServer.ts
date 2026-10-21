@@ -3,6 +3,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { generateKeyPairSync } from "node:crypto";
+import { spawn } from "node:child_process";
 import { Server, utils, type Connection, type SFTPWrapper } from "ssh2";
 import type { HostRecord } from "../../shared/types";
 
@@ -11,7 +12,8 @@ import type { HostRecord } from "../../shared/types";
  * ssh2 client code (sshManager, sftpManager, tunnelManager, the connection
  * pool) runs against genuine protocol traffic instead of mocks. It supports
  * exactly what those tests need: password auth, a PTY shell that echoes,
- * SFTP over a real directory, and direct-tcpip port forwarding. Not
+ * SFTP over a real directory, command execution (run by `sh` with HOME set
+ * to that directory), and direct-tcpip port forwarding. Not
  * included in the packaged app (see tsconfig.main.json).
  */
 
@@ -31,6 +33,8 @@ export interface TestSshServer {
     open: number;
     total: number;
     shellInput: string[];
+    /** Commands run with `exec`. */
+    execs: string[];
     windowChanges: { cols: number; rows: number }[];
     /** direct-tcpip destinations clients asked us to connect to. */
     forwards: string[];
@@ -229,6 +233,7 @@ export async function startTestSshServer(): Promise<TestSshServer> {
     open: 0,
     total: 0,
     shellInput: [],
+    execs: [],
     windowChanges: [],
     forwards: [],
     forwardRequests: [],
@@ -270,6 +275,17 @@ export async function startTestSshServer(): Promise<TestSshServer> {
           });
         });
         session.on("sftp", (accept) => serveSftp(accept(), root));
+        session.on("exec", (accept, _reject, info) => {
+          stats.execs.push(info.command);
+          const stream = accept();
+          const child = spawn("sh", ["-c", info.command], { cwd: root, env: { ...process.env, HOME: root } });
+          child.stdout.on("data", (d: Buffer) => stream.write(d));
+          child.stderr.on("data", (d: Buffer) => stream.stderr.write(d));
+          child.on("close", (code) => {
+            stream.exit(code ?? 1);
+            stream.end();
+          });
+        });
       });
 
       client.on("request", (accept, reject, name, info) => {

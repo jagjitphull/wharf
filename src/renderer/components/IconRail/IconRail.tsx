@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useAppStore, type ActiveView } from "../../state/store";
-import { IconLayers, IconClock, IconServer, IconSliders, IconTunnel } from "../Icons/Icons";
+import { IconClock, IconKey, IconLayers, IconServer, IconSliders, IconTunnel } from "../Icons/Icons";
 import "./IconRail.css";
 
 interface Item {
@@ -14,6 +14,7 @@ interface Item {
 const TOP: Item[] = [
   { label: "Hosts", view: "home", also: ["hosts", "sftp"], icon: <IconServer size={20} /> },
   { label: "Tunnels", view: "tunnels", icon: <IconTunnel size={20} /> },
+  { label: "SSH keys", view: "keys", icon: <IconKey size={20} /> },
   { label: "Workspaces", view: "workspaces", icon: <IconLayers size={20} /> },
   { label: "History", view: "history", icon: <IconClock size={20} /> },
 ];

@@ -65,6 +65,7 @@ export interface GroupInput {
 }
 
 export type { BackupImportResult, BackupPart, BackupPreview } from "./backupFormat";
+export type { GenerateKeyRequest, InstallKeyResult, SshKeyInfo, SshKeyType } from "./sshKeys";
 
 // ---------------------------------------------------------------------------
 // Snippets
@@ -530,6 +531,13 @@ export const IPC = {
     export: "backup:export",
     pick: "backup:pick",
     apply: "backup:apply",
+  },
+  sshKeys: {
+    list: "ssh-keys:list",
+    generate: "ssh-keys:generate",
+    publicKey: "ssh-keys:public-key",
+    remove: "ssh-keys:remove",
+    install: "ssh-keys:install",
   },
   snippets: {
     list: "snippets:list",

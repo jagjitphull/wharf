@@ -143,6 +143,13 @@ const api: WharfApi = {
     pick: () => ipcRenderer.invoke(IPC.backup.pick),
     apply: (token, options) => ipcRenderer.invoke(IPC.backup.apply, token, options),
   },
+  sshKeys: {
+    list: () => ipcRenderer.invoke(IPC.sshKeys.list),
+    generate: (request) => ipcRenderer.invoke(IPC.sshKeys.generate, request),
+    publicKey: (name) => ipcRenderer.invoke(IPC.sshKeys.publicKey, name),
+    remove: (name) => ipcRenderer.invoke(IPC.sshKeys.remove, name),
+    install: (name, hostId) => ipcRenderer.invoke(IPC.sshKeys.install, name, hostId),
+  },
   snippets: {
     list: () => ipcRenderer.invoke(IPC.snippets.list),
     create: (input) => ipcRenderer.invoke(IPC.snippets.create, input),
