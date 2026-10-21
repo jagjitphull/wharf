@@ -10,6 +10,7 @@ import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
 import { CommandBlocksSettings } from "./CommandBlocksSettings";
 import { HistorySettings } from "./HistorySettings";
+import { TranscriptSettings } from "./TranscriptSettings";
 import { GhostSuggestionSettings } from "./GhostSuggestionSettings";
 import { AiAutocompleteSettings } from "./AiAutocompleteSettings";
 import { NotificationSettings } from "./NotificationSettings";
@@ -215,6 +216,9 @@ export function Settings() {
 
         <h2>Command History</h2>
         <HistorySettings />
+
+        <h2>Session Transcripts</h2>
+        <TranscriptSettings />
 
         <h2>Notifications</h2>
         <NotificationSettings />

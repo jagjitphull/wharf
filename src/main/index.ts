@@ -17,6 +17,8 @@ import { registerWorkspacesIpc } from "./ipc/workspaces";
 import { registerHostStatsIpc } from "./ipc/hostStats";
 import { registerSshConfigIpc } from "./ipc/sshConfig";
 import { registerCommandHistoryIpc } from "./ipc/commandHistory";
+import { registerTranscriptsIpc } from "./ipc/transcripts";
+import { transcripts } from "./services/transcripts";
 import { registerAiIpc } from "./ipc/ai";
 import { registerCommandBlocksIpc } from "./ipc/commandBlocks";
 import { registerUpdateIpc, scheduleLaunchUpdateCheck } from "./ipc/update";
@@ -326,6 +328,7 @@ app.whenReady().then(() => {
   registerHostStatsIpc();
   registerSshConfigIpc();
   registerCommandHistoryIpc();
+  registerTranscriptsIpc();
   registerAiIpc();
   registerCommandBlocksIpc();
   registerUpdateIpc();
@@ -375,6 +378,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  transcripts.endAll();
   stopAllTunnels();
   closeAllSftp();
   stopAllHostStats();

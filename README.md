@@ -135,6 +135,13 @@ A personal SSH/SFTP terminal client, Termius-style.
   defaults supported), reviewable before importing
 - Per-session logging — record a terminal's raw output to a file, toggled
   from its right-click menu
+- Session transcripts (Settings → Session Transcripts, off by default) — keeps the text each new
+  SSH or local terminal session printed (escape codes removed, progress bars and command-line
+  redrawing reduced to what was on screen, full-screen programs such as vim and top left out,
+  Mosh and Windows local shells not recorded), and searches all of it from History → Session
+  output with the match shown in context and the transcript scrolled to it. Files are readable by
+  your user only, sealed with the master password when one is set, capped at 20 MB per session,
+  and deleted after the retention you choose
 - Keyword highlighting — built-in Error/Warning/OK/Info/Debug/IP-and-MAC
   categories plus custom regex rules, each with its own color, live in every
   terminal

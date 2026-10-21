@@ -26,7 +26,7 @@ import { LockScreen } from "./components/LockScreen/LockScreen";
 // exports and these don't need to be the exception.
 const SftpBrowser = lazy(() => import("./components/SftpBrowser/SftpBrowser").then((m) => ({ default: m.SftpBrowser })));
 const Tunnels = lazy(() => import("./components/Tunnels/Tunnels").then((m) => ({ default: m.Tunnels })));
-const CommandHistory = lazy(() => import("./components/CommandHistory/CommandHistory").then((m) => ({ default: m.CommandHistory })));
+const HistoryView = lazy(() => import("./components/CommandHistory/HistoryView").then((m) => ({ default: m.HistoryView })));
 const Workspaces = lazy(() => import("./components/Workspaces/Workspaces").then((m) => ({ default: m.Workspaces })));
 const Settings = lazy(() => import("./components/Settings/Settings").then((m) => ({ default: m.Settings })));
 const CommandPalette = lazy(() => import("./components/CommandPalette/CommandPalette").then((m) => ({ default: m.CommandPalette })));
@@ -219,7 +219,7 @@ export default function App() {
             )}
             {activeView === "history" && (
               <div className="view-enter" key="history">
-                <CommandHistory />
+                <HistoryView />
               </div>
             )}
             {activeView === "workspaces" && (

@@ -1,0 +1,38 @@
+.history-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.history-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 28px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-tab {
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.history-tab:hover {
+  color: var(--text);
+}
+
+.history-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.history-view-body {
+  flex: 1;
+  min-height: 0;
+}
