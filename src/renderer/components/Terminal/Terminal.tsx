@@ -26,6 +26,7 @@ import {
   scanAfterWrite,
   type CompiledRule,
 } from "./keywordHighlight";
+import { appendOutputTail, looksLikeSecretPrompt, shouldRecordTypedLine } from "./historyPolicy";
 import { createBlockDecorator } from "./blockDecorations";
 import { createCommandCaptureState, feedCommandCapture } from "./commandCapture";
 import {
@@ -161,6 +162,14 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const transitionMapRef = useRef<GhostTransitionMap>(new Map());
   const lastRunCommandRef = useRef<string | null>(null);
   const atPromptRef = useRef(false);
+  // What decides whether a typed line is a command or, say, a password (see
+  // historyPolicy.ts): whether the shell reports its prompts at all, the tail of
+  // the output so far, and whether our guess at the last typed line is still
+  // waiting for the shell's own text of it.
+  const integrationSeenRef = useRef(false);
+  const outputTailRef = useRef("");
+  const secretPromptShownRef = useRef(false);
+  const awaitingShellTextRef = useRef(false);
   const ghostSuggestionRef = useRef<GhostSuggestionState | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -643,6 +652,28 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     // supports them — a session without integration just never fires this,
     // so blocks/exit codes are additive, never required for the terminal to
     // otherwise work normally.
+    // Puts a command in Command History and the things built from it.
+    const recordCommand = (command: string) => {
+      // hostId/hostName are read fresh here rather than threaded through
+      // this closure's deps — they're set once when the pane connects and
+      // never change for its lifetime, so a stale read is never actually
+      // stale in practice.
+      const meta = useAppStore.getState().paneMeta[sessionId];
+      void wharf.commandHistory.add({
+        sessionId,
+        hostId: meta?.hostId ?? null,
+        hostName: meta?.title ?? "Unknown",
+        command,
+      });
+      // Makes a just-run command suggestible immediately, without waiting
+      // on a re-fetch of the full history list.
+      pushToGhostHistoryCache(historyCacheRef.current, command);
+      // Same immediacy for "next command" prediction — this command now
+      // becomes a real data point for whatever follows it, and the thing
+      // to predict from once the shell's back at a prompt.
+      recordGhostTransition(transitionMapRef.current, lastRunCommandRef.current, command);
+      lastRunCommandRef.current = command;
+    };
     const blockDecorator = createBlockDecorator(term);
     const oscDisposable = term.parser.registerOscHandler(133, (payload) => {
       // A ";C;<base64>" payload also carries the shell's own authoritative
@@ -651,11 +682,18 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       // (see the onData handler below), so this corrects that entry in
       // place rather than replacing the original synchronous write, which
       // keeps history responsive even over a slow SSH round trip.
+      integrationSeenRef.current = true;
       if (payload.startsWith("C")) {
         atPromptRef.current = false;
         const [, arg] = payload.split(";");
         const shellCommandText = decodeOsc133CommandText(arg);
-        if (shellCommandText) void wharf.commandHistory.correctLast(sessionId, shellCommandText);
+        if (shellCommandText) {
+          // If we recorded a guess for this line, the shell's text replaces it; if we
+          // didn't (typed ahead while another command ran), it is the first we hear of it.
+          if (awaitingShellTextRef.current) void wharf.commandHistory.correctLast(sessionId, shellCommandText);
+          else recordCommand(shellCommandText);
+        }
+        awaitingShellTextRef.current = false;
       } else if (payload === "B") {
         // Prompt fully drawn, shell is ready for input right now — the one
         // reliable "not mid-output" signal a "next command" ghost suggestion
@@ -683,6 +721,8 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
 
     const offData = wharf.ssh.onData((event) => {
       if (event.sessionId === sessionId) {
+        outputTailRef.current = appendOutputTail(outputTailRef.current, event.chunk);
+        secretPromptShownRef.current = looksLikeSecretPrompt(outputTailRef.current);
         term.write(event.chunk, () => {
           scanAfterWrite(term, compiledRulesRef.current, highlightStateRef.current);
           recomputeGhostSuggestion();
@@ -735,28 +775,20 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         }
       }
       for (const command of feedCommandCapture(commandCaptureRef.current, data)) {
-        // hostId/hostName are read fresh here rather than threaded through
-        // this closure's deps — they're set once when the pane connects and
-        // never change for its lifetime, so a stale read is never actually
-        // stale in practice.
-        const meta = useAppStore.getState().paneMeta[sessionId];
-        void wharf.commandHistory.add({
-          sessionId,
-          hostId: meta?.hostId ?? null,
-          hostName: meta?.title ?? "Unknown",
-          command,
+        // A line typed while a command is running, or in answer to a password
+        // prompt, is input to that program, not a command — never record it.
+        const record = shouldRecordTypedLine({
+          integrationSeen: integrationSeenRef.current,
+          atPrompt: atPromptRef.current,
+          secretPromptShown: secretPromptShownRef.current,
         });
+        secretPromptShownRef.current = false;
+        if (!record) continue;
+        recordCommand(command);
+        awaitingShellTextRef.current = true;
         // Paired up with the next OSC 133;C (if this shell has integration)
         // to give the resulting block its command text — see commandBlocks.ts.
         notePendingCommand(commandBlocksRef.current, command);
-        // Makes a just-run command suggestible immediately, without waiting
-        // on a re-fetch of the full history list.
-        pushToGhostHistoryCache(historyCacheRef.current, command);
-        // Same immediacy for "next command" prediction — this command now
-        // becomes a real data point for whatever follows it, and the thing
-        // to predict from once the shell's back at a prompt.
-        recordGhostTransition(transitionMapRef.current, lastRunCommandRef.current, command);
-        lastRunCommandRef.current = command;
       }
     });
 
