@@ -1,22 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Terminal as XTerm, type IDecoration, type IMarker } from "@xterm/xterm";
+import { Terminal as XTerm, type IMarker } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SerializeAddon } from "@xterm/addon-serialize";
-import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { wharf } from "../../api/wharf";
 import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { resolveXtermTheme } from "../../state/terminalThemes";
 import { flattenPanes, useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
-import { useAiPrefsStore } from "../../state/aiPrefsStore";
-import { useGhostSuggestionPrefsStore } from "../../state/ghostSuggestionPrefsStore";
-import { LONG_COMMAND_THRESHOLD_MS, useNotificationPrefsStore } from "../../state/notificationPrefsStore";
+import { useNotificationPrefsStore } from "../../state/notificationPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
-import { IconChevronDown, IconChevronUp, IconClose } from "../Icons/Icons";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
 import {
   compileRules,
@@ -26,29 +23,25 @@ import {
   scanAfterWrite,
   type CompiledRule,
 } from "./keywordHighlight";
-import { guessMatchesScreen, readTypedLine } from "./typedLine";
 import { appendOutputTail, looksLikeSecretPrompt, shouldRecordTypedLine } from "./historyPolicy";
 import { createBlockDecorator } from "./blockDecorations";
 import { createCommandCaptureState, feedCommandCaptureDetailed } from "./commandCapture";
-import {
-  createCommandBlocksState,
-  decodeOsc133CommandText,
-  handleOsc133,
-  notePendingCommand,
-  readBlockOutput,
-  type CommandBlock,
-} from "./commandBlocks";
+import { decodeOsc133CommandText, handleOsc133, notePendingCommand, type CommandBlock } from "./commandBlocks";
 import {
   createGhostHistoryCache,
   createGhostTransitionMap,
-  findGhostSuggestion,
-  findNextCommandSuggestion,
   pushToGhostHistoryCache,
   recordGhostTransition,
   type GhostHistoryCache,
   type GhostTransitionMap,
 } from "./ghostSuggestion";
 import { BlocksPanel } from "./BlocksPanel";
+import { AiSuggestPopup, ExplainPopup, NlPopup } from "./AiPopups";
+import { TerminalSearchBar } from "./TerminalSearchBar";
+import { useAiAssist } from "./useAiAssist";
+import { useCommandBlocks } from "./useCommandBlocks";
+import { useGhostSuggestion } from "./useGhostSuggestion";
+import { notifyCommandFinished } from "./notifyCommandFinished";
 import { registerScrollbackSource } from "./scrollbackRegistry";
 import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
@@ -71,39 +64,6 @@ interface Props {
   /** Id of the tab this pane lives in — needed for the Split Right/Down
    * context-menu actions, which add a new pane into this tab's layout. */
   tabId: string;
-}
-
-interface AiPopupState {
-  status: "loading" | "ready" | "error";
-  suggestions: string[];
-  error?: string;
-  /** The current line as of when this request was fired — used both to
-   * compute the keystroke delta on accept and to detect staleness (the
-   * user kept typing while waiting on the API, so the suggestions no
-   * longer apply to what's actually on the line). */
-  requestLine: string;
-}
-
-interface ExplainPopupState {
-  status: "loading" | "ready" | "error";
-  command: string;
-  explanation?: string;
-  suggestedFix?: string;
-  error?: string;
-}
-
-interface NlPopupState {
-  status: "input" | "loading" | "error";
-  description: string;
-  error?: string;
-}
-
-/** The currently-rendered ghost suggestion, if any — tracks enough to erase
- * it (marker/decoration) and to check it still fits the line on accept. */
-interface GhostSuggestionState {
-  marker: IMarker;
-  decoration: IDecoration;
-  fullCommand: string;
 }
 
 /** Whether xterm's viewport is currently scrolled all the way down (i.e.
@@ -145,11 +105,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const highlightStateRef = useRef(createHighlightState());
   const compiledRulesRef = useRef<CompiledRule[]>([]);
   const commandCaptureRef = useRef(createCommandCaptureState());
-  const commandBlocksRef = useRef(createCommandBlocksState());
   const terminalThemeId = themeOverrideId ?? globalTerminalThemeId;
-  const aiEnabled = useAiPrefsStore((s) => s.enabled);
-  const ghostEnabled = useGhostSuggestionPrefsStore((s) => s.enabled);
-  const ghostEnabledRef = useRef(ghostEnabled);
   const notifyOnLongCommand = useNotificationPrefsStore((s) => s.notifyOnLongCommand);
   const notifyOnLongCommandRef = useRef(notifyOnLongCommand);
   const visibleRef = useRef(visible);
@@ -171,43 +127,63 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   const promptEndRef = useRef<{ marker: IMarker; column: number } | null>(null);
   const outputTailRef = useRef("");
   const secretPromptShownRef = useRef(false);
-  const ghostSuggestionRef = useRef<GhostSuggestionState | null>(null);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
-  const [aiPopup, setAiPopup] = useState<AiPopupState | null>(null);
-  const [blocks, setBlocks] = useState<CommandBlock[]>([]);
-  const [blocksPanelOpen, setBlocksPanelOpen] = useState(false);
-  const [explainPopup, setExplainPopup] = useState<ExplainPopupState | null>(null);
-  const [explainBusyId, setExplainBusyId] = useState<string | null>(null);
-  const [nlPopup, setNlPopup] = useState<NlPopupState | null>(null);
   const searchOpenRef = useRef(false);
-  // Mirrors aiPopup/aiEnabled/nlPopup for the custom key handler below,
-  // which is registered once at mount (see the searchOpenRef comment on
-  // the same pattern) and would otherwise see a stale closure.
-  const aiPopupRef = useRef<AiPopupState | null>(null);
-  const aiEnabledRef = useRef(aiEnabled);
-  const nlPopupRef = useRef<NlPopupState | null>(null);
+
+  const {
+    commandBlocksRef,
+    blocks,
+    setBlocks,
+    blocksPanelOpen,
+    setBlocksPanelOpen,
+    jumpToBlock,
+    copyBlockCommand,
+    copyBlockOutput,
+    rerunBlock,
+    toggleBlockBookmark,
+  } = useCommandBlocks({ sessionId, termRef, commandCaptureRef });
+  const {
+    aiPopup,
+    setAiPopup,
+    nlPopup,
+    setNlPopup,
+    explainPopup,
+    setExplainPopup,
+    explainBusyId,
+    aiPopupRef,
+    aiEnabledRef,
+    nlPopupRef,
+    requestAiSuggestions,
+    acceptAiSuggestion,
+    explainBlock,
+    insertExplainFix,
+    generateFromDescription,
+  } = useAiAssist({ sessionId, termRef, commandCaptureRef });
+  const {
+    ghostSuggestionRef,
+    recompute: recomputeGhostSuggestion,
+    accept: acceptGhostSuggestion,
+    dispose: disposeGhostSuggestion,
+  } = useGhostSuggestion({
+    termRef,
+    commandCaptureRef,
+    integrationSeenRef,
+    promptEndRef,
+    atPromptRef,
+    historyCacheRef,
+    transitionMapRef,
+    lastRunCommandRef,
+    suppressed: () => !!(aiPopupRef.current || nlPopupRef.current || searchOpenRef.current),
+  });
 
   useEffect(() => {
     searchOpenRef.current = searchOpen;
     if (searchOpen) requestAnimationFrame(() => searchInputRef.current?.focus());
     else termRef.current?.focus();
   }, [searchOpen]);
-
-  useEffect(() => {
-    aiPopupRef.current = aiPopup;
-  }, [aiPopup]);
-
-  useEffect(() => {
-    aiEnabledRef.current = aiEnabled;
-  }, [aiEnabled]);
-
-  useEffect(() => {
-    ghostEnabledRef.current = ghostEnabled;
-    if (!ghostEnabled) disposeGhostSuggestion();
-  }, [ghostEnabled]);
 
   useEffect(() => {
     notifyOnLongCommandRef.current = notifyOnLongCommand;
@@ -217,301 +193,8 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     visibleRef.current = visible;
   }, [visible]);
 
-  useEffect(() => {
-    nlPopupRef.current = nlPopup;
-  }, [nlPopup]);
-
-  // Unlike the other popups (which either have their own <input> to catch
-  // Escape, or are handled in the terminal's custom key handler),
-  // explainPopup is opened from the Blocks panel — a plain mouse click, no
-  // keyboard state to piggyback on — so it gets its own small Escape
-  // listener instead.
-  useEffect(() => {
-    if (!explainPopup) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setExplainPopup(null);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [explainPopup]);
-
-  /** A desktop notification when a long-running command finishes on a pane
-   * you're not currently looking at — checked against notifyOnLongCommandRef
-   * (not the prop directly, since this is called from a listener registered
-   * once at mount) and skipped entirely for a pane/tab that's already
-   * visible and focused, so it never fires for something you're watching
-   * complete in real time. */
-  function notifyCommandFinished(block: CommandBlock) {
-    if (!notifyOnLongCommandRef.current) return;
-    if (Date.now() - block.timestamp < LONG_COMMAND_THRESHOLD_MS) return;
-    if (visibleRef.current && !document.hidden && document.hasFocus()) return;
-    if (typeof Notification === "undefined" || Notification.permission === "denied") return;
-
-    const meta = useAppStore.getState().paneMeta[sessionId];
-    const ok = block.exitCode === 0 || block.exitCode === null;
-    const notification = new Notification(ok ? "Command finished" : `Command failed (exit ${block.exitCode})`, {
-      body: `${meta?.title ?? "Terminal"} — ${block.command}`,
-    });
-    notification.onclick = () => {
-      window.focus();
-      const { setActiveTab, setActiveView } = useAppStore.getState();
-      setActiveTab(tabId);
-      setActiveView("hosts");
-    };
-  }
-
-  /** Fires an AI autocomplete request for whatever's currently typed
-   * (unsent) on this pane's line, sourced from the same buffer the command-
-   * history capture already maintains — no separate tracking needed. */
-  async function requestAiSuggestions() {
-    const requestLine = commandCaptureRef.current.buffer;
-    if (!requestLine) return; // nothing to complete
-    setAiPopup({ status: "loading", suggestions: [], requestLine });
-    try {
-      const provider = await wharf.ai.getProvider();
-      const hasKey = await wharf.ai.hasApiKey(provider);
-      if (!hasKey) {
-        setAiPopup({ status: "error", suggestions: [], requestLine, error: "No API key configured — add one in Settings." });
-        return;
-      }
-      const history = await wharf.commandHistory.list();
-      const recentCommands = history
-        .filter((h) => h.sessionId === sessionId)
-        .slice(-10)
-        .map((h) => h.command);
-      const meta = useAppStore.getState().paneMeta[sessionId];
-      const suggestions = await wharf.ai.suggest({
-        currentLine: requestLine,
-        recentCommands,
-        hostName: meta?.title ?? "unknown",
-        platform: wharf.window.platform,
-      });
-      // The user may have kept typing while this was in flight — stale
-      // suggestions for a line that no longer exists would be actively
-      // misleading, so just drop them rather than show them anyway.
-      if (commandCaptureRef.current.buffer !== requestLine) {
-        setAiPopup(null);
-        return;
-      }
-      setAiPopup({ status: "ready", suggestions, requestLine });
-    } catch (err) {
-      setAiPopup({ status: "error", suggestions: [], requestLine, error: ipcErrorMessage(err) });
-    }
-  }
-
-  /** Types the remainder of `suggestion` (past what's already on the line)
-   * into the terminal via paste — not a direct wharf.ssh.write, so it goes
-   * through the same onData path a real paste would, keeping the command-
-   * history capture buffer in sync automatically. Never sends Enter itself:
-   * the user reviews/edits before running it. */
-  function acceptAiSuggestion(suggestion: string) {
-    const popup = aiPopupRef.current;
-    setAiPopup(null);
-    // Clicking a suggestion row moves DOM focus to that (now-unmounting)
-    // button rather than the terminal — without this, further typing goes
-    // nowhere until the user clicks the terminal again.
-    termRef.current?.focus();
-    if (!popup || commandCaptureRef.current.buffer !== popup.requestLine) return;
-    const delta = suggestion.slice(popup.requestLine.length);
-    if (delta) termRef.current?.paste(delta);
-  }
-
-  /** Erases the currently-rendered ghost suggestion, if any — always safe to
-   * call even when nothing is showing. */
-  function disposeGhostSuggestion() {
-    const ghost = ghostSuggestionRef.current;
-    if (!ghost) return;
-    ghost.decoration.dispose();
-    ghost.marker.dispose();
-    ghostSuggestionRef.current = null;
-  }
-
-  /**
-   * What is typed at the prompt right now, or null when that can't be known well enough to act on
-   * (a program is running, the cursor isn't at the end of the line, the screen disagrees with
-   * the keystrokes). With shell integration it is read off the screen, so Tab completion and
-   * history recall are seen; without it, the keystroke guess is used only while the screen
-   * confirms it.
-   */
-  function currentTypedText(): string | null {
-    const term = termRef.current;
-    if (!term) return null;
-    const active = term.buffer.active;
-    if (integrationSeenRef.current) {
-      const prompt = promptEndRef.current;
-      if (!atPromptRef.current || !prompt || prompt.marker.isDisposed) return null;
-      const typed = readTypedLine(active, { line: prompt.marker.line, column: prompt.column });
-      return typed && typed.cursorAtEnd ? typed.text : null;
-    }
-    const guess = commandCaptureRef.current.buffer;
-    return guessMatchesScreen(active, guess) || guess === "" ? guess : null;
-  }
-
-  /** Re-evaluates the ghost suggestion — prefix-matched against the current
-   * typed buffer, or (buffer empty, at a real prompt) a "next command"
-   * prediction — and (re)renders it via an xterm decoration anchored to the
-   * cursor's current row/column — xterm handles the pixel positioning and
-   * scroll-following itself, and since a decoration is a DOM overlay rather
-   * than real buffer content, it can never race with or corrupt the shell's
-   * own echoed output. Called after every real write to the terminal (see
-   * the wharf.ssh.onData handler below) rather than on the user's own
-   * keystroke, since for a remote pty the cursor doesn't actually move
-   * until the shell's echo of that keystroke comes back — recomputing only
-   * once real content has landed keeps the suggestion's position always
-   * trustworthy, at the cost of it updating in the same lockstep as the
-   * user's own typed characters already do over a laggy connection. */
-  function recomputeGhostSuggestion() {
-    const term = termRef.current;
-    disposeGhostSuggestion();
-    if (!term) return;
-    if (!ghostEnabledRef.current || aiPopupRef.current || nlPopupRef.current || searchOpenRef.current) return;
-    const buffer = currentTypedText();
-    if (buffer === null) return;
-    const match = buffer
-      ? findGhostSuggestion(buffer, historyCacheRef.current)
-      : atPromptRef.current
-        ? findNextCommandSuggestion(lastRunCommandRef.current, transitionMapRef.current)
-        : null;
-    if (!match) return;
-    const remainder = match.slice(buffer.length);
-    const marker = term.registerMarker(0);
-    if (!marker) return;
-    const decoration = term.registerDecoration({ marker, x: term.buffer.active.cursorX, width: remainder.length, anchor: "left" });
-    if (!decoration) {
-      marker.dispose();
-      return;
-    }
-    decoration.onRender((el) => {
-      el.textContent = remainder;
-      el.classList.add("ghost-suggestion-text");
-    });
-    ghostSuggestionRef.current = { marker, decoration, fullCommand: match };
-  }
-
-  /** Right Arrow / End while a ghost suggestion is showing types its
-   * remainder into the line the same way an accepted AI suggestion is —
-   * pasted, never auto-submitted. */
-  function acceptGhostSuggestion() {
-    const ghost = ghostSuggestionRef.current;
-    disposeGhostSuggestion();
-    termRef.current?.focus();
-    if (!ghost) return;
-    // Read the line again rather than trusting what it was when the suggestion was drawn: if it
-    // no longer leads into the suggestion, typing the rest would produce a wrong command.
-    const typed = currentTypedText();
-    if (typed === null || !ghost.fullCommand.startsWith(typed)) return;
-    const delta = ghost.fullCommand.slice(typed.length);
-    if (delta) termRef.current?.paste(delta);
-  }
-
-  /** Scrolls the terminal so a block's command line is visible — a block
-   * whose start marker has scrolled out of the retained scrollback just
-   * can't be jumped to any more, same limit normal scrolling already has. */
-  // Every Blocks-panel row action below is triggered by clicking a button
-  // inside that panel, not the terminal — each ends with an explicit
-  // termRef.current?.focus() so keyboard input actually goes back to the
-  // terminal afterward, rather than being left on the (now-closed) panel
-  // button with nothing to receive it until the user clicks the terminal.
-  function jumpToBlock(block: CommandBlock) {
-    if (!block.startMarker.isDisposed) termRef.current?.scrollToLine(block.startMarker.line);
-    termRef.current?.focus();
-  }
-
-  function copyBlockCommand(block: CommandBlock) {
-    void wharf.clipboard.writeText(block.command);
-    termRef.current?.focus();
-  }
-
-  function copyBlockOutput(block: CommandBlock) {
-    const term = termRef.current;
-    if (!term) return;
-    void wharf.clipboard.writeText(readBlockOutput(term, block));
-    term.focus();
-  }
-
-  /** Re-running is a deliberate, explicit action on a command the user
-   * already ran once — unlike an AI suggestion (never auto-submitted, since
-   * the user hasn't reviewed it yet), this both types and submits it. */
-  function rerunBlock(block: CommandBlock) {
-    termRef.current?.paste(block.command);
-    // paste() feeds the command text through onData (so it reaches the pty
-    // and lands in commandCaptureRef's buffer), but the synthetic "\r" below
-    // is written directly and never passes through onData/feedCommandCapture
-    // — so the buffer would never flush and would pollute the next real
-    // command's capture. Clear it and supply the pending text for the
-    // resulting block ourselves instead.
-    commandCaptureRef.current.buffer = "";
-    notePendingCommand(commandBlocksRef.current, block.command);
-    wharf.ssh.write(sessionId, "\r");
-    termRef.current?.focus();
-  }
-
-  function toggleBlockBookmark(block: CommandBlock) {
-    setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, bookmarked: !b.bookmarked } : b)));
-    termRef.current?.focus();
-  }
-
-  /** Sends a failed block's command/output/exit code to the AI and shows
-   * its explanation (and a corrected command, if it has a confident one)
-   * in a popup — same positioning family as the AI suggestions popup. */
-  async function explainBlock(block: CommandBlock) {
-    const term = termRef.current;
-    if (!term || block.exitCode === null) return;
-    setExplainBusyId(block.id);
-    setExplainPopup({ status: "loading", command: block.command });
-    try {
-      const meta = useAppStore.getState().paneMeta[sessionId];
-      const result = await wharf.ai.explainFailure({
-        command: block.command,
-        output: readBlockOutput(term, block),
-        exitCode: block.exitCode,
-        hostName: meta?.title ?? "unknown",
-        platform: wharf.window.platform,
-      });
-      setExplainPopup({ status: "ready", command: block.command, explanation: result.explanation, suggestedFix: result.suggestedFix });
-    } catch (err) {
-      setExplainPopup({ status: "error", command: block.command, error: ipcErrorMessage(err) });
-    } finally {
-      setExplainBusyId(null);
-    }
-  }
-
-  function insertExplainFix() {
-    const popup = explainPopup;
-    setExplainPopup(null);
-    termRef.current?.focus();
-    if (popup?.suggestedFix) termRef.current?.paste(popup.suggestedFix);
-  }
-
-  /** Turns a plain-English description into one real command via the AI,
-   * then inserts it the same way an accepted AI suggestion is — pasted, not
-   * auto-submitted, so the user reviews it before running it. */
-  async function generateFromDescription(description: string) {
-    setNlPopup({ status: "loading", description });
-    // The popup's own <input> (which had focus, being autoFocus) only
-    // renders in the "input" status — moving to "loading" unmounts it, and
-    // a removed focused element reverts focus to document.body rather than
-    // the terminal, so it has to be reclaimed explicitly here.
-    termRef.current?.focus();
-    try {
-      const history = await wharf.commandHistory.list();
-      const recentCommands = history
-        .filter((h) => h.sessionId === sessionId)
-        .slice(-10)
-        .map((h) => h.command);
-      const meta = useAppStore.getState().paneMeta[sessionId];
-      const command = await wharf.ai.generateCommand({
-        description,
-        recentCommands,
-        hostName: meta?.title ?? "unknown",
-        platform: wharf.window.platform,
-      });
-      setNlPopup(null);
-      if (command) termRef.current?.paste(command);
-    } catch (err) {
-      setNlPopup({ status: "error", description, error: ipcErrorMessage(err) });
-    }
-  }
+  const notifyFinished = (block: CommandBlock) =>
+    notifyCommandFinished(block, { sessionId, tabId, enabled: notifyOnLongCommandRef.current, visible: visibleRef.current });
 
   // Mounts the xterm instance exactly once per session (this component is
   // kept alive-but-hidden by the parent while its tab is in the background,
@@ -741,7 +424,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       // can be open at a time), so it's always the last entry once handled.
       if (updated && payload.startsWith("D")) {
         const closed = updated[updated.length - 1];
-        if (closed) notifyCommandFinished(closed);
+        if (closed) notifyFinished(closed);
       }
       return true;
     });
@@ -1057,36 +740,17 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         />
       )}
       {visible && searchOpen && (
-        <div className="terminal-search-bar">
-          <input
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              findNext(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                if (e.shiftKey) findPrevious(searchQuery);
-                else findNext(searchQuery);
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                setSearchOpen(false);
-              }
-            }}
-            placeholder="Find in terminal…"
-          />
-          <button title="Previous match (Shift+Enter)" onClick={() => findPrevious(searchQuery)}>
-            <IconChevronUp />
-          </button>
-          <button title="Next match (Enter)" onClick={() => findNext(searchQuery)}>
-            <IconChevronDown />
-          </button>
-          <button title="Close (Esc)" onClick={() => setSearchOpen(false)}>
-            <IconClose />
-          </button>
-        </div>
+        <TerminalSearchBar
+          inputRef={searchInputRef}
+          query={searchQuery}
+          onQueryChange={(q) => {
+            setSearchQuery(q);
+            findNext(q);
+          }}
+          onNext={findNext}
+          onPrevious={findPrevious}
+          onClose={() => setSearchOpen(false)}
+        />
       )}
       {visible && snippetPickerOpen && (
         <SnippetPicker
@@ -1101,87 +765,22 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
           }}
         />
       )}
-      {visible && aiPopup && (
-        <div className="ai-suggest-popup">
-          <div className="ai-suggest-header">
-            <span>AI suggestions</span>
-            <button title="Close (Esc)" onClick={() => setAiPopup(null)}>
-              <IconClose />
-            </button>
-          </div>
-          {aiPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}
-          {aiPopup.status === "error" && <div className="ai-suggest-status ai-suggest-error">{aiPopup.error}</div>}
-          {aiPopup.status === "ready" && aiPopup.suggestions.length === 0 && <div className="ai-suggest-status">No suggestions.</div>}
-          {aiPopup.status === "ready" &&
-            aiPopup.suggestions.map((s, i) => (
-              <button key={i} className="ai-suggest-row" onClick={() => acceptAiSuggestion(s)}>
-                <span className="ai-suggest-index">{i + 1}</span>
-                <span className="ai-suggest-text">{s}</span>
-              </button>
-            ))}
-          {aiPopup.status === "ready" && aiPopup.suggestions.length > 0 && (
-            <div className="ai-suggest-hint">Tab/Enter · 1-{aiPopup.suggestions.length} · Esc</div>
-          )}
-        </div>
-      )}
+      {visible && aiPopup && <AiSuggestPopup popup={aiPopup} onClose={() => setAiPopup(null)} onAccept={acceptAiSuggestion} />}
       {visible && nlPopup && (
-        <div className="ai-suggest-popup">
-          <div className="ai-suggest-header">
-            <span>Generate command</span>
-            <button title="Close (Esc)" onClick={() => setNlPopup(null)}>
-              <IconClose />
-            </button>
-          </div>
-          {nlPopup.status === "input" && (
-            <div className="ai-suggest-status">
-              <input
-                autoFocus
-                className="ai-nl-input"
-                value={nlPopup.description}
-                placeholder="Describe what you want to do…"
-                onChange={(e) => setNlPopup({ status: "input", description: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    setNlPopup(null);
-                    termRef.current?.focus();
-                  } else if (e.key === "Enter" && nlPopup.description.trim()) {
-                    e.preventDefault();
-                    void generateFromDescription(nlPopup.description.trim());
-                  }
-                }}
-                onBlur={() => termRef.current?.focus()}
-              />
-            </div>
-          )}
-          {nlPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}
-          {nlPopup.status === "error" && <div className="ai-suggest-status ai-suggest-error">{nlPopup.error}</div>}
-          {nlPopup.status !== "loading" && <div className="ai-suggest-hint">Enter to generate · Esc to close</div>}
-        </div>
+        <NlPopup
+          popup={nlPopup}
+          onChange={(description) => setNlPopup({ status: "input", description })}
+          onSubmit={(description) => void generateFromDescription(description)}
+          onCancel={() => {
+            setNlPopup(null);
+            termRef.current?.focus();
+          }}
+          onBlur={() => termRef.current?.focus()}
+          onClose={() => setNlPopup(null)}
+        />
       )}
       {visible && explainPopup && (
-        <div className="ai-suggest-popup">
-          <div className="ai-suggest-header">
-            <span>Explain failure</span>
-            <button title="Close (Esc)" onClick={() => setExplainPopup(null)}>
-              <IconClose />
-            </button>
-          </div>
-          {explainPopup.status === "loading" && <div className="ai-suggest-status">Thinking…</div>}
-          {explainPopup.status === "error" && <div className="ai-suggest-status ai-suggest-error">{explainPopup.error}</div>}
-          {explainPopup.status === "ready" && (
-            <>
-              <div className="ai-explain-text">{explainPopup.explanation}</div>
-              {explainPopup.suggestedFix && (
-                <button className="ai-suggest-row" onClick={insertExplainFix}>
-                  <span className="ai-suggest-index">Fix</span>
-                  <span className="ai-suggest-text">{explainPopup.suggestedFix}</span>
-                </button>
-              )}
-              <div className="ai-suggest-hint">{explainPopup.suggestedFix ? "Click to insert the fix · " : ""}Esc to close</div>
-            </>
-          )}
-        </div>
+        <ExplainPopup popup={explainPopup} onClose={() => setExplainPopup(null)} onInsertFix={insertExplainFix} />
       )}
       {visible && blocksPanelOpen && (
         <BlocksPanel
