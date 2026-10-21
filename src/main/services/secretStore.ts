@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import log from "electron-log/main";
 import { store } from "./store";
 import type { MasterPasswordState } from "../../shared/types";
+import { clearPlain, eraseSealed, resealAll, sealAll, unsealAll } from "./protectedData";
+import { getUnlockedKey, setUnlockedKey } from "./unlockedKey";
 import { createConfig, keyFor, MIN_PASSWORD_LENGTH, open, SEALED_PREFIX, seal } from "./masterKey";
 
 /**
@@ -13,14 +15,11 @@ import { createConfig, keyFor, MIN_PASSWORD_LENGTH, open, SEALED_PREFIX, seal } 
  * transiently in the main process and in-flight over IPC when the user
  * enters or reveals a secret.
  */
-/** The key derived from the master password, held only while unlocked. */
-let masterKey: Buffer | null = null;
-
 const LOCKED_MESSAGE = "Saved passwords are locked. Unlock them with your master password in Settings, or when Wharf starts.";
 
 export function masterPasswordState(): MasterPasswordState {
   if (!store.get("masterPassword")) return "none";
-  return masterKey ? "unlocked" : "locked";
+  return getUnlockedKey() ? "unlocked" : "locked";
 }
 
 export function saveSecret(plaintext: string): string {
@@ -89,8 +88,9 @@ export function upgradeUnencryptedSecrets(): number {
 
 function encrypt(plaintext: string): string {
   if (store.get("masterPassword")) {
-    if (!masterKey) throw new Error(LOCKED_MESSAGE);
-    return seal(masterKey, plaintext);
+    const key = getUnlockedKey();
+    if (!key) throw new Error(LOCKED_MESSAGE);
+    return seal(key, plaintext);
   }
   if (!safeStorage.isEncryptionAvailable()) {
     // Fall back to storing base64 rather than plaintext so the format stays
@@ -103,8 +103,9 @@ function encrypt(plaintext: string): string {
 
 function decrypt(stored: string): string {
   if (stored.startsWith(SEALED_PREFIX)) {
-    if (!masterKey) throw new Error(LOCKED_MESSAGE);
-    return open(masterKey, stored);
+    const key = getUnlockedKey();
+    if (!key) throw new Error(LOCKED_MESSAGE);
+    return open(key, stored);
   }
   if (stored.startsWith("plain:")) {
     return Buffer.from(stored.slice("plain:".length), "base64").toString("utf8");
@@ -174,19 +175,21 @@ export function enableMasterPassword(password: string): void {
   requireValidPassword(password);
   const { config, key } = createConfig(password);
   const secrets = reencryptAll(decrypt, (plaintext) => seal(key, plaintext));
+  sealAll(key);
   store.set("secrets", secrets);
   store.set("masterPassword", config);
-  masterKey = key;
+  clearPlain();
+  setUnlockedKey(key);
 }
 
 /** Checks the password and unlocks saved secrets for this run. Throws "Wrong master password." otherwise. */
 export function unlock(password: string): void {
-  masterKey = checkedKey(password);
+  setUnlockedKey(checkedKey(password));
 }
 
 /** Forgets the key; saved secrets stay unreadable until unlock(). */
 export function lock(): void {
-  masterKey = null;
+  setUnlockedKey(null);
 }
 
 export function changeMasterPassword(current: string, next: string): void {
@@ -197,9 +200,10 @@ export function changeMasterPassword(current: string, next: string): void {
     (stored) => (stored.startsWith(SEALED_PREFIX) ? open(oldKey, stored) : decrypt(stored)),
     (plaintext) => seal(key, plaintext),
   );
+  resealAll(oldKey, key);
   store.set("secrets", secrets);
   store.set("masterPassword", config);
-  masterKey = key;
+  setUnlockedKey(key);
 }
 
 /** Turns the master password off, returning secrets to keyring storage (or, on a machine without one, the base64 fallback). */
@@ -212,14 +216,17 @@ export function removeMasterPassword(password: string): void {
         ? `enc:${safeStorage.encryptString(plaintext).toString("base64")}`
         : `plain:${Buffer.from(plaintext, "utf8").toString("base64")}`,
   );
+  unsealAll(key);
   store.set("secrets", secrets);
   store.set("masterPassword", null);
-  masterKey = null;
+  eraseSealed();
+  setUnlockedKey(null);
 }
 
-/** The way out when the password is forgotten: erases every saved secret and the master password. Hosts and their settings stay; passwords must be entered again. */
+/** The way out when the password is forgotten: erases every saved secret, the master password, and the History, workspaces and last session that were sealed with it. Hosts and their settings stay; passwords must be entered again. */
 export function resetSecrets(): void {
   store.set("secrets", {});
   store.set("masterPassword", null);
-  masterKey = null;
+  eraseSealed();
+  setUnlockedKey(null);
 }
