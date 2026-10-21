@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore, flattenPanes, TAB_COLORS, TAB_GROUP_COLORS, type TabGroup, type TerminalTab } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
@@ -8,7 +8,16 @@ import { toast } from "../../state/toastStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { buildTerminalThemeMenuItems } from "../Terminal/TerminalThemeSwatches";
 import { PromptDialog } from "../PromptDialog/PromptDialog";
-import { IconBroadcast, IconChevronDown, IconChevronUp, IconClose, IconDuplicate, IconPin } from "../Icons/Icons";
+import {
+  IconBroadcast,
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronUp,
+  IconClose,
+  IconDuplicate,
+  IconPin,
+} from "../Icons/Icons";
 import "./TabStrip.css";
 
 const isMac = wharf.window.platform === "darwin";
@@ -56,6 +65,35 @@ export function TabStrip() {
   useEffect(() => {
     stripRef.current?.querySelector(".tab.active")?.scrollIntoView({ inline: "nearest", block: "nearest" });
   }, [activeTabId, activeView, tabs.length]);
+
+  // Which edges have more tabs beyond them. They fade out (instead of ending in a hard cut
+  // through a tab) and get a scroll button. Re-measured when tabs open, close, move or are
+  // renamed (all change the strip's content width), on scrolling, and on resizing.
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
+  }, []);
+  useEffect(measure, [measure, tabs, tabGroups, paneMeta]);
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", measure, { passive: true });
+    const observer = new ResizeObserver(measure); // the window or the title bar changed size
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", measure);
+      observer.disconnect();
+    };
+  }, [measure]);
+
+  function scrollBy(direction: -1 | 1) {
+    const el = stripRef.current;
+    if (el) el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: "smooth" });
+  }
 
   /** A plain mouse wheel only turns vertically; over the strip, make it scroll the tabs. */
   function scrollSideways(e: React.WheelEvent<HTMLDivElement>) {
@@ -188,7 +226,16 @@ export function TabStrip() {
 
   return (
     <>
-      <div className="tab-strip" ref={stripRef} onWheel={scrollSideways}>
+      {edges.left && (
+        <button className="tab-scroll-btn" title="Scroll tabs left" aria-label="Scroll tabs left" onClick={() => scrollBy(-1)}>
+          <IconChevronLeft size={13} />
+        </button>
+      )}
+      <div
+        className={`tab-strip ${edges.left ? "fade-left" : ""} ${edges.right ? "fade-right" : ""}`}
+        ref={stripRef}
+        onWheel={scrollSideways}
+      >
         {segments.map((seg, i) =>
           seg.group ? (
             <div
@@ -242,6 +289,11 @@ export function TabStrip() {
           ),
         )}
       </div>
+      {edges.right && (
+        <button className="tab-scroll-btn" title="Scroll tabs right" aria-label="Scroll tabs right" onClick={() => scrollBy(1)}>
+          <IconChevronRight size={13} />
+        </button>
+      )}
       <ContextMenu menu={menu} onClose={closeMenu} />
       {newGroupTabId && (
         <PromptDialog

@@ -16,6 +16,44 @@
   display: none;
 }
 
+/* Tabs beyond an edge fade out rather than ending in a hard cut through a tab. */
+.tab-strip.fade-left,
+.tab-strip.fade-right {
+  --fade-left: 0px;
+  --fade-right: 0px;
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent 100%);
+}
+
+.tab-strip.fade-left {
+  --fade-left: 28px;
+}
+
+.tab-strip.fade-right {
+  --fade-right: 28px;
+}
+
+.tab-scroll-btn {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.tab-scroll-btn:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
 /* A Chrome/Edge-style tab group: the label pill plus whichever tabs are
    currently its consecutive run (see the segments computation in
    TabStrip.tsx), wrapped in one flex row so they stay visually
@@ -68,7 +106,7 @@
   position: relative;
   /* Tabs give up width (down to the minimum) before the strip has to scroll. */
   flex: 0 1 auto;
-  min-width: 120px;
+  min-width: 104px;
   display: flex;
   align-items: center;
   gap: 8px;
