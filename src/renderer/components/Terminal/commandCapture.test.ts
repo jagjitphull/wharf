@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCommandCaptureState, feedCommandCapture } from "./commandCapture";
+import { createCommandCaptureState, feedCommandCapture, feedCommandCaptureDetailed } from "./commandCapture";
 
 function run(...chunks: string[]): string[] {
   const state = createCommandCaptureState();
@@ -66,5 +66,31 @@ describe("feedCommandCapture", () => {
     const state = createCommandCaptureState();
     feedCommandCapture(state, "cd /us\t");
     expect(state.buffer).toBe("cd /us");
+  });
+});
+
+describe("feedCommandCaptureDetailed", () => {
+  const lines = (...chunks: string[]) => {
+    const state = createCommandCaptureState();
+    return chunks.flatMap((c) => feedCommandCaptureDetailed(state, c));
+  };
+
+  it("marks a line typed with a leading space as hidden, and trims it", () => {
+    expect(lines(" echo secret\r", "echo plain\r")).toEqual([
+      { command: "echo secret", hidden: true },
+      { command: "echo plain", hidden: false },
+    ]);
+  });
+
+  it("treats a leading tab the same way", () => {
+    expect(lines("\techo x\r")[0].hidden).toBe(false); // a Tab keypress is Tab completion, not text
+  });
+
+  it("a space typed and then backspaced away doesn't hide the line", () => {
+    expect(lines(" \x7fls\r")).toEqual([{ command: "ls", hidden: false }]);
+  });
+
+  it("keeps whether a backslash-continued command began with a space", () => {
+    expect(lines(" echo a \\\r", "b\r")).toEqual([{ command: "echo a b", hidden: true }]);
   });
 });

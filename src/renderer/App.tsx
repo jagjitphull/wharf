@@ -58,6 +58,27 @@ export default function App() {
   // Restoring tabs reconnects hosts, which needs saved passwords, so with a
   // master password set it waits for the lock screen to be answered.
   const [lock, setLock] = useState<"checking" | "locked" | "open">("checking");
+  // The master password locked itself (idle) or was locked from Settings: ask for it again.
+  useEffect(() => wharf.secrets.onLocked(() => setLock("locked")), []);
+  // …and unlocked from elsewhere (another window, Settings): a lock screen still up has nothing left to ask.
+  useEffect(() => wharf.secrets.onUnlocked(() => setLock((l) => (l === "locked" ? "open" : l))), []);
+
+  // Tell the main process the user is around, so idle auto-lock doesn't fire under them.
+  useEffect(() => {
+    let last = 0;
+    const report = () => {
+      const now = Date.now();
+      if (now - last < 3000) return;
+      last = now;
+      wharf.secrets.reportActivity();
+    };
+    const events = ["keydown", "pointerdown", "wheel"] as const;
+    for (const e of events) window.addEventListener(e, report, { capture: true, passive: true });
+    return () => {
+      for (const e of events) window.removeEventListener(e, report, { capture: true });
+    };
+  }, []);
+
   useEffect(() => {
     wharf.secrets
       .status()

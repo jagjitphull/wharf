@@ -1,12 +1,21 @@
-import { randomUUID } from "node:crypto";
 import { ipcMain } from "electron";
-import { IPC, type CommandHistoryEntry, type CommandHistoryInput } from "../../shared/types";
-import { addCommandHistoryEntry, clearCommandHistory, correctLastCommandHistoryEntry, getCommandHistory } from "../services/store";
+import { IPC, type CommandHistoryEntry, type CommandHistoryInput, type HistorySettings } from "../../shared/types";
+import { createHistoryRecorder } from "../services/historyRecorder";
+import { clearCommandHistory, getCommandHistory, getHistorySettings, setCommandHistory, setHistorySettings } from "../services/store";
+
+const recorder = createHistoryRecorder({
+  entries: getCommandHistory,
+  setEntries: setCommandHistory,
+  settings: getHistorySettings,
+  now: Date.now,
+});
 
 export function registerCommandHistoryIpc(): void {
-  ipcMain.handle(IPC.commandHistory.add, (_event, input: CommandHistoryInput): void => {
-    const entry: CommandHistoryEntry = { id: randomUUID(), timestamp: Date.now(), ...input };
-    addCommandHistoryEntry(entry);
+  // Honors a retention limit that has come due since the last launch.
+  recorder.prune();
+
+  ipcMain.handle(IPC.commandHistory.add, (_event, input: CommandHistoryInput & { hidden?: boolean }): boolean => {
+    return recorder.record(input);
   });
 
   ipcMain.handle(IPC.commandHistory.list, (): CommandHistoryEntry[] => {
@@ -17,7 +26,18 @@ export function registerCommandHistoryIpc(): void {
     clearCommandHistory();
   });
 
-  ipcMain.handle(IPC.commandHistory.correctLast, (_event, sessionId: string, command: string): void => {
-    correctLastCommandHistoryEntry(sessionId, command);
+  ipcMain.handle(
+    IPC.commandHistory.shellText,
+    (_event, input: Pick<CommandHistoryInput, "sessionId" | "hostId" | "hostName">, command: string): void => {
+      recorder.shellText(input, command);
+    },
+  );
+
+  ipcMain.handle(IPC.commandHistory.getSettings, (): HistorySettings => getHistorySettings());
+
+  ipcMain.handle(IPC.commandHistory.setSettings, (_event, settings: HistorySettings): HistorySettings => {
+    const saved = setHistorySettings(settings);
+    recorder.prune(); // a shorter retention applies to what is already stored
+    return saved;
   });
 }

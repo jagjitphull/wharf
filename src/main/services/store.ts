@@ -9,12 +9,15 @@ import type {
   AiProviderConfig,
   CommandHistoryEntry,
   GroupRecord,
+  HistorySettings,
   HostRecord,
   SnippetRecord,
   TunnelRecord,
   WorkspaceRecord,
   WorkspaceTab,
 } from "../../shared/types";
+import { normalizeAutoLockMinutes } from "../../shared/autoLock";
+import { DEFAULT_HISTORY_SETTINGS, normalizeHistorySettings } from "../../shared/historyFilter";
 
 export interface WindowBounds {
   x: number;
@@ -35,10 +38,14 @@ interface Schema {
    * launch" in Settings has something to reopen. */
   lastSessionTabs: WorkspaceTab[];
   commandHistory: CommandHistoryEntry[];
+  /** What Command History keeps: on/off, secret filtering, ignore patterns, retention (see shared/historyFilter.ts). */
+  historySettings: HistorySettings;
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
   /** Set when a master password protects `secrets`: the salt/cost it was derived with and a check value. Never the password or key. */
   masterPassword: MasterPasswordConfig | null;
+  /** Minutes without activity before an unlocked master password locks again (0 = never). */
+  autoLockMinutes: number;
   /** Which AI autocomplete backend is active. */
   aiProvider: AiProvider;
   /** Per-cloud-provider API key id in `secrets` (same encrypted-at-rest storage as host passwords) — Ollama has no key, so it never appears here. */
@@ -60,8 +67,10 @@ const defaults: Schema = {
   workspaces: [],
   lastSessionTabs: [],
   commandHistory: [],
+  historySettings: DEFAULT_HISTORY_SETTINGS,
   secrets: {},
   masterPassword: null,
+  autoLockMinutes: 0,
   aiProvider: "claude",
   aiApiKeySecretIds: {},
   aiProviderConfig: {},
@@ -164,44 +173,36 @@ export function setLastSessionTabs(tabs: WorkspaceTab[]): void {
   store.set("lastSessionTabs", tabs);
 }
 
-// Caps the persisted log so a long-lived install doesn't grow this file
-// unboundedly — oldest entries are dropped first (FIFO) once past the cap.
-const COMMAND_HISTORY_MAX = 2000;
-
 export function getCommandHistory(): CommandHistoryEntry[] {
   return store.get("commandHistory");
 }
 
-export function addCommandHistoryEntry(entry: CommandHistoryEntry): void {
-  const next = [...store.get("commandHistory"), entry];
-  if (next.length > COMMAND_HISTORY_MAX) next.splice(0, next.length - COMMAND_HISTORY_MAX);
-  store.set("commandHistory", next);
+export function setCommandHistory(entries: CommandHistoryEntry[]): void {
+  store.set("commandHistory", entries);
 }
 
 export function clearCommandHistory(): void {
   store.set("commandHistory", []);
 }
 
-/**
- * Overwrites the most recent entry for `sessionId` with more accurate text
- * — used when the shell's own OSC 133;C integration (see
- * shellIntegration.ts) reports the command it's actually about to run,
- * which arrives slightly after the keystroke-buffer guess that created the
- * entry in the first place, but is authoritative (unlike the guess, it
- * isn't fooled by tab completion or arrow-key history recall). A no-op if
- * that entry has since aged out of the list (COMMAND_HISTORY_MAX) or no
- * entry for this session exists yet.
- */
-export function correctLastCommandHistoryEntry(sessionId: string, command: string): void {
-  const entries = store.get("commandHistory");
-  for (let i = entries.length - 1; i >= 0; i--) {
-    if (entries[i].sessionId === sessionId) {
-      const next = [...entries];
-      next[i] = { ...next[i], command };
-      store.set("commandHistory", next);
-      return;
-    }
-  }
+export function getHistorySettings(): HistorySettings {
+  return normalizeHistorySettings(store.get("historySettings"));
+}
+
+export function setHistorySettings(settings: HistorySettings): HistorySettings {
+  const next = normalizeHistorySettings(settings);
+  store.set("historySettings", next);
+  return next;
+}
+
+export function getAutoLockMinutes(): number {
+  return normalizeAutoLockMinutes(store.get("autoLockMinutes"));
+}
+
+export function setAutoLockMinutes(minutes: number): number {
+  const next = normalizeAutoLockMinutes(minutes);
+  store.set("autoLockMinutes", next);
+  return next;
 }
 
 export function getAiProvider(): AiProvider {

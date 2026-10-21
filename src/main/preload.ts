@@ -118,6 +118,11 @@ const api: WharfApi = {
     removeMasterPassword: (password) => ipcRenderer.invoke(IPC.secrets.removeMasterPassword, password),
     unlock: (password) => ipcRenderer.invoke(IPC.secrets.unlock, password),
     lock: () => ipcRenderer.invoke(IPC.secrets.lock),
+    getAutoLock: () => ipcRenderer.invoke(IPC.secrets.getAutoLock),
+    setAutoLock: (minutes) => ipcRenderer.invoke(IPC.secrets.setAutoLock, minutes),
+    reportActivity: () => ipcRenderer.send(IPC.secrets.activity),
+    onLocked: (cb) => on(IPC.secrets.onLocked, cb as (...args: unknown[]) => void),
+    onUnlocked: (cb) => on(IPC.secrets.onUnlocked, cb as (...args: unknown[]) => void),
     reset: () => ipcRenderer.invoke(IPC.secrets.reset),
   },
   update: {
@@ -163,7 +168,9 @@ const api: WharfApi = {
     add: (input) => ipcRenderer.invoke(IPC.commandHistory.add, input),
     list: () => ipcRenderer.invoke(IPC.commandHistory.list),
     clear: () => ipcRenderer.invoke(IPC.commandHistory.clear),
-    correctLast: (sessionId, command) => ipcRenderer.invoke(IPC.commandHistory.correctLast, sessionId, command),
+    shellText: (input, command) => ipcRenderer.invoke(IPC.commandHistory.shellText, input, command),
+    getSettings: () => ipcRenderer.invoke(IPC.commandHistory.getSettings),
+    setSettings: (settings) => ipcRenderer.invoke(IPC.commandHistory.setSettings, settings),
   },
   ai: {
     suggest: (request) => ipcRenderer.invoke(IPC.ai.suggest, request),
