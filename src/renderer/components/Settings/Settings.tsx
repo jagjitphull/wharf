@@ -9,6 +9,7 @@ import { useRestoreTabsPrefsStore } from "../../state/restoreTabsPrefsStore";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
 import { CommandBlocksSettings } from "./CommandBlocksSettings";
+import { HistorySettings } from "./HistorySettings";
 import { GhostSuggestionSettings } from "./GhostSuggestionSettings";
 import { AiAutocompleteSettings } from "./AiAutocompleteSettings";
 import { NotificationSettings } from "./NotificationSettings";
@@ -211,6 +212,9 @@ export function Settings() {
 
         <h2>Command Blocks</h2>
         <CommandBlocksSettings />
+
+        <h2>Command History</h2>
+        <HistorySettings />
 
         <h2>Notifications</h2>
         <NotificationSettings />

@@ -93,7 +93,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   passphrases with a key derived from it (scrypt, AES-256-GCM) instead of relying on the OS keyring,
   which is the way to protect them on a Linux machine that has none. Wharf asks for it at launch
   (or you can carry on without unlocking: hosts using an agent or an unprotected key still work);
-  it can be changed, removed, or locked on demand.
+  it can be changed, removed, or locked on demand, and can lock itself after 5 minutes to 4 hours
+  without typing or clicking in any Wharf window (Settings; off by default, because a tunnel that
+  has to reconnect with a saved password waits while it is locked).
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
@@ -142,7 +144,11 @@ A personal SSH/SFTP terminal client, Termius-style.
   any terminal session, filterable by command or host (best-effort —
   reconstructed from keystrokes, so shell history recall and tab
   completion aren't captured exactly as run), with one-click copy and a
-  Clear History button
+  Clear History button. Settings → Command History controls what it keeps: turn recording off,
+  skip commands that look like they carry a secret (`--password=…`, `TOKEN=…`, `mysql -pSECRET`,
+  bearer tokens…), never record commands matching your own patterns, or delete entries after 7
+  days to a year. A line typed with a leading space is never recorded, and neither is a password
+  typed at a prompt (`sudo`, `ssh`…)
 - AI-powered autocomplete — press `Ctrl/Cmd+Space` in any terminal to ask
   your choice of **Claude, OpenAI (ChatGPT), Gemini, or a local Ollama
   server** for up to 3 completions of the command you're typing, grounded in
@@ -281,6 +287,7 @@ npm run format:check  # prettier --check (npm run format fixes in place)
 npm run build         # production build of renderer + main into dist-electron/
 npm run package       # build + electron-builder (produces installers in release/; never publishes)
 npm run smoke         # launch the packaged app and check it works (needs a display; see below)
+npm run e2e           # drive the packaged app through its UI, scenario by scenario (Linux, needs a display)
 ```
 
 ### Tests and CI
@@ -325,6 +332,14 @@ packaged build. It needs a display: on a headless
 machine run `xvfb-run -a npm run smoke`. Set `SMOKE_NO_SANDBOX=1` where the unpacked `chrome-sandbox`
 isn't setuid root (containers, CI; it's applied automatically as root) and `SMOKE_SCREENSHOT=file.png`
 to save a screenshot.
+
+**End-to-end scenarios.** `npm run e2e` (`scripts/e2e/`) goes further than the smoke test: each file
+in `scripts/e2e/scenarios` starts a fresh packaged app (own profile and `$HOME`) and drives it through
+the real UI and IPC. They cover Home and navigation, the tab menu, reconnect, the command palette,
+Command Block marks (against real bash), toasts, History (what is and isn't recorded, including
+that passwords never are), interface size, and the master password with auto-lock. Run one with
+`xvfb-run -a npm run e2e -- <scenario>`; `E2E_SHOTS=dir` saves screenshots. Linux only, because the
+scenarios open a local bash shell. CI runs them after the smoke test.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, format check, typecheck, tests, build and a
 full Linux `npm run package` on every pull request and every push to `main`, then runs the smoke
@@ -492,7 +507,8 @@ src/main/testing/
 scripts/
   verify-pty.js          postinstall check that node-pty actually loads under Electron
   smoke-test.mjs         launches the packaged app and checks it works (npm run smoke)
-.github/workflows/ci.yml  audit, lint, format, typecheck, test, build, package and smoke test on every PR
+  e2e/                   end-to-end scenarios against the packaged app (npm run e2e)
+.github/workflows/ci.yml  audit, lint, format, typecheck, test, build, package, smoke test and e2e scenarios on every PR
 .github/dependabot.yml    weekly npm and GitHub Actions update PRs
 ```
 
@@ -513,9 +529,9 @@ scripts/
   next launch after you install and unlock a keyring re-encrypts what was saved. What Wharf
   also offers is an optional master password (Settings) for machines that will never have a
   keyring. It has to be entered at every launch, there is no recovery if it is forgotten (the only
-  way out is erasing the saved passwords from the lock screen or Settings), it doesn't lock
-  automatically after a period of inactivity, and a master password set while the keyring is
-  available replaces the keyring for those secrets. An SSH agent or a key without a passphrase
+  way out is erasing the saved passwords from the lock screen or Settings), it locks by itself
+  after a period of inactivity only if you choose one in Settings (it doesn't by default), and a
+  master password set while the keyring is available replaces the keyring for those secrets. An SSH agent or a key without a passphrase
   avoids storing anything.
 - `knownHosts.ts` supports exact-host and `*`/`?` glob patterns (including
   `!negation`), `[host]:port`, hashed (`HashKnownHosts`) entries, and `@revoked`

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore, flattenPanes, TAB_COLORS, TAB_GROUP_COLORS, type TabGroup, type TerminalTab } from "../../state/store";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
 import { getTerminalThemePreset } from "../../state/terminalThemes";
@@ -49,6 +49,18 @@ export function TabStrip() {
   } = useAppStore();
   const globalTerminalThemeId = useTerminalPrefsStore((s) => s.terminalThemeId);
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  // With more tabs than fit, the strip scrolls; a tab you just opened or switched to
+  // must never be the one that's out of sight.
+  useEffect(() => {
+    stripRef.current?.querySelector(".tab.active")?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [activeTabId, activeView, tabs.length]);
+
+  /** A plain mouse wheel only turns vertically; over the strip, make it scroll the tabs. */
+  function scrollSideways(e: React.WheelEvent<HTMLDivElement>) {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY;
+  }
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [newGroupTabId, setNewGroupTabId] = useState<string | null>(null);
@@ -176,7 +188,7 @@ export function TabStrip() {
 
   return (
     <>
-      <div className="tab-strip">
+      <div className="tab-strip" ref={stripRef} onWheel={scrollSideways}>
         {segments.map((seg, i) =>
           seg.group ? (
             <div

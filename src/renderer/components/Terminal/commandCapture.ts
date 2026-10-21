@@ -17,7 +17,7 @@
  * though, this is only ever a same-tick placeholder: shellIntegration.ts's
  * hooks report the shell's own authoritative command text a moment later
  * (see decodeOsc133CommandText in commandBlocks.ts and Terminal.tsx's
- * commandHistory.correctLast call), which is immune to exactly the two
+ * commandHistory.shellText call), which is immune to exactly the two
  * blind spots above and overwrites this guess once it arrives.
  */
 
@@ -40,8 +40,19 @@ const ESCAPE_SEQ = /\x1b\[[0-9;]*[A-Za-z~]|\x1bO[A-Za-z]|\x1b./gs;
  * one, but a pasted block with embedded newlines can complete several at
  * once. Empty (whitespace-only) lines are dropped, not returned. */
 export function feedCommandCapture(state: CommandCaptureState, rawData: string): string[] {
+  return feedCommandCaptureDetailed(state, rawData).map((c) => c.command);
+}
+
+export interface CapturedCommand {
+  command: string;
+  /** The line was typed with a leading space: the long-standing shell convention for "don't remember this one". */
+  hidden: boolean;
+}
+
+/** Same as feedCommandCapture, but says which lines were typed with a leading space. */
+export function feedCommandCaptureDetailed(state: CommandCaptureState, rawData: string): CapturedCommand[] {
   const data = rawData.replace(ESCAPE_SEQ, "");
-  const completed: string[] = [];
+  const completed: CapturedCommand[] = [];
 
   for (const ch of data) {
     if (ch === "\r" || ch === "\n") {
@@ -53,7 +64,7 @@ export function feedCommandCapture(state: CommandCaptureState, rawData: string):
         continue;
       }
       const command = state.buffer.trim();
-      if (command) completed.push(command);
+      if (command) completed.push({ command, hidden: /^[ \t]/.test(state.buffer) });
       state.buffer = "";
     } else if (ch === "\x7f" || ch === "\b") {
       // Backspace/Delete — drop the last character, same as the shell's own line editing.

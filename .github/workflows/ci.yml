@@ -14,7 +14,7 @@ jobs:
   build:
     name: Lint, typecheck, test, build, and package (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
@@ -80,6 +80,25 @@ jobs:
         with:
           name: smoke-screenshot-${{ github.sha }}
           path: ${{ runner.temp }}/smoke-screenshot.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # The scenarios in scripts/e2e drive the same packaged app through its real
+      # UI: Home, tabs, the command palette, Command Blocks, History (including
+      # that passwords never land in it), reconnect, interface size, and the
+      # master password with auto-lock. Each starts a fresh app; see scripts/e2e/run.mjs.
+      - name: End-to-end scenarios (packaged app)
+        env:
+          E2E_NO_SANDBOX: "1"
+          E2E_SHOTS: ${{ runner.temp }}/e2e-shots
+        run: xvfb-run -a --server-args="-screen 0 1440x900x24" npm run e2e -- release/linux-unpacked/wharf
+
+      - name: Upload end-to-end screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screenshots-${{ github.sha }}
+          path: ${{ runner.temp }}/e2e-shots
           if-no-files-found: ignore
           retention-days: 7
 

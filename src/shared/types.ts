@@ -168,6 +168,8 @@ export interface CommandHistoryEntry {
 
 export type CommandHistoryInput = Omit<CommandHistoryEntry, "id" | "timestamp">;
 
+export type { HistorySettings } from "./historyFilter";
+
 // ---------------------------------------------------------------------------
 // AI autocomplete
 // ---------------------------------------------------------------------------
@@ -490,6 +492,14 @@ export const IPC = {
     removeMasterPassword: "secrets:remove-master-password",
     unlock: "secrets:unlock",
     lock: "secrets:lock",
+    getAutoLock: "secrets:get-auto-lock",
+    setAutoLock: "secrets:set-auto-lock",
+    /** Fire-and-forget from a window: the user did something (typed, clicked). */
+    activity: "secrets:activity",
+    /** Main -> windows: the master password just locked, show the lock screen. */
+    onLocked: "secrets:on-locked",
+    /** Main -> windows: it was unlocked (maybe from another window), so a lock screen still showing can go. */
+    onUnlocked: "secrets:on-unlocked",
     reset: "secrets:reset",
   },
   update: {
@@ -541,7 +551,9 @@ export const IPC = {
     add: "command-history:add",
     list: "command-history:list",
     clear: "command-history:clear",
-    correctLast: "command-history:correct-last",
+    shellText: "command-history:shell-text",
+    getSettings: "command-history:get-settings",
+    setSettings: "command-history:set-settings",
   },
   ai: {
     suggest: "ai:suggest",

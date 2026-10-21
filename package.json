@@ -28,6 +28,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.{js,mjs,json,md}\" \".github/**/*.yml\"",
     "smoke": "node scripts/smoke-test.mjs",
+    "e2e": "node scripts/e2e/run.mjs",
     "postinstall": "node scripts/verify-pty.js"
   },
   "dependencies": {

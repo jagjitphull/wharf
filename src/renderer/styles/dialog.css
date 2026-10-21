@@ -1,4 +1,7 @@
 .dialog-overlay {
+  /* Dialogs opened from a tab (rename, save as workspace, new group) live inside the title
+     bar's drag region, which children inherit; see .context-menu. */
+  -webkit-app-region: no-drag;
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);

@@ -28,7 +28,9 @@
    grid; the width is forced so it keeps spanning the pane after a resize. */
 .cmd-block {
   box-sizing: border-box;
-  width: 100% !important;
+  /* The rail sits in the pane's left padding, beside the first column rather than over its text. */
+  margin-left: -7px;
+  width: calc(100% + 7px) !important;
   border-left: 3px solid var(--block-color);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: var(--block-tint, transparent);

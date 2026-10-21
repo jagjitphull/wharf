@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SecretStorageStatus } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { AUTO_LOCK_CHOICES } from "../../../shared/autoLock";
+
+const AUTO_LOCK_LABEL: Record<number, string> = {
+  0: "Never",
+  5: "After 5 minutes",
+  15: "After 15 minutes",
+  30: "After 30 minutes",
+  60: "After 1 hour",
+  240: "After 4 hours",
+};
 
 type Form = "set" | "change" | "remove" | "unlock" | null;
 
@@ -17,9 +27,14 @@ export function SecretStorageSettings() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [autoLock, setAutoLock] = useState(0);
+
   const refresh = useCallback(() => wharf.secrets.status().then(setStatus), []);
   useEffect(() => {
     void refresh();
+    void wharf.secrets.getAutoLock().then(setAutoLock);
+    // "Lock now" and auto-lock both land here: keep the buttons in step with the real state.
+    return wharf.secrets.onLocked(() => void refresh());
   }, [refresh]);
 
   function open(next: Form) {
@@ -94,6 +109,29 @@ export function SecretStorageSettings() {
           Saved passwords and key passphrases are encrypted with your master password
           {master === "locked" ? " and are locked until you enter it." : "."} Wharf asks for it each time it starts; there is no way to
           recover it if it is forgotten.
+        </p>
+      )}
+
+      {master !== "none" && (
+        <div className="appearance-row">
+          <span className="appearance-label">Lock automatically when idle</span>
+          <select
+            className="font-family-select"
+            value={autoLock}
+            onChange={(e) => void wharf.secrets.setAutoLock(Number(e.target.value)).then(setAutoLock)}
+          >
+            {AUTO_LOCK_CHOICES.map((m) => (
+              <option key={m} value={m}>
+                {AUTO_LOCK_LABEL[m]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {master !== "none" && autoLock > 0 && (
+        <p className="hint">
+          Idle means no typing or clicking in any Wharf window. Locking only forgets the key: open sessions and tunnels keep running, but
+          one that has to reconnect with a saved password waits for you to unlock.
         </p>
       )}
 

@@ -23,6 +23,7 @@ import type {
   HostStatsUpdateEvent,
   CommandHistoryEntry,
   CommandHistoryInput,
+  HistorySettings,
   AiSuggestRequest,
   AiProvider,
   AiProviderConfig,
@@ -160,6 +161,15 @@ export interface WharfApi {
     /** Throws "Wrong master password." if it doesn't match. Starts any tunnels set to start at launch. */
     unlock(password: string): Promise<void>;
     lock(): Promise<void>;
+    /** Minutes without activity before an unlocked master password locks itself (0 = never). */
+    getAutoLock(): Promise<number>;
+    setAutoLock(minutes: number): Promise<number>;
+    /** Tells the main process the user is active, so auto-lock doesn't fire under them. Cheap; callers throttle. */
+    reportActivity(): void;
+    /** Fires when the master password locks, whether by auto-lock or "Lock now", so the lock screen can appear. */
+    onLocked(cb: () => void): () => void;
+    /** Fires when the master password is unlocked, from any window. */
+    onUnlocked(cb: () => void): () => void;
     /** Forgotten password: erases every saved secret and the master password. */
     reset(): Promise<void>;
   };
@@ -213,15 +223,19 @@ export interface WharfApi {
     onUpdate(cb: (event: HostStatsUpdateEvent) => void): () => void;
   };
   commandHistory: {
-    /** Records one typed command. Best-effort — see CommandHistoryEntry's doc comment. */
-    add(input: CommandHistoryInput): Promise<void>;
+    /** Offers one typed command for recording. Best-effort — see CommandHistoryEntry's doc comment.
+     * Resolves to whether it was stored (not when history is off, or the command is filtered out).
+     * `hidden` is for a line the user typed with a leading space: nothing is stored, and the
+     * shell's report of the same command (see shellText) is dropped too. */
+    add(input: CommandHistoryInput & { hidden?: boolean }): Promise<boolean>;
     list(): Promise<CommandHistoryEntry[]>;
     clear(): Promise<void>;
-    /** Overwrites the most recent entry for `sessionId` with more accurate
-     * text once the shell's own OSC 133 integration reports the command it's
-     * actually about to run — see commandCapture.ts's doc comment. A no-op
-     * if no entry for this session exists (or it's aged out). */
-    correctLast(sessionId: string, command: string): Promise<void>;
+    /** The shell's own text for the command it is about to run (OSC 133;C — see commandCapture.ts's
+     * doc comment): replaces the keystroke guess given to `add`, or is recorded on its own when
+     * there was no guess. */
+    shellText(input: Pick<CommandHistoryInput, "sessionId" | "hostId" | "hostName">, command: string): Promise<void>;
+    getSettings(): Promise<HistorySettings>;
+    setSettings(settings: HistorySettings): Promise<HistorySettings>;
   };
   ai: {
     /** Asks the active provider for up to 3 likely completions of the current line. Throws if that provider isn't configured. */
