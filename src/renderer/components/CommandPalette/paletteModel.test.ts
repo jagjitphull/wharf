@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { HostRecord } from "@shared/types";
-import { buildSections, flatten, rankActions, scoreText, type PaletteAction } from "./paletteModel";
+import type { HostRecord, SnippetRecord } from "@shared/types";
+import { buildSections, flatten, MAX_SNIPPET_RESULTS, rankActions, rankSnippets, scoreText, type PaletteAction } from "./paletteModel";
 
 const act = (id: string, title: string, extra: Partial<PaletteAction> = {}): PaletteAction => ({ id, title, run: () => {}, ...extra });
 const host = (name: string, extra: Partial<HostRecord> = {}): HostRecord => ({
@@ -16,6 +16,13 @@ const host = (name: string, extra: Partial<HostRecord> = {}): HostRecord => ({
   updatedAt: 0,
   ...extra,
 });
+
+const snip = (name: string, command: string): SnippetRecord => ({ id: name, name, command, createdAt: 0, updatedAt: 0 });
+const snippets = [
+  snip("Restart nginx", "sudo systemctl restart nginx"),
+  snip("Tail app logs", "docker logs -f {{container}}"),
+  snip("Disk usage", "df -h"),
+];
 
 const actions = [
   act("rc", "Reconnect tab", { subtitle: "Starts a new session", featured: true, keywords: "restart" }),
@@ -79,5 +86,41 @@ describe("buildSections", () => {
   it("sorts hosts by closeness, then name", () => {
     const names = flatten(buildSections([], hosts, "web")).map((e) => (e.type === "host" ? e.host.name : ""));
     expect(names).toEqual(["web-01", "web-02"]);
+  });
+});
+
+describe("rankSnippets", () => {
+  it("offers nothing for an empty query", () => {
+    expect(rankSnippets(snippets, "")).toEqual([]);
+    expect(rankSnippets(snippets, "   ")).toEqual([]);
+  });
+
+  it("matches the name or the command text, name first", () => {
+    expect(rankSnippets(snippets, "nginx").map((s) => s.name)).toEqual(["Restart nginx"]);
+    expect(rankSnippets(snippets, "docker").map((s) => s.name)).toEqual(["Tail app logs"]);
+    const both = [snip("logs", "echo hi"), snip("other", "tail logs")];
+    expect(rankSnippets(both, "logs").map((s) => s.name)).toEqual(["logs", "other"]);
+  });
+
+  it("needs every word to match", () => {
+    expect(rankSnippets(snippets, "restart zzz")).toEqual([]);
+  });
+
+  it("caps the list", () => {
+    const many = Array.from({ length: 20 }, (_, i) => snip(`deploy ${i}`, "x"));
+    expect(rankSnippets(many, "deploy")).toHaveLength(MAX_SNIPPET_RESULTS);
+  });
+});
+
+describe("buildSections with snippets", () => {
+  it("puts matching snippets between actions and hosts", () => {
+    const sections = buildSections([act("logs", "Show logs")], [host("logserver")], "log", snippets);
+    expect(sections.map((s) => s.title)).toEqual(["Actions", "Snippets", "Hosts"]);
+    expect(flatten(sections).map((e) => e.type)).toEqual(["action", "snippet", "host"]);
+  });
+
+  it("shows no snippets for an empty query or an actions-only query", () => {
+    expect(buildSections(actions, [], "", snippets).map((s) => s.title)).toEqual(["Actions"]);
+    expect(buildSections(actions, [], ">restart", snippets).map((s) => s.title)).not.toContain("Snippets");
   });
 });

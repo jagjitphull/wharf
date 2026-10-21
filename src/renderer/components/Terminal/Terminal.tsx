@@ -14,6 +14,7 @@ import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { useNotificationPrefsStore } from "../../state/notificationPrefsStore";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
+import { registerTerminalInserter } from "./terminalInsert";
 import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
 import {
   compileRules,
@@ -221,6 +222,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     // var it defaults to (--term-bg) never changes for a non-"app" preset.
     if (initialTheme.background) el.style.background = initialTheme.background;
     termRef.current = term;
+    const unregisterInserter = registerTerminalInserter(sessionId, (text, run) => {
+      term.focus();
+      term.paste(text);
+      if (run) term.input("\r", true); // after the paste, so a bracketed paste doesn't swallow the Enter
+    });
     const fit = new FitAddon();
     term.loadAddon(fit);
     const search = new SearchAddon();
@@ -563,6 +569,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       disposeAllDecorations(highlightStateRef.current);
       disposeGhostSuggestion();
       unregisterScrollbackSource();
+      unregisterInserter();
       term.dispose();
       termRef.current = null;
       searchAddonRef.current = null;
@@ -754,14 +761,16 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       )}
       {visible && snippetPickerOpen && (
         <SnippetPicker
+          sessionId={sessionId}
           onClose={() => {
             setSnippetPickerOpen(false);
             termRef.current?.focus();
           }}
-          onInsert={(command) => {
+          onInsert={(command, run) => {
             setSnippetPickerOpen(false);
             termRef.current?.focus();
             termRef.current?.paste(command);
+            if (run) termRef.current?.input("\r", true);
           }}
         />
       )}

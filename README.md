@@ -194,10 +194,13 @@ A personal SSH/SFTP terminal client, Termius-style.
   Block's menu, "Explain & Fix…" sends the command, its output, and exit
   code to the AI and shows a plain-English explanation plus, when it has a
   confident one, a corrected command you can insert with a click
-- Workflows — a Snippet whose command contains `{{placeholder}}` tokens
-  (e.g. `docker logs -f {{container}}`) becomes a small fill-in form on
-  insert instead of pasting immediately; fill in the values once per use,
-  same Insert Snippet flow as any other snippet
+- Workflows — a Snippet whose command contains `{{variables}}` becomes a small fill-in form on
+  insert instead of pasting immediately. `{{name}}` is asked for each time, `{{name:default}}`
+  comes pre-filled, `{{env=prod|staging}}` offers a choice, and built-ins fill themselves:
+  `{{$host}}`, `{{$hostname}}`, `{{$user}}` (of the terminal's host), `{{$date}}`, `{{$time}}`,
+  `{{$timestamp}}` and `{{$clipboard}}`. A snippet can be set to run right away (Enter pressed
+  for you) instead of only being typed for you to check. Quick-run: type a snippet's name or
+  command into the command palette (`Ctrl/Cmd+K`) and Enter puts it into the focused terminal
 - Inline Suggestions — fish/zsh-autosuggestions-style ghost text: as you
   type, the rest of the most recent matching command from that host's
   history is shown dimmed right after the cursor; press `→` or `End` to

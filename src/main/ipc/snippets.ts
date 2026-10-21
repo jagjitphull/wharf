@@ -14,6 +14,7 @@ export function registerSnippetsIpc(): void {
       id: randomUUID(),
       name: input.name,
       command: input.command,
+      ...(input.run ? { run: true } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -25,7 +26,14 @@ export function registerSnippetsIpc(): void {
     const snippets = getSnippets();
     const idx = snippets.findIndex((s) => s.id === id);
     if (idx === -1) throw new Error(`Snippet ${id} not found`);
-    const updated: SnippetRecord = { ...snippets[idx], name: input.name, command: input.command, updatedAt: Date.now() };
+    const { run: _previous, ...rest } = snippets[idx];
+    const updated: SnippetRecord = {
+      ...rest,
+      name: input.name,
+      command: input.command,
+      ...(input.run ? { run: true } : {}),
+      updatedAt: Date.now(),
+    };
     const next = [...snippets];
     next[idx] = updated;
     setSnippets(next);

@@ -15,6 +15,9 @@ import { buildPaletteActions } from "./components/CommandPalette/actions";
 import { Toaster } from "./components/Toaster/Toaster";
 import { toast } from "./state/toastStore";
 import { LockScreen } from "./components/LockScreen/LockScreen";
+import { activeSessionId, renderForSession } from "./components/SnippetPicker/snippetRun";
+import { insertIntoTerminal } from "./components/Terminal/terminalInsert";
+import type { SnippetRecord } from "@shared/types";
 
 // Lazy: each is its own chunk, fetched only the first time its view/modal
 // is actually opened, rather than all bundled into the one chunk the whole
@@ -35,12 +38,13 @@ const KeyboardShortcuts = lazy(() =>
 );
 
 export default function App() {
-  const { activeView, hosts, groups, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
+  const { activeView, hosts, groups, snippets, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const tabCount = useAppStore((s) => s.tabs.length);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // Rebuilt each time the palette opens, so tab-dependent actions reflect the tabs that exist then.
+  const canRunSnippets = useMemo(() => paletteOpen && activeSessionId() !== null, [paletteOpen]);
   const paletteActions = useMemo(
     () => (paletteOpen ? buildPaletteActions({ openShortcuts: () => setShortcutsOpen(true) }) : []),
     [paletteOpen],
@@ -173,6 +177,21 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [setActiveView]);
 
+  async function handleRunSnippet(snippet: SnippetRecord, values: Record<string, string>) {
+    const sessionId = activeSessionId();
+    if (!sessionId) {
+      toast.error("Open a terminal tab first — there is nowhere to put the snippet.");
+      return;
+    }
+    try {
+      const command = await renderForSession(snippet.command, values, sessionId);
+      setActiveView("hosts"); // show the terminal it goes into
+      if (!insertIntoTerminal(sessionId, command, snippet.run === true)) toast.error("That terminal isn't ready yet.");
+    } catch (err) {
+      toast.error(ipcErrorMessage(err));
+    }
+  }
+
   async function handlePaletteConnect(host: (typeof hosts)[number]) {
     setPaletteOpen(false);
     setContextHostId(host.id);
@@ -248,8 +267,11 @@ export default function App() {
             hosts={hosts}
             groups={groups}
             actions={paletteActions}
+            snippets={snippets}
+            canRunSnippets={canRunSnippets}
             onClose={() => setPaletteOpen(false)}
             onConnect={handlePaletteConnect}
+            onRunSnippet={(snippet, values) => void handleRunSnippet(snippet, values)}
           />
         </Suspense>
       )}
