@@ -5,6 +5,10 @@ const SIDEBAR_COLLAPSED_KEY = "wharf-sidebar-collapsed";
 const SIDEBAR_WIDTH_KEY = "wharf-sidebar-width";
 const UI_ZOOM_KEY = "wharf-ui-zoom";
 const COLLAPSED_GROUPS_KEY = "wharf-collapsed-groups";
+const HOME_VIEW_KEY = "wharf-home-view";
+
+/** How Home lays hosts out: cards, or one compact row each. */
+export type HomeViewMode = "cards" | "list";
 
 export const DEFAULT_UI_ZOOM = 1;
 export const MIN_UI_ZOOM = 0.85;
@@ -48,6 +52,14 @@ function readStoredCollapsedGroups(): Set<string> {
   }
 }
 
+function readStoredHomeView(): HomeViewMode {
+  try {
+    return localStorage.getItem(HOME_VIEW_KEY) === "list" ? "list" : "cards";
+  } catch {
+    return "cards";
+  }
+}
+
 function readStoredUiZoom(): number {
   try {
     const v = Number(localStorage.getItem(UI_ZOOM_KEY));
@@ -86,6 +98,8 @@ interface UiPrefsState {
    * plus the "__root__" sentinel for the top-level "Hosts" node itself. */
   collapsedGroupIds: Set<string>;
   toggleGroupCollapsed(id: string): void;
+  homeView: HomeViewMode;
+  setHomeView(mode: HomeViewMode): void;
 }
 
 const initialUiZoom = readStoredUiZoom();
@@ -143,6 +157,17 @@ export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
 
   resetUiZoom() {
     get().setUiZoom(DEFAULT_UI_ZOOM);
+  },
+
+  homeView: readStoredHomeView(),
+
+  setHomeView(mode) {
+    try {
+      localStorage.setItem(HOME_VIEW_KEY, mode);
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ homeView: mode });
   },
 
   collapsedGroupIds: readStoredCollapsedGroups(),

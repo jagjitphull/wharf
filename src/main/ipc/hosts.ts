@@ -13,6 +13,12 @@ export function registerHostsIpc(): void {
     return getHosts();
   });
 
+  ipcMain.handle(IPC.hosts.setPinned, (_event, id: string, pinned: boolean): void => {
+    const hosts = getHosts();
+    if (!hosts.some((h) => h.id === id)) throw new Error(`Host ${id} not found`);
+    setHosts(hosts.map((h) => (h.id === id ? { ...h, pinned: pinned === true ? true : undefined } : h)));
+  });
+
   ipcMain.handle(IPC.hosts.create, (_event, input: HostInput): HostRecord => {
     const hosts = getHosts();
     const now = Date.now();

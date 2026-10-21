@@ -39,6 +39,7 @@ export interface BackupHost {
   tags?: string[];
   jumpHostId?: string | null;
   mosh?: boolean;
+  pinned?: boolean;
 }
 
 export interface BackupTunnel {
@@ -229,6 +230,7 @@ export function parseBackup(raw: unknown): ParsedBackup {
         tags: Array.isArray(h.tags) ? h.tags.filter(isString) : undefined,
         jumpHostId: isString(h.jumpHostId) ? h.jumpHostId : null,
         ...(h.mosh === true ? { mosh: true } : {}),
+        ...(h.pinned === true ? { pinned: true } : {}),
       });
     } else invalid++;
   }
@@ -379,6 +381,7 @@ export function planImport(
       tags: h.tags,
       jumpHostId: null, // filled in below, once every host has its id
       ...(h.mosh ? { mosh: true } : {}),
+      ...(h.pinned ? { pinned: true } : {}),
       createdAt: now,
       updatedAt: now,
     };

@@ -77,7 +77,7 @@ beforeEach(() => {
   data = {
     groups: [{ id: "g1", name: "Prod", parentId: null, createdAt: 1, updatedAt: 1 }],
     hosts: [
-      host("a", { groupId: "g1", mosh: true }),
+      host("a", { groupId: "g1", mosh: true, pinned: true }),
       host("b", { authMethod: "privateKey", privateKeyPath: "/k", jumpHostId: "a" }),
       host("c", { authMethod: "agent", secretId: null }),
     ],
@@ -114,7 +114,8 @@ describe("build", () => {
 
   it("carries hosts (with Mosh and jump host), groups, tunnels, snippets and workspaces", () => {
     const file = createBackup(deps()).build({ parts: ALL });
-    expect(file.hosts.find((h) => h.id === "a")).toMatchObject({ mosh: true, groupId: "g1" });
+    expect(file.hosts.find((h) => h.id === "a")).toMatchObject({ mosh: true, groupId: "g1", pinned: true });
+    expect(file.hosts.find((h) => h.id === "b")).not.toHaveProperty("pinned");
     expect(file.hosts.find((h) => h.id === "b")).toMatchObject({ jumpHostId: "a", privateKeyPath: "/k" });
     expect(file.tunnels[0]).toMatchObject({ srcPort: 5432, autoStart: true });
     expect(file.snippets[0]).toMatchObject({ name: "Disk", run: true });
@@ -180,6 +181,7 @@ describe("apply", () => {
     expect(secretsByHost[b.secretId!]).toBe("key-passphrase");
     expect(data.hosts.find((h) => h.name === "host-c")!.secretId).toBeNull();
     expect(b.jumpHostId).toBe(a.id);
+    expect(a.pinned).toBe(true);
     expect(a.groupId).toBe(data.groups[0].id);
     expect(data.tunnels[0]).toMatchObject({ hostId: a.id, srcPort: 5432, autoStart: true });
     expect(data.workspaces[0].tabs[0].layout).toEqual({ type: "leaf", hostId: a.id });

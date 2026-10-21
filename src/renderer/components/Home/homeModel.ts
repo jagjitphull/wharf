@@ -48,11 +48,12 @@ export interface HomeSection {
 export type HomeFilter = "all" | "connected" | string;
 
 /**
- * The Home screen's sections: hosts that are connected right now first (when
- * showing everything), then the most recently connected ones (when not
+ * The Home screen's sections, when showing everything: pinned hosts first, then
+ * hosts connected right now, then the most recently connected ones (when not
  * searching), then one section per group in the groups' own order, then
- * whatever has no group. Empty sections are dropped. A host in the first two
- * also appears in its group.
+ * whatever has no group. Empty sections are dropped. A host in one of the
+ * first three also appears in its group; a pinned host is not repeated under
+ * Connected now or Recent (its card already shows when it is live).
  */
 export function buildSections(
   hosts: HostRecord[],
@@ -69,13 +70,19 @@ export function buildSections(
   }
 
   const sections: HomeSection[] = [];
+  const pinnedIds = new Set<string>();
+  if (filter === "all" && !query.trim()) {
+    const pinned = visible.filter((h) => h.pinned).sort(byName);
+    for (const h of pinned) pinnedIds.add(h.id);
+    if (pinned.length) sections.push({ id: "pinned", title: "Pinned", hosts: pinned });
+  }
   if (filter === "all") {
-    const live = visible.filter((h) => connectedHostIds.has(h.id)).sort(byName);
+    const live = visible.filter((h) => connectedHostIds.has(h.id) && !pinnedIds.has(h.id)).sort(byName);
     if (live.length) sections.push({ id: "connected", title: "Connected now", hosts: live });
   }
   if (filter === "all" && !query.trim()) {
     const recent = visible
-      .filter((h) => (h.lastConnectedAt ?? 0) > 0 && !connectedHostIds.has(h.id))
+      .filter((h) => (h.lastConnectedAt ?? 0) > 0 && !connectedHostIds.has(h.id) && !pinnedIds.has(h.id))
       .sort((a, b) => (b.lastConnectedAt ?? 0) - (a.lastConnectedAt ?? 0))
       .slice(0, RECENT_COUNT);
     if (recent.length) sections.push({ id: "recent", title: "Recent", hosts: recent });
@@ -91,4 +98,14 @@ export function buildSections(
     if (rest.length) sections.push({ id: "ungrouped", title: groups.length ? "Ungrouped" : "All hosts", hosts: rest });
   }
   return sections;
+}
+
+/** The section ids a host can be dropped on to move it: real groups, and the ungrouped list. Pinned, Connected now and Recent are views, not places. */
+export function isDropSection(sectionId: string): boolean {
+  return sectionId !== "pinned" && sectionId !== "connected" && sectionId !== "recent";
+}
+
+/** The group id to move a host to when it is dropped on a section: null for the ungrouped list. */
+export function sectionGroupId(sectionId: string): string | null {
+  return sectionId === "ungrouped" ? null : sectionId;
 }

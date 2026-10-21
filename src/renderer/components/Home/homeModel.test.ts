@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GroupRecord, HostRecord } from "@shared/types";
-import { buildSections, formatLastConnected, greeting, hostGlyph, hostMatches } from "./homeModel";
+import { buildSections, formatLastConnected, greeting, hostGlyph, hostMatches, isDropSection, sectionGroupId } from "./homeModel";
 
 const host = (id: string, name: string, groupId: string | null, extra: Partial<HostRecord> = {}): HostRecord => ({
   id,
@@ -155,5 +155,57 @@ describe("the Recent section", () => {
   });
   it("is absent when nothing has ever connected", () => {
     expect(buildSections(hosts, groups, { query: "", filter: "all", connectedHostIds: none }).some((x) => x.id === "recent")).toBe(false);
+  });
+});
+
+describe("the Pinned section", () => {
+  const pinnedHosts = [
+    host("1", "web-02", "p", { pinned: true }),
+    host("2", "web-01", "p"),
+    host("3", "rocky-lab", "l", { pinned: true }),
+    host("4", "router", null),
+  ];
+  const titles = (s: ReturnType<typeof buildSections>) => s.map((x) => x.title);
+
+  it("comes first, sorted by name, and keeps each host in its group too", () => {
+    const sections = buildSections(pinnedHosts, groups, { query: "", filter: "all", connectedHostIds: none });
+    expect(titles(sections)).toEqual(["Pinned", "Production", "Lab", "Ungrouped"]);
+    expect(sections[0].hosts.map((h) => h.name)).toEqual(["rocky-lab", "web-02"]);
+    expect(sections[1].hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+  });
+
+  it("is absent when nothing is pinned, while searching, and when filtering to a group", () => {
+    expect(titles(buildSections(hosts, groups, { query: "", filter: "all", connectedHostIds: none }))).not.toContain("Pinned");
+    expect(titles(buildSections(pinnedHosts, groups, { query: "web", filter: "all", connectedHostIds: none }))).not.toContain("Pinned");
+    expect(titles(buildSections(pinnedHosts, groups, { query: "", filter: "p", connectedHostIds: none }))).toEqual(["Production"]);
+  });
+
+  it("is not repeated under Connected now or Recent", () => {
+    const hs = [
+      host("1", "a", null, { pinned: true, lastConnectedAt: 100 }),
+      host("2", "b", null, { lastConnectedAt: 50 }),
+      host("3", "c", null),
+    ];
+    const sections = buildSections(hs, [], { query: "", filter: "all", connectedHostIds: new Set(["1", "3"]) });
+    expect(titles(sections)).toEqual(["Pinned", "Connected now", "Recent", "All hosts"]);
+    expect(sections[1].hosts.map((h) => h.name)).toEqual(["c"]); // a is pinned, so it isn't listed twice
+    expect(sections[2].hosts.map((h) => h.name)).toEqual(["b"]);
+  });
+
+  it("the Connected filter still lists a pinned host that is connected", () => {
+    const hs = [host("1", "a", null, { pinned: true })];
+    expect(buildSections(hs, [], { query: "", filter: "connected", connectedHostIds: new Set(["1"]) })[0].hosts).toHaveLength(1);
+  });
+});
+
+describe("drop targets", () => {
+  it("only groups and the ungrouped list accept a dropped host", () => {
+    for (const id of ["pinned", "connected", "recent"]) expect(isDropSection(id)).toBe(false);
+    for (const id of ["p", "l", "ungrouped"]) expect(isDropSection(id)).toBe(true);
+  });
+
+  it("maps the ungrouped list to no group", () => {
+    expect(sectionGroupId("ungrouped")).toBeNull();
+    expect(sectionGroupId("p")).toBe("p");
   });
 });

@@ -29,6 +29,8 @@ export interface HostRecord {
   mosh?: boolean;
   /** When a session to this host last connected (ms since the epoch); unset until it first does. */
   lastConnectedAt?: number;
+  /** Kept at the top of Home as a favourite. */
+  pinned?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -415,6 +417,7 @@ export const IPC = {
     update: "hosts:update",
     remove: "hosts:remove",
     checkReachable: "hosts:check-reachable",
+    setPinned: "hosts:set-pinned",
   },
   groups: {
     list: "groups:list",
