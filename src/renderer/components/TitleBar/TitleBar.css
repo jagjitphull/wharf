@@ -114,6 +114,10 @@
   padding: 0;
 }
 
+.title-bar-controls .win-btn:focus-visible {
+  outline: none;
+}
+
 .win-btn-dot {
   display: flex;
   align-items: center;

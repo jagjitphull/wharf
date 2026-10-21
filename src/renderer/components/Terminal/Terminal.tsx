@@ -26,6 +26,7 @@ import {
   scanAfterWrite,
   type CompiledRule,
 } from "./keywordHighlight";
+import { guessMatchesScreen, readTypedLine } from "./typedLine";
 import { appendOutputTail, looksLikeSecretPrompt, shouldRecordTypedLine } from "./historyPolicy";
 import { createBlockDecorator } from "./blockDecorations";
 import { createCommandCaptureState, feedCommandCaptureDetailed } from "./commandCapture";
@@ -98,12 +99,11 @@ interface NlPopupState {
 }
 
 /** The currently-rendered ghost suggestion, if any — tracks enough to erase
- * it (marker/decoration) and to compute the delta to insert on accept. */
+ * it (marker/decoration) and to check it still fits the line on accept. */
 interface GhostSuggestionState {
   marker: IMarker;
   decoration: IDecoration;
   fullCommand: string;
-  typedLength: number;
 }
 
 /** Whether xterm's viewport is currently scrolled all the way down (i.e.
@@ -166,6 +166,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
   // historyPolicy.ts): whether the shell reports its prompts at all, the tail of
   // the output so far.
   const integrationSeenRef = useRef(false);
+  // Where the shell's prompt last ended (OSC 133;B): typing starts here, so what is on the
+  // screen from here to the cursor is the real line (see typedLine.ts).
+  const promptEndRef = useRef<{ marker: IMarker; column: number } | null>(null);
   const outputTailRef = useRef("");
   const secretPromptShownRef = useRef(false);
   const ghostSuggestionRef = useRef<GhostSuggestionState | null>(null);
@@ -323,6 +326,27 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     ghostSuggestionRef.current = null;
   }
 
+  /**
+   * What is typed at the prompt right now, or null when that can't be known well enough to act on
+   * (a program is running, the cursor isn't at the end of the line, the screen disagrees with
+   * the keystrokes). With shell integration it is read off the screen, so Tab completion and
+   * history recall are seen; without it, the keystroke guess is used only while the screen
+   * confirms it.
+   */
+  function currentTypedText(): string | null {
+    const term = termRef.current;
+    if (!term) return null;
+    const active = term.buffer.active;
+    if (integrationSeenRef.current) {
+      const prompt = promptEndRef.current;
+      if (!atPromptRef.current || !prompt || prompt.marker.isDisposed) return null;
+      const typed = readTypedLine(active, { line: prompt.marker.line, column: prompt.column });
+      return typed && typed.cursorAtEnd ? typed.text : null;
+    }
+    const guess = commandCaptureRef.current.buffer;
+    return guessMatchesScreen(active, guess) || guess === "" ? guess : null;
+  }
+
   /** Re-evaluates the ghost suggestion — prefix-matched against the current
    * typed buffer, or (buffer empty, at a real prompt) a "next command"
    * prediction — and (re)renders it via an xterm decoration anchored to the
@@ -341,7 +365,8 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     disposeGhostSuggestion();
     if (!term) return;
     if (!ghostEnabledRef.current || aiPopupRef.current || nlPopupRef.current || searchOpenRef.current) return;
-    const buffer = commandCaptureRef.current.buffer;
+    const buffer = currentTypedText();
+    if (buffer === null) return;
     const match = buffer
       ? findGhostSuggestion(buffer, historyCacheRef.current)
       : atPromptRef.current
@@ -360,7 +385,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
       el.textContent = remainder;
       el.classList.add("ghost-suggestion-text");
     });
-    ghostSuggestionRef.current = { marker, decoration, fullCommand: match, typedLength: buffer.length };
+    ghostSuggestionRef.current = { marker, decoration, fullCommand: match };
   }
 
   /** Right Arrow / End while a ghost suggestion is showing types its
@@ -371,7 +396,11 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     disposeGhostSuggestion();
     termRef.current?.focus();
     if (!ghost) return;
-    const delta = ghost.fullCommand.slice(ghost.typedLength);
+    // Read the line again rather than trusting what it was when the suggestion was drawn: if it
+    // no longer leads into the suggestion, typing the rest would produce a wrong command.
+    const typed = currentTypedText();
+    if (typed === null || !ghost.fullCommand.startsWith(typed)) return;
+    const delta = ghost.fullCommand.slice(typed.length);
     if (delta) termRef.current?.paste(delta);
   }
 
@@ -690,6 +719,9 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         // or records it on its own if there was none (typed ahead, or a re-run block).
         if (shellCommandText) void wharf.commandHistory.shellText(who(), shellCommandText);
       } else if (payload === "B") {
+        promptEndRef.current?.marker.dispose();
+        const marker = term.registerMarker(0);
+        promptEndRef.current = marker ? { marker, column: term.buffer.active.cursorX } : null;
         // Prompt fully drawn, shell is ready for input right now — the one
         // reliable "not mid-output" signal a "next command" ghost suggestion
         // (see recomputeGhostSuggestion) needs before it's safe to show one.

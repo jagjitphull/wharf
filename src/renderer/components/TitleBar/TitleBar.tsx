@@ -38,6 +38,10 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
     fn();
   };
 
+  // Window controls are mouse-only chrome, like a native title bar's: clicking one shouldn't
+  // take focus from the terminal or leave a focus ring on the button.
+  const keepFocus = (e: React.MouseEvent) => e.preventDefault();
+
   return (
     <div className={`title-bar ${isMac ? "mac" : ""}`} onDoubleClick={() => wharf.window.toggleMaximize()}>
       <span className="title-bar-brand">
@@ -106,14 +110,20 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
 
       {!isMac && (
         <div className="title-bar-controls">
-          <button className="win-btn" title="Minimize" onClick={() => wharf.window.minimize()}>
+          <button className="win-btn" tabIndex={-1} onMouseDown={keepFocus} title="Minimize" onClick={() => wharf.window.minimize()}>
             <span className="win-btn-dot win-btn-minimize">
               <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
                 <rect x="0" y="3.3" width="8" height="1.3" fill="currentColor" />
               </svg>
             </span>
           </button>
-          <button className="win-btn" title={maximized ? "Restore" : "Maximize"} onClick={() => wharf.window.toggleMaximize()}>
+          <button
+            className="win-btn"
+            tabIndex={-1}
+            onMouseDown={keepFocus}
+            title={maximized ? "Restore" : "Maximize"}
+            onClick={() => wharf.window.toggleMaximize()}
+          >
             <span className="win-btn-dot win-btn-maximize">
               {maximized ? (
                 <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
@@ -127,7 +137,7 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
               )}
             </span>
           </button>
-          <button className="win-btn" title="Close" onClick={() => wharf.window.close()}>
+          <button className="win-btn" tabIndex={-1} onMouseDown={keepFocus} title="Close" onClick={() => wharf.window.close()}>
             <span className="win-btn-dot win-btn-close">
               <svg className="win-btn-glyph" width="8" height="8" viewBox="0 0 8 8">
                 <line x1="0" y1="0" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" />

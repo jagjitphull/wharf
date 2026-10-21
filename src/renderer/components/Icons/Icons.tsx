@@ -316,3 +316,19 @@ export function IconMoon({ size = 16 }: IconProps) {
     </svg>
   );
 }
+
+export function IconChevronLeft({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M10 3.5 5.5 8l4.5 4.5" />
+    </svg>
+  );
+}
+
+export function IconChevronRight({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" {...common}>
+      <path d="M6 3.5 10.5 8 6 12.5" />
+    </svg>
+  );
+}

@@ -176,6 +176,32 @@ export async function run(t, start) {
   await app.until(async () => (await geometry()).activeInView, 3000);
   const back = await geometry();
   t.ok("switching to the first tab scrolls it into view", back.activeInView, JSON.stringify(back));
+  // The strip is overflowing: its cut edges fade and get scroll buttons rather than ending in a hard cut.
+  const edge = () =>
+    app.evJson(`(() => {
+      const strip = document.querySelector('.tab-strip');
+      return {
+        fadeLeft: strip.classList.contains('fade-left'), fadeRight: strip.classList.contains('fade-right'),
+        masked: getComputedStyle(strip).maskImage !== 'none',
+        leftBtn: !!document.querySelector('.tab-scroll-btn[aria-label="Scroll tabs left"]'),
+        rightBtn: !!document.querySelector('.tab-scroll-btn[aria-label="Scroll tabs right"]'),
+        scrollLeft: strip.scrollLeft,
+      };
+    })()`);
+  let e = await edge();
+  t.ok(
+    "at the start, only the right edge fades and has a scroll button",
+    e.fadeRight && !e.fadeLeft && e.masked && e.rightBtn && !e.leftBtn,
+    JSON.stringify(e),
+  );
+  await app.click('.tab-scroll-btn[aria-label="Scroll tabs right"]');
+  await app.until(async () => (await edge()).scrollLeft > 0, 3000);
+  e = await edge();
+  t.ok("the right scroll button scrolls, and the left edge then fades too", e.scrollLeft > 0 && e.fadeLeft && e.leftBtn, JSON.stringify(e));
+  await app.ev(`document.querySelector('.tab-strip').scrollLeft = 1e6`);
+  await app.until(async () => !(await edge()).fadeRight, 3000);
+  e = await edge();
+  t.ok("at the far end the right fade and button go away", !e.fadeRight && !e.rightBtn && e.fadeLeft, JSON.stringify(e));
   if (back.scrolls) {
     await app.ev(
       `document.querySelector('.tab-strip').dispatchEvent(new WheelEvent('wheel', { deltaY: 200, bubbles: true, cancelable: true }))`,

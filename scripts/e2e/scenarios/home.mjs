@@ -92,4 +92,19 @@ export async function run(t, start) {
   t.ok("closing the last tab returns to Home", await app.until(() => app.q(".home"), 5000));
   await app.rail("Settings");
   t.ok("Settings is lit on the rail", (await railActive()) === "Settings");
+
+  // --- window controls neither take focus nor show a focus ring when pressed
+  const control = await app.evJson(
+    `(() => { const b = document.querySelectorAll('.title-bar-controls .win-btn')[1].getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`,
+  );
+  await app.send("Input.dispatchMouseEvent", { type: "mousePressed", x: control.x, y: control.y, button: "left", clickCount: 1 });
+  const focus = await app.evJson(
+    `({ tag: document.activeElement?.tagName, onControl: !!document.activeElement?.closest('.win-btn'), ring: document.querySelector('.win-btn:focus-visible') !== null })`,
+  );
+  await app.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: 5, y: 400, button: "left", clickCount: 1 }); // released elsewhere: no click, so the window is left alone
+  t.ok("pressing a window control doesn't focus it or draw a focus ring", !focus.onControl && !focus.ring, JSON.stringify(focus));
+  t.ok(
+    "window controls are not tab stops",
+    (await app.evJson(`[...document.querySelectorAll('.win-btn')].every((b) => b.tabIndex === -1)`)) === true,
+  );
 }

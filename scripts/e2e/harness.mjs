@@ -106,7 +106,13 @@ export async function launch({ exe, shotsDir, profile, home, env = {} }) {
     });
     await send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code, windowsVirtualKeyCode: vk, modifiers });
   };
-  const KEYS = { Enter: ["Enter", 13, "\r"], Escape: ["Escape", 27] };
+  const KEYS = {
+    Enter: ["Enter", 13, "\r"],
+    Escape: ["Escape", 27],
+    Tab: ["Tab", 9, "\t"],
+    ArrowRight: ["ArrowRight", 39],
+    ArrowUp: ["ArrowUp", 38],
+  };
 
   const app = {
     profile,
@@ -120,7 +126,7 @@ export async function launch({ exe, shotsDir, profile, home, env = {} }) {
     until,
     output: () => appOutput,
 
-    /** Presses a named key (Enter, Escape) or a letter with Ctrl held. */
+    /** Presses a named key (Enter, Escape, Tab, ArrowRight, ArrowUp) or a letter with Ctrl held. */
     async press(name, { ctrl = false } = {}) {
       if (KEYS[name]) {
         const [code, vk, text] = KEYS[name];
