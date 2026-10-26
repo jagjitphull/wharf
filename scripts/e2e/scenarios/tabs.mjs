@@ -188,6 +188,11 @@ export async function run(t, start) {
         scrollLeft: strip.scrollLeft,
       };
     })()`);
+  // the fade follows the scroll position a frame or two later (scroll event, then a render)
+  await app.until(async () => {
+    const x = await edge();
+    return x.fadeRight && !x.fadeLeft;
+  }, 3000);
   let e = await edge();
   t.ok(
     "at the start, only the right edge fades and has a scroll button",
