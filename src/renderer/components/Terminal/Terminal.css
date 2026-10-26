@@ -1,12 +1,17 @@
 .terminal-pane {
   position: absolute;
   inset: 0;
-  padding: 8px;
   background: var(--term-bg, var(--bg));
 }
 
+/* The 8px margin around the text is the terminal element's own padding, not the pane's: the fit
+   addon subtracts the terminal element's padding from the space it fits into, but knows nothing of
+   its parent's. With the padding on the pane it counted 16px too much height, so the last row
+   spilled out of the pane under the status bar whenever that was enough for one more row. */
 .terminal-pane .xterm {
+  box-sizing: border-box;
   height: 100%;
+  padding: 8px;
 }
 
 /* Fish/zsh-autosuggestions-style ghost text, rendered via an xterm
