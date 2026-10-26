@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createKeyManager, fingerprintOf } from "./sshKeys";
 
 const { utils } = ssh2;
+// Windows has no POSIX permission bits to check (files there are protected by the profile's ACLs).
+const posix = process.platform !== "win32";
 let dir: string;
 const mgr = () => createKeyManager(() => dir);
 
@@ -27,8 +29,10 @@ describe("generate", () => {
       hasPublicFile: true,
     });
     expect(info.fingerprint).toMatch(/^SHA256:[A-Za-z0-9+/]{43}$/);
-    expect(statSync(path.join(dir, "id_test")).mode & 0o777).toBe(0o600);
-    expect(statSync(path.join(dir, "id_test.pub")).mode & 0o777).toBe(0o644);
+    if (posix) {
+      expect(statSync(path.join(dir, "id_test")).mode & 0o777).toBe(0o600);
+      expect(statSync(path.join(dir, "id_test.pub")).mode & 0o777).toBe(0o644);
+    }
     expect(readFileSync(path.join(dir, "id_test"), "utf8")).toMatch(/^-----BEGIN OPENSSH PRIVATE KEY-----/);
     expect(readFileSync(path.join(dir, "id_test.pub"), "utf8")).toMatch(/^ssh-ed25519 \S+ me@laptop\n$/);
   });
@@ -68,7 +72,7 @@ describe("generate", () => {
   it("creates the key folder (owner-only) when it doesn't exist yet", () => {
     const fresh = path.join(dir, "nested", ".ssh");
     createKeyManager(() => fresh).generate({ name: "k", type: "ed25519" });
-    expect(statSync(fresh).mode & 0o777).toBe(0o700);
+    if (posix) expect(statSync(fresh).mode & 0o777).toBe(0o700);
   });
 });
 

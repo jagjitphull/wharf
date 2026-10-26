@@ -43,8 +43,11 @@ describe("installPublicKey", () => {
   it("creates ~/.ssh and authorized_keys with safe permissions and adds the key", async () => {
     expect(await install.installPublicKey("a", KEY)).toEqual({ added: true });
     expect(fs.readFileSync(authorized(), "utf8")).toBe(KEY + "\n");
-    expect(fs.statSync(path.join(server.root, ".ssh")).mode & 0o777).toBe(0o700);
-    expect(fs.statSync(authorized()).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      // (Windows has no POSIX permission bits to check.)
+      expect(fs.statSync(path.join(server.root, ".ssh")).mode & 0o777).toBe(0o700);
+      expect(fs.statSync(authorized()).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("adds a key only once", async () => {
