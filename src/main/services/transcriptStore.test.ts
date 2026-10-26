@@ -91,7 +91,8 @@ describe("recording", () => {
     expect(lines[lines.length - 1].text).toMatch(/size limit/);
   });
 
-  it("writes files owner-only", () => {
+  // Windows has no POSIX permission bits to check (files there are protected by the profile's ACLs).
+  it.skipIf(process.platform === "win32")("writes files owner-only", () => {
     const t = make();
     t.begin("s1", { hostId: null, hostName: "Local" });
     t.end("s1");
