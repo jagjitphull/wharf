@@ -49,7 +49,7 @@ export async function run(t, start) {
   await app.until(() => app.q(".host-card"), 10_000);
   t.ok("pins survive a restart", (await sections())[0].title === "Pinned");
 
-  await app.rightClick(".home-section:first-of-type .host-card");
+  await app.rightClick('.home-section[data-section="pinned"] .host-card');
   t.ok(
     "the right-click menu offers Unpin for a pinned host",
     (await app.menuItems()).includes("Unpin"),

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { GroupRecord, HostRecord } from "@shared/types";
-import { buildSections, formatLastConnected, greeting, hostGlyph, hostMatches, isDropSection, sectionGroupId } from "./homeModel";
+import {
+  buildSections,
+  formatLastConnected,
+  greeting,
+  homeSummary,
+  hostGlyph,
+  hostMatches,
+  isDropSection,
+  sectionGroupId,
+} from "./homeModel";
 
 const host = (id: string, name: string, groupId: string | null, extra: Partial<HostRecord> = {}): HostRecord => ({
   id,
@@ -223,5 +232,25 @@ describe("drop targets", () => {
   it("maps the ungrouped list to no group", () => {
     expect(sectionGroupId("ungrouped")).toBeNull();
     expect(sectionGroupId("p")).toBe("p");
+  });
+});
+
+describe("homeSummary", () => {
+  const now = 10 * 60 * 60 * 1000;
+  it("says so when there are no hosts", () => {
+    expect(homeSummary([], 0, now)).toBe("No hosts yet");
+  });
+
+  it("counts hosts and connections, singular and plural", () => {
+    expect(homeSummary([host("1", "a", null)], 0, now)).toBe("1 host · none connected");
+    expect(homeSummary(hosts, 2, now)).toBe("4 hosts · 2 connected");
+  });
+
+  it("adds when a host was last connected, taking the newest", () => {
+    const hs = [
+      host("1", "a", null, { lastConnectedAt: now - 3 * 60 * 60 * 1000 }),
+      host("2", "b", null, { lastConnectedAt: now - 5 * 60 * 1000 }),
+    ];
+    expect(homeSummary(hs, 1, now)).toBe("2 hosts · 1 connected · last connected 5 min ago");
   });
 });

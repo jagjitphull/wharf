@@ -35,6 +35,18 @@ export function formatLastConnected(at: number, now: number): string {
   return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** The line under Home's greeting: "7 hosts · 2 connected · last connected 3 h ago". */
+export function homeSummary(hosts: HostRecord[], connectedCount: number, now: number): string {
+  if (hosts.length === 0) return "No hosts yet";
+  const parts = [
+    `${hosts.length} host${hosts.length === 1 ? "" : "s"}`,
+    connectedCount > 0 ? `${connectedCount} connected` : "none connected",
+  ];
+  const last = Math.max(0, ...hosts.map((h) => h.lastConnectedAt ?? 0));
+  if (last > 0) parts.push(`last connected ${formatLastConnected(last, now)}`);
+  return parts.join(" · ");
+}
+
 /** How many hosts Home's Recent row shows. */
 export const RECENT_COUNT = 4;
 

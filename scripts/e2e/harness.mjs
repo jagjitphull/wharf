@@ -155,7 +155,7 @@ export async function launch({ exe, shotsDir, profile, home, env = {} }) {
     menuItems: () => evJson(`[...document.querySelectorAll('.context-menu-item')].map((i) => i.textContent)`),
     async rightClick(selector, index = 0) {
       const r = await evJson(
-        `(() => { const b = document.querySelectorAll(${JSON.stringify(selector)})[${index}].getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`,
+        `(() => { const el = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; el.scrollIntoView({ block: "center" }); const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`,
       );
       await send("Input.dispatchMouseEvent", { type: "mousePressed", x: r.x, y: r.y, button: "right", clickCount: 1 });
       await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: r.x, y: r.y, button: "right", clickCount: 1 });
