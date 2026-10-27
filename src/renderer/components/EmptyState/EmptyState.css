@@ -9,6 +9,11 @@
   padding: 24px;
 }
 
+.empty-state.compact {
+  height: auto;
+  padding: 56px 24px;
+}
+
 .empty-state-icon {
   display: flex;
   color: var(--text-dim);
