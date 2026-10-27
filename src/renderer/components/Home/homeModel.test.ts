@@ -167,11 +167,27 @@ describe("the Pinned section", () => {
   ];
   const titles = (s: ReturnType<typeof buildSections>) => s.map((x) => x.title);
 
-  it("comes first, sorted by name, and keeps each host in its group too", () => {
+  it("comes first, sorted by name, and a pinned host is left out of its group", () => {
     const sections = buildSections(pinnedHosts, groups, { query: "", filter: "all", connectedHostIds: none });
     expect(titles(sections)).toEqual(["Pinned", "Production", "Lab", "Ungrouped"]);
     expect(sections[0].hosts.map((h) => h.name)).toEqual(["rocky-lab", "web-02"]);
-    expect(sections[1].hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+    expect(sections[1].hosts.map((h) => h.name)).toEqual(["web-01"]);
+    expect(sections[1].pinnedAbove).toBe(1);
+    expect(sections[3].pinnedAbove).toBeUndefined();
+  });
+
+  it("keeps a group whose hosts are all pinned, so it can still take a drop", () => {
+    const lab = buildSections(pinnedHosts, groups, { query: "", filter: "all", connectedHostIds: none }).find((x) => x.id === "l");
+    expect(lab?.hosts).toEqual([]);
+    expect(lab?.pinnedAbove).toBe(1);
+  });
+
+  it("shows a pinned host in its group when there is no Pinned section (searching, or one group)", () => {
+    const searched = buildSections(pinnedHosts, groups, { query: "web", filter: "all", connectedHostIds: none });
+    expect(searched.find((x) => x.id === "p")?.hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+    const one = buildSections(pinnedHosts, groups, { query: "", filter: "p", connectedHostIds: none });
+    expect(one[0].hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+    expect(one[0].pinnedAbove).toBeUndefined();
   });
 
   it("is absent when nothing is pinned, while searching, and when filtering to a group", () => {

@@ -444,9 +444,18 @@ export function HomeView() {
             >
               <h3>
                 {sec.title}
-                <span className="home-section-count">{sec.hosts.length}</span>
+                <span className="home-section-count">{sec.hosts.length + (sec.pinnedAbove ?? 0)}</span>
               </h3>
-              <div className={homeView === "list" ? "home-list" : "home-grid"}>{sec.hosts.map(hostItem)}</div>
+              {sec.hosts.length > 0 ? (
+                <div className={homeView === "list" ? "home-list" : "home-grid"}>{sec.hosts.map(hostItem)}</div>
+              ) : (
+                <p className="home-section-note empty">Every host here is pinned above. Drop a host here to move it into {sec.title}.</p>
+              )}
+              {sec.hosts.length > 0 && sec.pinnedAbove ? (
+                <p className="home-section-note">
+                  {sec.pinnedAbove} more {sec.pinnedAbove === 1 ? "host is" : "hosts are"} pinned above.
+                </p>
+              ) : null}
             </section>
           ))
         )}

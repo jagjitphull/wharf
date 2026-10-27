@@ -42,6 +42,8 @@ export interface HomeSection {
   id: string;
   title: string;
   hosts: HostRecord[];
+  /** Hosts of this group that are shown under Pinned instead; the section stays (as a drop target) even if nothing else is left. */
+  pinnedAbove?: number;
 }
 
 /** "all" shows everything, "connected" only hosts with an open session, otherwise a group id. */
@@ -51,9 +53,10 @@ export type HomeFilter = "all" | "connected" | string;
  * The Home screen's sections, when showing everything: pinned hosts first, then
  * hosts connected right now, then the most recently connected ones (when not
  * searching), then one section per group in the groups' own order, then
- * whatever has no group. Empty sections are dropped. A host in one of the
- * first three also appears in its group; a pinned host is not repeated under
- * Connected now or Recent (its card already shows when it is live).
+ * whatever has no group. Empty sections are dropped. A pinned host is shown
+ * once, under Pinned — not repeated under Connected now, Recent or its group
+ * (the group's section says how many are pinned above). A host that is
+ * connected or recent but not pinned also stays in its group.
  */
 export function buildSections(
   hosts: HostRecord[],
@@ -89,13 +92,23 @@ export function buildSections(
   }
   for (const g of groups) {
     if (filter !== "all" && filter !== g.id) continue;
-    const list = visible.filter((h) => h.groupId === g.id).sort(byName);
-    if (list.length) sections.push({ id: g.id, title: g.name, hosts: list });
+    const inGroup = visible.filter((h) => h.groupId === g.id).sort(byName);
+    const list = inGroup.filter((h) => !pinnedIds.has(h.id));
+    const pinnedAbove = inGroup.length - list.length;
+    if (list.length || pinnedAbove) sections.push({ id: g.id, title: g.name, hosts: list, ...(pinnedAbove ? { pinnedAbove } : {}) });
   }
   if (filter === "all") {
     const known = new Set(groups.map((g) => g.id));
-    const rest = visible.filter((h) => !h.groupId || !known.has(h.groupId)).sort(byName);
-    if (rest.length) sections.push({ id: "ungrouped", title: groups.length ? "Ungrouped" : "All hosts", hosts: rest });
+    const ungrouped = visible.filter((h) => !h.groupId || !known.has(h.groupId)).sort(byName);
+    const rest = ungrouped.filter((h) => !pinnedIds.has(h.id));
+    const pinnedAbove = ungrouped.length - rest.length;
+    if (rest.length || pinnedAbove)
+      sections.push({
+        id: "ungrouped",
+        title: groups.length ? "Ungrouped" : "All hosts",
+        hosts: rest,
+        ...(pinnedAbove ? { pinnedAbove } : {}),
+      });
   }
   return sections;
 }
