@@ -82,6 +82,8 @@ export async function run(t, start) {
     await app.sleep(150);
     t.ok(`the host sidebar stays out of the way on ${view}`, !(await app.q(".sidebar")));
   }
+  // Settings is a lazily loaded view, so wait for its side panel rather than assuming it is there.
+  await app.until(() => app.q(".settings-preview-pane button"), 10_000);
   t.ok(
     "Settings no longer lists the shortcuts, but offers the full reference",
     !(await app.q(".settings-preview-pane .shortcut-row")) &&
