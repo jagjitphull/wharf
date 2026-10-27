@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { TunnelInput, TunnelStatus, TunnelType } from "@shared/types";
 import { useAppStore } from "../../state/store";
+import { EmptyState } from "../EmptyState/EmptyState";
+import { IconPlus, IconTunnel } from "../Icons/Icons";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import "../../styles/dialog.css";
 import "./Tunnels.css";
@@ -186,7 +188,22 @@ export function Tunnels() {
             </div>
           );
         })}
-        {tunnels.length === 0 && !showForm && <p className="hint">No tunnels yet.</p>}
+        {tunnels.length === 0 && !showForm && (
+          <EmptyState
+            compact
+            icon={<IconTunnel size={40} />}
+            title="No port forwards yet"
+            hint={
+              hosts.length === 0
+                ? "A port forward reaches a service behind a server — a database, a web admin page — as if it ran on this computer. Add a host first, then come back."
+                : "A port forward reaches a service behind a server — a database, a web admin page — as if it ran on this computer."
+            }
+          >
+            <button className="btn primary small" onClick={() => setShowForm(true)} disabled={hosts.length === 0}>
+              <IconPlus size={13} /> New tunnel
+            </button>
+          </EmptyState>
+        )}
       </div>
     </div>
   );

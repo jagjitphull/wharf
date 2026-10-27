@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CommandHistoryEntry } from "@shared/types";
 import { wharf } from "../../api/wharf";
-import { IconCheck, IconCopy, IconSearch, IconTrash } from "../Icons/Icons";
+import { useAppStore } from "../../state/store";
+import { EmptyState } from "../EmptyState/EmptyState";
+import { IconCheck, IconClock, IconCopy, IconSearch, IconTerminal, IconTrash } from "../Icons/Icons";
 import "./CommandHistory.css";
 
 function formatTime(ms: number): string {
@@ -105,8 +107,18 @@ export function CommandHistory() {
 
       <div className="history-list">
         {loading && <div className="history-empty">Loading…</div>}
-        {!loading && filtered.length === 0 && (
-          <div className="history-empty">{normalizedFilter ? "No matches." : "No commands recorded yet."}</div>
+        {!loading && filtered.length === 0 && normalizedFilter && <div className="history-empty">No matches.</div>}
+        {!loading && filtered.length === 0 && !normalizedFilter && (
+          <EmptyState
+            compact
+            icon={<IconClock size={40} />}
+            title="No commands recorded yet"
+            hint="Commands you run in a terminal show up here, grouped by day, so you can find one again and run it with a click."
+          >
+            <button className="btn primary small" onClick={() => void useAppStore.getState().openLocalShell()}>
+              <IconTerminal size={13} /> Open a local shell
+            </button>
+          </EmptyState>
         )}
         {!loading &&
           groups.map((group) => (

@@ -3,7 +3,8 @@ import type { TranscriptInfo, TranscriptSearchResult, TranscriptSettings } from 
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { useAppStore } from "../../state/store";
 import { toast } from "../../state/toastStore";
-import { IconSearch, IconTrash } from "../Icons/Icons";
+import { EmptyState } from "../EmptyState/EmptyState";
+import { IconFile, IconSearch, IconTrash } from "../Icons/Icons";
 import { highlightRuns } from "./highlight";
 import { TranscriptViewer } from "./TranscriptViewer";
 import "./Transcripts.css";
@@ -191,7 +192,18 @@ export function Transcripts() {
       ) : (
         <div className="history-list">
           {loading && <div className="history-empty">Loading…</div>}
-          {!loading && list.length === 0 && <div className="history-empty">No sessions recorded yet.</div>}
+          {!loading && list.length === 0 && (
+            <EmptyState
+              compact
+              icon={<IconFile size={40} />}
+              title="No sessions recorded yet"
+              hint={
+                settings && !settings.enabled
+                  ? "Turn recording on in Settings, then what your terminals print is kept here to search."
+                  : "What a terminal prints is kept here, so you can search it later. Open a session and it will show up."
+              }
+            />
+          )}
           {list.map((info) => (
             <div className="transcripts-row" key={info.id}>
               <button className="transcripts-open" onClick={() => setOpen({ id: info.id })}>
