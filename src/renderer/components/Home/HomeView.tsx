@@ -184,6 +184,7 @@ export function HomeView() {
         key={host.id}
         className={`host-card ${live ? "live" : ""} ${draggingId === host.id ? "dragging" : ""}`}
         role="button"
+        title={`Click to open a terminal on ${host.name}`}
         tabIndex={0}
         onClick={() => void connect(host)}
         onKeyDown={(e) => {
@@ -213,7 +214,7 @@ export function HomeView() {
           ) : (
             <span className={`host-card-reach ${reach}`} title={REACHABILITY_LABEL[reach]}>
               <span className="host-card-dot" />
-              {reach === "online" ? "online" : reach === "offline" ? "offline" : ""}
+              {reach === "online" ? "online" : reach === "offline" ? "unreachable" : ""}
             </span>
           )}
         </div>
@@ -233,7 +234,9 @@ export function HomeView() {
             <span className="host-card-last" title={new Date(host.lastConnectedAt).toLocaleString()}>
               {formatLastConnected(host.lastConnectedAt, now)}
             </span>
-          ) : null}
+          ) : (
+            <span className="host-card-last never">Never connected</span>
+          )}
         </div>
         <div className="host-card-actions" onClick={(e) => e.stopPropagation()}>
           <button className="primary" title="Open terminal" onClick={() => void connect(host)}>
@@ -304,7 +307,7 @@ export function HomeView() {
           ))}
         </span>
         <span className="home-row-last" title={host.lastConnectedAt ? new Date(host.lastConnectedAt).toLocaleString() : undefined}>
-          {host.lastConnectedAt ? formatLastConnected(host.lastConnectedAt, now) : ""}
+          {host.lastConnectedAt ? formatLastConnected(host.lastConnectedAt, now) : "Never connected"}
         </span>
         {live > 0 ? (
           <span className="host-card-status">
@@ -314,7 +317,7 @@ export function HomeView() {
         ) : (
           <span className={`host-card-reach ${reach}`} title={REACHABILITY_LABEL[reach]}>
             <span className="host-card-dot" />
-            {reach === "online" ? "online" : reach === "offline" ? "offline" : ""}
+            {reach === "online" ? "online" : reach === "offline" ? "unreachable" : ""}
           </span>
         )}
         <span className="home-row-actions" onClick={(e) => e.stopPropagation()}>

@@ -21,7 +21,7 @@ export async function run(t, start) {
     const sections = () => app.evJson(`[...document.querySelectorAll('.home-section h3')].map((h) => h.firstChild.textContent)`);
     const lastText = () => app.q(".host-card-last", "(e) => e?.textContent ?? null");
 
-    t.ok("a host that never connected shows no last-connected time", (await lastText()) === null);
+    t.ok("a host that never connected says so rather than showing a time", (await lastText()) === "Never connected");
     t.ok("…and there is no Recent section", !(await sections()).includes("Recent"), JSON.stringify(await sections()));
 
     await app.click(".host-card");
@@ -34,7 +34,7 @@ export async function run(t, start) {
     );
 
     await app.click(".home-tab");
-    await app.until(() => app.q(".host-card-last"), 5000);
+    await app.until(async () => (await lastText()) === "just now", 5000);
     t.ok("coming back to Home, the card says it connected just now", (await lastText()) === "just now", String(await lastText()));
     t.ok(
       "the live session has its own section, ahead of everything",

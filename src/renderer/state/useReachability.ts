@@ -32,6 +32,6 @@ export function useReachability(hosts: HostRecord[]): Record<string, Reachabilit
 
 export const REACHABILITY_LABEL: Record<Reachability, string> = {
   checking: "Checking…",
-  online: "Online",
-  offline: "Offline / unreachable",
+  online: "Answering on its SSH port",
+  offline: "Nothing answered on this host's SSH port — check the address, your network or VPN",
 };
