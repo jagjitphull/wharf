@@ -77,6 +77,22 @@ export async function run(t, start) {
   );
   t.ok("the host sidebar returns on the terminal view", await app.q(".sidebar, aside"));
   t.ok("the rail's Hosts stays lit on a terminal", (await railActive()) === "Hosts", await railActive());
+  for (const view of ["Tunnels", "SSH keys", "History", "Workspaces", "Settings"]) {
+    await app.rail(view);
+    await app.sleep(150);
+    t.ok(`the host sidebar stays out of the way on ${view}`, !(await app.q(".sidebar")));
+  }
+  t.ok(
+    "Settings no longer lists the shortcuts, but offers the full reference",
+    !(await app.q(".settings-preview-pane .shortcut-row")) &&
+      (await app.evJson(
+        `[...document.querySelectorAll('.settings-preview-pane button')].some((b) => /keyboard shortcuts/i.test(b.textContent))`,
+      )),
+  );
+  await app.clickText(".settings-preview-pane button", "View all keyboard shortcuts");
+  t.ok("…and the button opens it", await app.until(() => app.q(".shortcuts-dialog, .dialog"), 3000));
+  await app.press("Escape");
+  await app.until(async () => !(await app.q(".dialog")), 3000);
   await app.rail("Tunnels");
   t.ok(
     "Tunnels via the rail; neither a tab nor Home is lit",

@@ -81,7 +81,7 @@ export async function run(t, start) {
   t.ok("the layout choice is remembered", !!(await app.q(".home-row")));
 
   // The list rows' CSS once shared a class name with the sidebar's host rows and crushed them to a few pixels.
-  await app.rail("Tunnels");
+  await app.newLocalShell();
   await app.until(() => app.q(".sidebar .host-row"), 3000);
   const side = await app.evJson(
     `(() => { const r = document.querySelector('.sidebar .host-row'); return { display: getComputedStyle(r).display, name: r.querySelector('.host-name').getBoundingClientRect().width, row: r.getBoundingClientRect().width }; })()`,
@@ -91,7 +91,7 @@ export async function run(t, start) {
     side.display === "flex" && side.name > 150,
     JSON.stringify(side),
   );
-  await app.rail("Hosts");
+  await app.click(".home-tab");
   await app.until(() => app.q(".home-row"), 3000);
   await app.ev(`${cardOf("router")}.querySelector('button[aria-label="Unpin"]').click()`);
   await app.until(async () => (await sections())[0].hosts.length === 1, 5000);
