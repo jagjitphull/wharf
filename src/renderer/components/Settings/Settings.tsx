@@ -16,19 +16,12 @@ import { NotificationSettings } from "./NotificationSettings";
 import { UpdateSettings } from "./UpdateSettings";
 import { SecretStorageSettings } from "./SecretStorageSettings";
 import { TerminalPreview } from "./TerminalPreview";
-import { GROUPS as SHORTCUT_GROUPS } from "../KeyboardShortcuts/KeyboardShortcuts";
 import { IconMinus, IconPlus } from "../Icons/Icons";
 import "../../styles/dialog.css";
-import "../KeyboardShortcuts/KeyboardShortcuts.css";
 import "./Settings.css";
 
 const isMac = wharf.window.platform === "darwin";
 const MOD = isMac ? "Cmd" : "Ctrl";
-/** The preview pane's own quick-reference is just these two groups
- * (app-wide navigation + terminal-specific) — SFTP editor and picker
- * shortcuts are less useful to have on hand while in Settings, and the
- * full list is one keypress away regardless (see the hint below). */
-const PREVIEW_SHORTCUT_GROUPS = SHORTCUT_GROUPS.filter((g) => g.title === "Global" || g.title === "Terminal");
 
 const MODES: { mode: ThemeMode; label: string }[] = [
   { mode: "light", label: "Light" },
@@ -36,7 +29,7 @@ const MODES: { mode: ThemeMode; label: string }[] = [
   { mode: "system", label: "System" },
 ];
 
-export function Settings() {
+export function Settings({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
   const { mode, resolved, accent, setMode, setAccent } = useThemeStore();
   const { fontSize, fontFamily, terminalThemeId, increaseFontSize, decreaseFontSize, setFontFamily, setTerminalThemeId } =
     useTerminalPrefsStore();
@@ -230,22 +223,15 @@ export function Settings() {
         <p className="hint">Live — reflects the theme and font picked under Terminal.</p>
 
         <span className="settings-preview-label">Keyboard shortcuts</span>
-        <div className="shortcuts-groups settings-preview-shortcuts">
-          {PREVIEW_SHORTCUT_GROUPS.map((group) => (
-            <div key={group.title} className="shortcuts-group">
-              <h3>{group.title}</h3>
-              {group.shortcuts.map((s) => (
-                <div key={s.keys} className="shortcut-row">
-                  <kbd>{s.keys}</kbd>
-                  <span>{s.description}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
         <p className="hint">
-          <code>{MOD}+/</code> for the full shortcuts reference, from anywhere in the app.
+          Press <code>{MOD}+K</code> to jump to a host or run any action, or <code>{MOD}+/</code> for the full list of shortcuts, from
+          anywhere in the app.
         </p>
+        <div>
+          <button className="btn small" onClick={onOpenShortcuts}>
+            View all keyboard shortcuts
+          </button>
+        </div>
       </div>
     </div>
   );

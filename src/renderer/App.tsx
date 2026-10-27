@@ -210,8 +210,9 @@ export default function App() {
       {lock === "locked" && <LockScreen onDone={() => setLock("open")} />}
       <div className="app-shell">
         <IconRail />
-        {/* Home lists every host as a card, so the tree beside it would only repeat it. */}
-        {!sidebarCollapsed && activeView !== "home" && (
+        {/* The host tree is for picking a host to open: Home lists every host as a card, and Tunnels, SSH keys,
+            History, Workspaces and Settings have their own content to give the room to. */}
+        {!sidebarCollapsed && (activeView === "hosts" || activeView === "sftp") && (
           <>
             <Sidebar onOpenPalette={() => setPaletteOpen(true)} />
             <SidebarResizeHandle />
@@ -254,7 +255,7 @@ export default function App() {
             )}
             {activeView === "settings" && (
               <div className="view-enter" key="settings">
-                <Settings />
+                <Settings onOpenShortcuts={() => setShortcutsOpen(true)} />
               </div>
             )}
           </Suspense>
