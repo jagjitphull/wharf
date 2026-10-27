@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import ssh2 from "ssh2";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createKeyManager, fingerprintOf } from "./sshKeys";
 
 const { utils } = ssh2;
@@ -158,5 +158,37 @@ describe("publicKey and remove", () => {
     expect(() => mgr().remove("notes")).toThrow(/isn't a key/);
     expect(() => mgr().remove("../notes")).toThrow();
     expect(existsSync(path.join(dir, "notes"))).toBe(true);
+  });
+});
+
+describe("generate when ssh2 makes a key it cannot read back", () => {
+  // ssh2 occasionally returns an ed25519 key that its own parser rejects (about 1 in 250).
+  const unreadable = {
+    private: "-----BEGIN OPENSSH PRIVATE KEY-----\nbm90IGEga2V5\n-----END OPENSSH PRIVATE KEY-----\n",
+    public: "ssh-ed25519 AAAA",
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it("makes another pair instead of writing the bad one", () => {
+    const real = utils.generateKeyPairSync.bind(utils) as (type: string, options: object) => { private: string; public: string };
+    const spy = vi
+      .spyOn(utils, "generateKeyPairSync")
+      .mockImplementationOnce(() => unreadable as never)
+      .mockImplementation(real as never);
+    const info = mgr().generate({ name: "id_retry", type: "ed25519" });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(info).toMatchObject({ name: "id_retry", type: "ssh-ed25519", hasPublicFile: true });
+    expect(
+      mgr()
+        .list()
+        .map((k) => k.name),
+    ).toEqual(["id_retry"]);
+  });
+
+  it("gives up with a message, and leaves nothing on disk, if it never reads back", () => {
+    vi.spyOn(utils, "generateKeyPairSync").mockImplementation(() => unreadable as never);
+    expect(() => mgr().generate({ name: "id_never", type: "ed25519" })).toThrow(/reads back/);
+    expect(existsSync(path.join(dir, "id_never"))).toBe(false);
+    expect(existsSync(path.join(dir, "id_never.pub"))).toBe(false);
   });
 });
