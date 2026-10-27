@@ -1,4 +1,5 @@
 import { useAppStore } from "../../state/store";
+import { useHistoryTab } from "../../state/historyTab";
 import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
@@ -90,6 +91,16 @@ export function buildPaletteActions(ctx: Context): PaletteAction[] {
     { id: "go.tunnels", title: "Go to Tunnels", run: go("tunnels") },
     { id: "go.workspaces", title: "Go to Workspaces", run: go("workspaces") },
     { id: "go.history", title: "Go to History", subtitle: "Commands you've run", run: go("history") },
+    {
+      id: "go.transcripts",
+      title: "Search session output",
+      subtitle: "Find text your terminal sessions printed",
+      keywords: "transcript recording log find history",
+      run: () => {
+        useHistoryTab.getState().setTab("transcripts");
+        go("history")();
+      },
+    },
     { id: "go.settings", title: "Go to Settings", keywords: "preferences options", run: go("settings") },
     {
       id: "theme.toggle",

@@ -33,6 +33,7 @@ vi.mock("./knownHosts", () => ({
     return true;
   },
 }));
+vi.mock("./transcripts", () => ({ transcripts: { begin: () => {}, feed: () => {}, end: () => {} } }));
 vi.mock("electron-log/main", () => ({ default: { warn: () => {}, error: () => {}, info: () => {} } }));
 
 let server: TestSshServer;

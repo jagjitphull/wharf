@@ -13,6 +13,13 @@ vi.mock("./store", () => ({
   },
 }));
 
+// Transcript files are rewritten when the master password changes; transcriptStore.test.ts covers that against a real folder.
+const mockConvertTranscripts = vi.fn();
+const mockClearTranscripts = vi.fn();
+vi.mock("./transcripts", () => ({
+  transcripts: { convertAll: (fn: unknown) => mockConvertTranscripts(fn), clearSync: () => mockClearTranscripts() },
+}));
+
 const mockIsEncryptionAvailable = vi.fn();
 const mockEncryptString = vi.fn();
 const mockDecryptString = vi.fn();
@@ -57,6 +64,8 @@ beforeEach(async () => {
     if (!(key in other)) throw new Error(`unexpected store.set(${key})`);
     other[key] = value;
   });
+  mockConvertTranscripts.mockReset();
+  mockClearTranscripts.mockReset();
   mockIsEncryptionAvailable.mockReset().mockReturnValue(true);
   mockEncryptString.mockReset().mockImplementation((plaintext: string) => Buffer.from(plaintext, "utf8"));
   mockDecryptString.mockReset().mockImplementation((buf: Buffer) => buf.toString("utf8"));
@@ -412,11 +421,14 @@ describe("History, workspaces and the last session follow the master password", 
     expect(other.workspaces).toEqual([workspace]);
     expect(other.sealedData).toEqual({});
     expect(protectedData.readProtected("commandHistory")).toEqual([entry]);
+    expect(mockClearTranscripts).not.toHaveBeenCalled(); // they are converted back to plain, never deleted
+    expect(mockConvertTranscripts).toHaveBeenCalledTimes(2); // sealed on enable, unsealed on remove
   });
 
   it("a forgotten password: reset erases what was sealed, and the app starts clean", () => {
     mod.enableMasterPassword("correct horse battery");
     mod.resetSecrets();
+    expect(mockClearTranscripts).toHaveBeenCalledTimes(1);
     expect(other.sealedData).toEqual({});
     expect(protectedData.readProtected("commandHistory")).toEqual([]);
     expect(protectedData.writeProtected("commandHistory", [entry])).toBe(true);

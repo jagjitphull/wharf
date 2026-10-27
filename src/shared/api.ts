@@ -24,6 +24,10 @@ import type {
   CommandHistoryEntry,
   CommandHistoryInput,
   HistorySettings,
+  TranscriptContent,
+  TranscriptInfo,
+  TranscriptSearchResult,
+  TranscriptSettings,
   AiSuggestRequest,
   AiProvider,
   AiProviderConfig,
@@ -236,6 +240,19 @@ export interface WharfApi {
     shellText(input: Pick<CommandHistoryInput, "sessionId" | "hostId" | "hostName">, command: string): Promise<void>;
     getSettings(): Promise<HistorySettings>;
     setSettings(settings: HistorySettings): Promise<HistorySettings>;
+  };
+  transcripts: {
+    /** Recorded sessions, newest first. */
+    list(): Promise<TranscriptInfo[]>;
+    read(id: string): Promise<TranscriptContent | null>;
+    /** Case-insensitive text search across every readable transcript. */
+    search(query: string): Promise<TranscriptSearchResult>;
+    remove(id: string): Promise<void>;
+    clear(): Promise<void>;
+    /** Asks where to save the transcript as plain text, then writes it. Resolves to the path, or null if cancelled. */
+    saveAs(id: string): Promise<string | null>;
+    getSettings(): Promise<TranscriptSettings>;
+    setSettings(settings: TranscriptSettings): Promise<TranscriptSettings>;
   };
   ai: {
     /** Asks the active provider for up to 3 likely completions of the current line. Throws if that provider isn't configured. */

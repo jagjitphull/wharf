@@ -1,13 +1,14 @@
 import log from "electron-log/main";
-import { open, seal } from "./masterKey";
+import { open, seal, SEALED_PREFIX } from "./masterKey";
 import { store } from "./store";
+import { transcripts } from "./transcripts";
 import { getUnlockedKey } from "./unlockedKey";
 import type { CommandHistoryEntry, WorkspaceRecord, WorkspaceTab } from "../../shared/types";
 
 /**
  * The parts of the data file that say what you ran and where you connected —
  * Command History, saved workspaces and the last session's tabs (with their
- * scrollback) — follow the master password: with one set they are kept sealed
+ * scrollback), plus the session transcript files — follow the master password: with one set they are kept sealed
  * with its key instead of as plain JSON, and unreadable (empty) while locked.
  *
  * Reads give an empty value and writes are dropped while locked, never the
@@ -57,6 +58,7 @@ export function sealAll(key: Buffer): void {
   const next = { ...sealedData() };
   for (const name of PROTECTED_KEYS) next[name] = seal(key, JSON.stringify(store.get(name)));
   store.set("sealedData", next);
+  transcripts.convertAll((line) => (line.startsWith(SEALED_PREFIX) ? line : seal(key, line)));
 }
 
 /** The plain copies, emptied once the sealed ones are in place. */
@@ -77,6 +79,7 @@ export function resealAll(oldKey: Buffer, newKey: Buffer): void {
     }
   }
   store.set("sealedData", next);
+  transcripts.convertAll((line) => (line.startsWith(SEALED_PREFIX) ? seal(newKey, open(oldKey, line)) : line));
 }
 
 /** Turning the master password off: back to plain. Call before the config is cleared; then eraseSealed(). */
@@ -91,9 +94,15 @@ export function unsealAll(key: Buffer): void {
       log.error(`Couldn't restore protected data "${name}" while removing the master password:`, err);
     }
   }
+  transcripts.convertAll((line) => (line.startsWith(SEALED_PREFIX) ? open(key, line) : line));
 }
 
 /** Drops every sealed copy — after unsealAll(), or when the password was forgotten and they can't be read again. */
 export function eraseSealed(): void {
   store.set("sealedData", {});
+}
+
+/** A forgotten password: transcripts sealed with it can never be read again, so they go too. */
+export function eraseSealedTranscripts(): void {
+  transcripts.clearSync();
 }

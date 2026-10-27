@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import log from "electron-log/main";
 import { store } from "./store";
 import type { MasterPasswordState } from "../../shared/types";
-import { clearPlain, eraseSealed, resealAll, sealAll, unsealAll } from "./protectedData";
+import { clearPlain, eraseSealed, eraseSealedTranscripts, resealAll, sealAll, unsealAll } from "./protectedData";
 import { getUnlockedKey, setUnlockedKey } from "./unlockedKey";
 import { createConfig, keyFor, MIN_PASSWORD_LENGTH, open, SEALED_PREFIX, seal } from "./masterKey";
 
@@ -223,10 +223,11 @@ export function removeMasterPassword(password: string): void {
   setUnlockedKey(null);
 }
 
-/** The way out when the password is forgotten: erases every saved secret, the master password, and the History, workspaces and last session that were sealed with it. Hosts and their settings stay; passwords must be entered again. */
+/** The way out when the password is forgotten: erases every saved secret, the master password, and the History, workspaces, last session and transcripts that were sealed with it. Hosts and their settings stay; passwords must be entered again. */
 export function resetSecrets(): void {
   store.set("secrets", {});
   store.set("masterPassword", null);
   eraseSealed();
+  eraseSealedTranscripts();
   setUnlockedKey(null);
 }

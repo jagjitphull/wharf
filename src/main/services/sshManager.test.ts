@@ -10,6 +10,11 @@ const h = vi.hoisted(() => ({
   hosts: [] as HostRecord[],
   sent: [] as { channel: string; payload: any }[],
   acceptHostKey: true,
+  transcripts: {
+    begin: vi.fn(),
+    feed: vi.fn(),
+    end: vi.fn(),
+  },
 }));
 vi.mock("electron", () => ({
   BrowserWindow: {
@@ -22,6 +27,7 @@ vi.mock("./secretStore", async () => {
   return { readSecret: (id: string | null) => (id === "pw" ? TEST_PASSWORD : id === "wrong" ? "not-the-password" : null) };
 });
 vi.mock("./knownHosts", () => ({ verifyHostKeyInteractive: async () => h.acceptHostKey }));
+vi.mock("./transcripts", () => ({ transcripts: h.transcripts }));
 
 let server: TestSshServer;
 let ssh: typeof import("./sshManager");
@@ -60,6 +66,7 @@ beforeEach(async () => {
   h.hosts = [testHost(server.port)];
   h.sent = [];
   h.acceptHostKey = true;
+  for (const fn of Object.values(h.transcripts)) fn.mockClear();
   server.stats.shellInput.length = 0;
   server.stats.windowChanges.length = 0;
   server.stats.forwards.length = 0;
@@ -76,6 +83,16 @@ describe("shell sessions", () => {
   it("opens a shell on a real SSH server and streams its output", async () => {
     const id = await open();
     await until(() => output(id).includes("welcome"), "the server's banner");
+  });
+
+  it("hands a session's output to its transcript from open to close", async () => {
+    const id = await open();
+    expect(h.transcripts.begin).toHaveBeenCalledWith(id, { hostId: "host-1", hostName: h.hosts[0].name });
+    await until(() => output(id).includes("welcome"), "the server's banner");
+    const fed = h.transcripts.feed.mock.calls.filter(([sid]) => sid === id).map(([, text]) => text as string);
+    expect(fed.join("")).toBe(output(id));
+    ssh.disconnect(id);
+    expect(h.transcripts.end).toHaveBeenCalledWith(id);
   });
 
   it("sends typed input to the remote shell and shows its reply", async () => {

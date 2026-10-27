@@ -172,6 +172,16 @@ const api: WharfApi = {
     getSettings: () => ipcRenderer.invoke(IPC.commandHistory.getSettings),
     setSettings: (settings) => ipcRenderer.invoke(IPC.commandHistory.setSettings, settings),
   },
+  transcripts: {
+    list: () => ipcRenderer.invoke(IPC.transcripts.list),
+    read: (id) => ipcRenderer.invoke(IPC.transcripts.read, id),
+    search: (query) => ipcRenderer.invoke(IPC.transcripts.search, query),
+    remove: (id) => ipcRenderer.invoke(IPC.transcripts.remove, id),
+    clear: () => ipcRenderer.invoke(IPC.transcripts.clear),
+    saveAs: (id) => ipcRenderer.invoke(IPC.transcripts.saveAs, id),
+    getSettings: () => ipcRenderer.invoke(IPC.transcripts.getSettings),
+    setSettings: (settings) => ipcRenderer.invoke(IPC.transcripts.setSettings, settings),
+  },
   ai: {
     suggest: (request) => ipcRenderer.invoke(IPC.ai.suggest, request),
     getProvider: () => ipcRenderer.invoke(IPC.ai.getProvider),

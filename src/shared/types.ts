@@ -171,6 +171,14 @@ export interface CommandHistoryEntry {
 export type CommandHistoryInput = Omit<CommandHistoryEntry, "id" | "timestamp">;
 
 export type { HistorySettings } from "./historyFilter";
+export type {
+  TranscriptContent,
+  TranscriptInfo,
+  TranscriptLine,
+  TranscriptMatch,
+  TranscriptSearchResult,
+  TranscriptSettings,
+} from "./transcripts";
 
 // ---------------------------------------------------------------------------
 // AI autocomplete
@@ -556,6 +564,16 @@ export const IPC = {
     shellText: "command-history:shell-text",
     getSettings: "command-history:get-settings",
     setSettings: "command-history:set-settings",
+  },
+  transcripts: {
+    list: "transcripts:list",
+    read: "transcripts:read",
+    search: "transcripts:search",
+    remove: "transcripts:remove",
+    clear: "transcripts:clear",
+    saveAs: "transcripts:save-as",
+    getSettings: "transcripts:get-settings",
+    setSettings: "transcripts:set-settings",
   },
   ai: {
     suggest: "ai:suggest",

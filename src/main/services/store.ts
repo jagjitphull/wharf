@@ -18,6 +18,7 @@ import type {
 } from "../../shared/types";
 import { normalizeAutoLockMinutes } from "../../shared/autoLock";
 import { DEFAULT_HISTORY_SETTINGS, normalizeHistorySettings } from "../../shared/historyFilter";
+import { DEFAULT_TRANSCRIPT_SETTINGS, normalizeTranscriptSettings, type TranscriptSettings } from "../../shared/transcripts";
 
 export interface WindowBounds {
   x: number;
@@ -40,6 +41,8 @@ interface Schema {
   commandHistory: CommandHistoryEntry[];
   /** What Command History keeps: on/off, secret filtering, ignore patterns, retention (see shared/historyFilter.ts). */
   historySettings: HistorySettings;
+  /** Whether terminal sessions are recorded as searchable text transcripts, and for how long they are kept (see transcriptStore.ts). */
+  transcriptSettings: TranscriptSettings;
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
   /** With a master password: Command History, workspaces and last-session tabs, each sealed with its key (see protectedData.ts). The plain copies above are empty then. */
@@ -70,6 +73,7 @@ const defaults: Schema = {
   lastSessionTabs: [],
   commandHistory: [],
   historySettings: DEFAULT_HISTORY_SETTINGS,
+  transcriptSettings: DEFAULT_TRANSCRIPT_SETTINGS,
   secrets: {},
   sealedData: {},
   masterPassword: null,
@@ -177,6 +181,16 @@ export function getHistorySettings(): HistorySettings {
 export function setHistorySettings(settings: HistorySettings): HistorySettings {
   const next = normalizeHistorySettings(settings);
   store.set("historySettings", next);
+  return next;
+}
+
+export function getTranscriptSettings(): TranscriptSettings {
+  return normalizeTranscriptSettings(store.get("transcriptSettings"));
+}
+
+export function setTranscriptSettings(settings: TranscriptSettings): TranscriptSettings {
+  const next = normalizeTranscriptSettings(settings);
+  store.set("transcriptSettings", next);
   return next;
 }
 
