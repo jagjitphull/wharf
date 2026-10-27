@@ -34,7 +34,16 @@ export async function run(t, start) {
     s[0].title === "Pinned" && JSON.stringify(s[0].hosts) === '["rocky"]',
     JSON.stringify(s[0]),
   );
-  t.ok("…and still in its own group", s.find((x) => x.title === "Lab").hosts.includes("rocky"));
+  t.ok("…and not repeated under its own group, which says so", !s.find((x) => x.title === "Lab").hosts.includes("rocky"));
+  t.ok(
+    "a group with only pinned hosts stays as a drop target with a note",
+    /pinned above/i.test(
+      await app.q(
+        '.home-section[data-section="' + s.find((x) => x.title === "Lab").id + '"] .home-section-note',
+        "(e) => e?.textContent ?? ''",
+      ),
+    ),
+  );
   t.ok("it is saved on the host", (await hostsNow()).find((h) => h.id === rocky.id).pinned === true);
   await app.reload();
   await app.until(() => app.q(".host-card"), 10_000);
@@ -77,7 +86,11 @@ export async function run(t, start) {
   const side = await app.evJson(
     `(() => { const r = document.querySelector('.sidebar .host-row'); return { display: getComputedStyle(r).display, name: r.querySelector('.host-name').getBoundingClientRect().width, row: r.getBoundingClientRect().width }; })()`,
   );
-  t.ok("the sidebar's host rows keep their own layout beside the Home list", side.display === "flex" && side.name > 150, JSON.stringify(side));
+  t.ok(
+    "the sidebar's host rows keep their own layout beside the Home list",
+    side.display === "flex" && side.name > 150,
+    JSON.stringify(side),
+  );
   await app.rail("Hosts");
   await app.until(() => app.q(".home-row"), 3000);
   await app.ev(`${cardOf("router")}.querySelector('button[aria-label="Unpin"]').click()`);
