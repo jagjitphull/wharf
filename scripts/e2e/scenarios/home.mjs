@@ -82,19 +82,22 @@ export async function run(t, start) {
     await app.sleep(150);
     t.ok(`the host sidebar stays out of the way on ${view}`, !(await app.q(".sidebar")));
   }
+  // The views below load lazily, so wait for what each one renders rather than assuming it is there.
   await app.rail("Tunnels");
+  await app.until(() => app.q(".empty-state-title"), 10_000);
   t.ok(
     "Tunnels with none says what they are for and offers a first one",
     (await app.q(".empty-state-title", "(e) => e?.textContent")) === "No port forwards yet" &&
       (await app.q(".empty-state-actions .btn.primary")),
   );
   await app.rail("History");
-  await app.until(() => app.q(".empty-state-title"), 3000);
+  await app.until(async () => /No commands recorded yet/.test((await app.q(".empty-state-title", "(e) => e?.textContent")) ?? ""), 10_000);
   t.ok(
     "History with nothing recorded has a friendly empty state",
     /No commands recorded yet/.test(await app.q(".empty-state-title", "(e) => e?.textContent")),
   );
   await app.rail("Settings");
+  await app.until(() => app.q(".settings-preview-pane button"), 10_000);
   t.ok(
     "Settings no longer lists the shortcuts, but offers the full reference",
     !(await app.q(".settings-preview-pane .shortcut-row")) &&
