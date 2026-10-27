@@ -91,7 +91,9 @@ A personal SSH/SFTP terminal client, Termius-style.
   refused or the host key changed, since retrying a bad password can lock an account.
 - Optional master password (Settings → saved passwords) that encrypts saved passwords and key
   passphrases with a key derived from it (scrypt, AES-256-GCM) instead of relying on the OS keyring,
-  which is the way to protect them on a Linux machine that has none. Wharf asks for it at launch
+  which is the way to protect them on a Linux machine that has none. It also seals Command
+  History, saved workspaces and the last session's tabs (with their scrollback) in the data
+  file, so what you ran and where you connected is unreadable without it. Wharf asks for it at launch
   (or you can carry on without unlocking: hosts using an agent or an unprotected key still work);
   it can be changed, removed, or locked on demand, and can lock itself after 5 minutes to 4 hours
   without typing or clicking in any Wharf window (Settings; off by default, because a tunnel that

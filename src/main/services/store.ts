@@ -42,6 +42,8 @@ interface Schema {
   historySettings: HistorySettings;
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
+  /** With a master password: Command History, workspaces and last-session tabs, each sealed with its key (see protectedData.ts). The plain copies above are empty then. */
+  sealedData: Partial<Record<"commandHistory" | "workspaces" | "lastSessionTabs", string>>;
   /** Set when a master password protects `secrets`: the salt/cost it was derived with and a check value. Never the password or key. */
   masterPassword: MasterPasswordConfig | null;
   /** Minutes without activity before an unlocked master password locks again (0 = never). */
@@ -69,6 +71,7 @@ const defaults: Schema = {
   commandHistory: [],
   historySettings: DEFAULT_HISTORY_SETTINGS,
   secrets: {},
+  sealedData: {},
   masterPassword: null,
   autoLockMinutes: 0,
   aiProvider: "claude",
@@ -165,34 +168,6 @@ export function getSnippets(): SnippetRecord[] {
 
 export function setSnippets(snippets: SnippetRecord[]): void {
   store.set("snippets", snippets);
-}
-
-export function getWorkspaces(): WorkspaceRecord[] {
-  return store.get("workspaces");
-}
-
-export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
-  store.set("workspaces", workspaces);
-}
-
-export function getLastSessionTabs(): WorkspaceTab[] {
-  return store.get("lastSessionTabs");
-}
-
-export function setLastSessionTabs(tabs: WorkspaceTab[]): void {
-  store.set("lastSessionTabs", tabs);
-}
-
-export function getCommandHistory(): CommandHistoryEntry[] {
-  return store.get("commandHistory");
-}
-
-export function setCommandHistory(entries: CommandHistoryEntry[]): void {
-  store.set("commandHistory", entries);
-}
-
-export function clearCommandHistory(): void {
-  store.set("commandHistory", []);
 }
 
 export function getHistorySettings(): HistorySettings {
