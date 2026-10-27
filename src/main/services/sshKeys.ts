@@ -6,6 +6,8 @@ import { validateGenerateRequest, validateKeyName, type GenerateKeyRequest, type
 
 const { utils } = ssh2;
 
+/** How many times to make a key pair that fails to read back before giving up. */
+const KEYGEN_ATTEMPTS = 8;
 /** Anything bigger than this in ~/.ssh isn't a key. */
 const MAX_KEY_FILE_BYTES = 64 * 1024;
 /** Files in ~/.ssh that are never private keys, whatever they contain. */
@@ -157,12 +159,20 @@ export function createKeyManager(dir: () => string) {
         type: string,
         options: object,
       ) => { private: string; public: string };
-      const pair = generateKeyPair(req.type, {
-        ...(req.type === "ed25519" ? {} : { bits: req.bits }),
-        comment: req.comment ?? "",
-        format: "new",
-        ...(passphrase ? { passphrase, cipher: "aes256-ctr", rounds: 16 } : {}),
-      });
+      // ssh2 now and then (about 1 in 250 ed25519 keys) produces a key it cannot parse back. Nothing is written until
+      // a pair reads back, so a bad one is simply made again rather than left on disk.
+      let pair: { private: string; public: string } | null = null;
+      for (let attempt = 0; attempt < KEYGEN_ATTEMPTS && !pair; attempt++) {
+        const candidate = generateKeyPair(req.type, {
+          ...(req.type === "ed25519" ? {} : { bits: req.bits }),
+          comment: req.comment ?? "",
+          format: "new",
+          ...(passphrase ? { passphrase, cipher: "aes256-ctr", rounds: 16 } : {}),
+        });
+        const parsed = utils.parseKey(candidate.private, passphrase);
+        if (!(parsed instanceof Error) && parsePublic(Array.isArray(parsed) ? parsed[0] : parsed)) pair = candidate;
+      }
+      if (!pair) throw new Error("Couldn't make a key that reads back correctly. Try again.");
 
       // 'wx': fail rather than overwrite if something appeared in the meantime.
       writeFileSync(privatePath, pair.private.endsWith("\n") ? pair.private : pair.private + "\n", { flag: "wx", mode: 0o600 });
