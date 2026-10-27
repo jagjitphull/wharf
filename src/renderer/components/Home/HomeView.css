@@ -614,3 +614,102 @@
 .home-row-actions button.pinned {
   opacity: 1;
 }
+
+.getting-started {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+
+.getting-started header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.getting-started h2 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.getting-started-progress {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.getting-started-hide {
+  display: flex;
+  align-self: center;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.getting-started-hide:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.getting-started ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.getting-started li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.getting-started-tick {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  color: var(--accent-contrast, #fff);
+}
+
+.getting-started li.done .getting-started-tick {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.getting-started-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.getting-started-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.getting-started li.done .getting-started-text strong {
+  color: var(--text-dim);
+  font-weight: 500;
+  text-decoration: line-through;
+}
+
+.getting-started-text small {
+  color: var(--text-dim);
+  font-size: 12px;
+}

@@ -15,6 +15,12 @@ export async function run(t, start) {
   );
   t.ok("the host sidebar is hidden on Home", !(await app.q(".sidebar, aside")));
   t.ok("the empty state offers a first host", (await app.q(".home-empty h2", "(e) => e?.textContent")) === "Add your first host");
+  await app.until(() => app.q(".getting-started"), 5000);
+  t.ok(
+    "a fresh profile gets a getting-started checklist with nothing done",
+    (await app.q(".getting-started-progress", "(e) => e?.textContent")) === "0 of 3 done",
+    await app.q(".getting-started-progress", "(e) => e?.textContent"),
+  );
 
   const group = await app.ev(`window.wharf.groups.create({ name: "Production", parentId: null }).then((g) => g.id)`);
   for (const [n, g, tags] of [
@@ -34,7 +40,28 @@ export async function run(t, start) {
     JSON.stringify(await cards()) === JSON.stringify(["db-primary", "web-01", "router"]),
     JSON.stringify(await cards()),
   );
-  t.ok("the summary counts hosts", (await app.q(".home-sub", "(e) => e.textContent")).startsWith("3 hosts"));
+  t.ok(
+    "the summary counts hosts and says nothing is connected",
+    (await app.q(".home-sub", "(e) => e.textContent")) === "3 hosts · none connected",
+    await app.q(".home-sub", "(e) => e.textContent"),
+  );
+  t.ok(
+    "the title bar shows the palette shortcut, and it opens the palette",
+    /K/.test((await app.q(".title-bar-palette kbd", "(e) => e?.textContent")) ?? "") &&
+      (await app.click(".title-bar-palette")) &&
+      (await app.until(() => app.q(".palette"), 3000)),
+  );
+  await app.press("Escape");
+  await app.until(async () => !(await app.q(".palette")), 3000);
+  t.ok(
+    "adding hosts ticks the first step",
+    (await app.q(".getting-started-progress", "(e) => e?.textContent")) === "1 of 3 done",
+    await app.q(".getting-started-progress", "(e) => e?.textContent"),
+  );
+  await app.click(".getting-started-hide");
+  await app.reload();
+  await app.until(() => app.q(".host-card"), 10_000);
+  t.ok("hiding the checklist sticks across a restart", !(await app.q(".getting-started")));
   t.ok("there is a greeting", /^(Good|Working)/.test(await app.q(".home h1", "(e) => e.textContent")));
 
   await app.setInput(".home-search input", "nginx");

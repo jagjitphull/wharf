@@ -6,6 +6,7 @@ const SIDEBAR_WIDTH_KEY = "wharf-sidebar-width";
 const UI_ZOOM_KEY = "wharf-ui-zoom";
 const COLLAPSED_GROUPS_KEY = "wharf-collapsed-groups";
 const HOME_VIEW_KEY = "wharf-home-view";
+const GETTING_STARTED_KEY = "wharf-getting-started-dismissed";
 
 /** How Home lays hosts out: cards, or one compact row each. */
 export type HomeViewMode = "cards" | "list";
@@ -49,6 +50,14 @@ function readStoredCollapsedGroups(): Set<string> {
     return Array.isArray(parsed) ? new Set(parsed.filter((id) => typeof id === "string")) : new Set();
   } catch {
     return new Set();
+  }
+}
+
+function readStoredFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -100,6 +109,9 @@ interface UiPrefsState {
   toggleGroupCollapsed(id: string): void;
   homeView: HomeViewMode;
   setHomeView(mode: HomeViewMode): void;
+  /** Whether the "Getting started" checklist on Home has been hidden for good. */
+  gettingStartedDismissed: boolean;
+  dismissGettingStarted(): void;
 }
 
 const initialUiZoom = readStoredUiZoom();
@@ -160,6 +172,17 @@ export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
   },
 
   homeView: readStoredHomeView(),
+
+  gettingStartedDismissed: readStoredFlag(GETTING_STARTED_KEY),
+
+  dismissGettingStarted() {
+    try {
+      localStorage.setItem(GETTING_STARTED_KEY, "1");
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ gettingStartedDismissed: true });
+  },
 
   setHomeView(mode) {
     try {

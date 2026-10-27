@@ -23,7 +23,17 @@ import { isTunnelLive, useTunnelStatuses } from "../../state/useTunnelStatuses";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { toast } from "../../state/toastStore";
 import { REACHABILITY_LABEL, useReachability } from "../../state/useReachability";
-import { buildSections, formatLastConnected, greeting, hostGlyph, isDropSection, sectionGroupId, type HomeFilter } from "./homeModel";
+import { GettingStarted } from "./GettingStarted";
+import {
+  buildSections,
+  formatLastConnected,
+  greeting,
+  homeSummary,
+  hostGlyph,
+  isDropSection,
+  sectionGroupId,
+  type HomeFilter,
+} from "./homeModel";
 import "./HomeView.css";
 
 /** Host colours are free hex values; a translucent tint of one makes the tile. */
@@ -356,9 +366,7 @@ export function HomeView() {
         <header className="home-header">
           <div>
             <h1>{greeting(new Date().getHours())}</h1>
-            <p className="home-sub">
-              {hosts.length} host{hosts.length === 1 ? "" : "s"} · {connectedCount} connected
-            </p>
+            <p className="home-sub">{homeSummary(hosts, connectedCount, now)}</p>
           </div>
           <div className="home-header-actions">
             <label className="home-search">
@@ -377,6 +385,8 @@ export function HomeView() {
         </header>
 
         {error && <div className="home-error">{error}</div>}
+
+        <GettingStarted hostCount={hosts.length} onAddHost={() => setHostDialog({ host: null, groupId: null })} />
 
         {hosts.length > 0 && (
           <div className="home-chips">
