@@ -31,6 +31,7 @@ const api: WharfApi = {
     update: (id, input) => ipcRenderer.invoke(IPC.hosts.update, id, input),
     remove: (id) => ipcRenderer.invoke(IPC.hosts.remove, id),
     checkReachable: (hostname, port) => ipcRenderer.invoke(IPC.hosts.checkReachable, hostname, port),
+    setPinned: (id, pinned) => ipcRenderer.invoke(IPC.hosts.setPinned, id, pinned),
   },
   groups: {
     list: () => ipcRenderer.invoke(IPC.groups.list),

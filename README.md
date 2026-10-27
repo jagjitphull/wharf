@@ -105,6 +105,10 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
+- Home: pin favourites (the pin on a card or row, or **Pin to top** in its menu) to keep them in a
+  Pinned section above everything; switch between cards and a compact one-line-per-host list (the
+  choice is remembered); drag a host onto another group's section or chip — or onto the drop bar
+  that appears while dragging, including **No group** — to move it
 - SSH keys page (the key icon in the left rail): lists the private keys in `~/.ssh` with type, size,
   comment, SHA256 fingerprint (as `ssh-keygen -l` prints it), whether a passphrase protects them
   and which saved hosts use them. Generate Ed25519, RSA (2048–4096) or ECDSA keys, optionally
@@ -369,9 +373,11 @@ to save a screenshot.
 
 **End-to-end scenarios.** `npm run e2e` (`scripts/e2e/`) goes further than the smoke test: each file
 in `scripts/e2e/scenarios` starts a fresh packaged app (own profile and `$HOME`) and drives it through
-the real UI and IPC. They cover Home and navigation, the tab menu, reconnect, the command palette,
-Command Block marks (against real bash), toasts, History (what is and isn't recorded, including
-that passwords never are), interface size, and the master password with auto-lock. Run one with
+the real UI and IPC. They cover Home (last connected, pinning, list layout, drag and drop) and navigation, the tab menu,
+reconnect, the command palette and snippets, Command Block marks (against real bash), toasts, History
+(what is and isn't recorded, including that passwords never are), session transcripts, port forwards
+from a host card (against a real SSH server), backup export/import, the SSH keys page, interface size,
+and the master password with auto-lock and sealed data. Run one with
 `xvfb-run -a npm run e2e -- <scenario>`; `E2E_SHOTS=dir` saves screenshots. Linux only, because the
 scenarios open a local bash shell. CI runs them after the smoke test.
 

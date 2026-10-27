@@ -76,6 +76,7 @@ export function createBackup(deps: BackupDeps) {
           tags: h.tags,
           jumpHostId: h.jumpHostId ?? null,
           ...(h.mosh ? { mosh: true } : {}),
+          ...(h.pinned ? { pinned: true } : {}),
         })),
         tunnels: parts.has("tunnels")
           ? data.tunnels.map(({ hostId, name, type, srcHost, srcPort, dstHost, dstPort, autoStart }) => ({

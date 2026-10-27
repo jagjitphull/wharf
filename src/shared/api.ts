@@ -60,6 +60,8 @@ export interface WharfApi {
     remove(id: string): Promise<void>;
     /** Raw TCP reachability probe against hostname:port — no SSH handshake, no auth, no host-key check. */
     checkReachable(hostname: string, port: number): Promise<boolean>;
+    /** Pins a host to the top of Home (or unpins it). */
+    setPinned(id: string, pinned: boolean): Promise<void>;
   };
   groups: {
     list(): Promise<GroupRecord[]>;
