@@ -133,136 +133,52 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
 
   return (
     <div className="dialog-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <form className="dialog" onSubmit={handleSubmit}>
+      <form className="dialog host-dialog" onSubmit={handleSubmit}>
         <h2>{host ? "Edit host" : "Add host"}</h2>
 
-        <label>
-          Name
-          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="prod-web-1" />
-        </label>
-
-        <div className="dialog-row">
-          <label className="grow">
-            Hostname / IP
-            <input
-              required
-              value={form.hostname}
-              onChange={(e) => setForm({ ...form, hostname: e.target.value })}
-              placeholder="203.0.113.10"
-            />
-          </label>
-          <label className="narrow">
-            Port
-            <input required type="number" value={form.port} onChange={(e) => setForm({ ...form, port: Number(e.target.value) })} />
-          </label>
-        </div>
-
-        <label>
-          Username
-          <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="root" />
-        </label>
-
-        <label>
-          Color
-          <div className="host-color-swatches">
-            <button
-              type="button"
-              className={`host-color-swatch none ${!form.color ? "active" : ""}`}
-              title="Default (no color)"
-              onClick={() => setForm({ ...form, color: undefined })}
-            />
-            {HOST_COLOR_PRESETS.map((c) => (
-              <button
-                type="button"
-                key={c}
-                className={`host-color-swatch ${form.color === c ? "active" : ""}`}
-                style={{ background: c }}
-                title={c}
-                onClick={() => setForm({ ...form, color: c })}
-              />
-            ))}
-          </div>
-        </label>
-
-        <label>
-          Tags
-          <div className="host-tags-input">
-            {(form.tags ?? []).map((tag) => (
-              <span className="host-tag-chip" key={tag}>
-                {tag}
-                <button type="button" onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`}>
-                  ×
-                </button>
-              </span>
-            ))}
-            <input
-              value={tagDraft}
-              onChange={(e) => setTagDraft(e.target.value)}
-              onKeyDown={handleTagInputKeyDown}
-              onBlur={() => {
-                addTag(tagDraft);
-                setTagDraft("");
-              }}
-              placeholder={(form.tags ?? []).length ? "" : "prod, db, us-east…"}
-            />
-          </div>
-        </label>
-
-        <label>
-          Group
-          <select value={form.groupId ?? ""} onChange={(e) => setForm({ ...form, groupId: e.target.value || null })}>
-            <option value="">(none)</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Auth method
-          <select value={form.authMethod} onChange={(e) => setForm({ ...form, authMethod: e.target.value as AuthMethod })}>
-            <option value="password">Password</option>
-            <option value="privateKey">Private key</option>
-            <option value="agent">SSH agent</option>
-          </select>
-        </label>
-
-        {form.authMethod === "password" && (
+        <section className="host-section">
+          <h3>Connection</h3>
           <label>
-            Password
-            <input
-              type="password"
-              value={form.secret}
-              placeholder={secretPlaceholder}
-              onChange={(e) => setForm({ ...form, secret: e.target.value })}
-            />
+            Name
+            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="prod-web-1" />
           </label>
-        )}
-        {form.authMethod === "password" && storedUnencrypted && <p className="secret-note">{UNENCRYPTED_NOTE}</p>}
 
-        {form.authMethod === "privateKey" && (
-          <>
-            <label>
-              Private key file path
+          <div className="dialog-row">
+            <label className="grow">
+              Hostname / IP
               <input
                 required
-                value={form.privateKeyPath}
-                onChange={(e) => setForm({ ...form, privateKeyPath: e.target.value })}
-                placeholder="/home/you/.ssh/id_ed25519"
-                list="ssh-key-paths"
+                value={form.hostname}
+                onChange={(e) => setForm({ ...form, hostname: e.target.value })}
+                placeholder="203.0.113.10"
               />
-              <datalist id="ssh-key-paths">
-                {keyPaths.map((k) => (
-                  <option key={k.path} value={k.path}>
-                    {k.name}
-                  </option>
-                ))}
-              </datalist>
             </label>
+            <label className="narrow">
+              Port
+              <input required type="number" value={form.port} onChange={(e) => setForm({ ...form, port: Number(e.target.value) })} />
+            </label>
+          </div>
+
+          <label>
+            Username
+            <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="root" />
+          </label>
+        </section>
+
+        <section className="host-section">
+          <h3>Sign-in</h3>
+          <label>
+            Auth method
+            <select value={form.authMethod} onChange={(e) => setForm({ ...form, authMethod: e.target.value as AuthMethod })}>
+              <option value="password">Password</option>
+              <option value="privateKey">Private key</option>
+              <option value="agent">SSH agent</option>
+            </select>
+          </label>
+
+          {form.authMethod === "password" && (
             <label>
-              Key passphrase (if any)
+              Password
               <input
                 type="password"
                 value={form.secret}
@@ -270,33 +186,128 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
                 onChange={(e) => setForm({ ...form, secret: e.target.value })}
               />
             </label>
-            {storedUnencrypted && <p className="secret-note">{UNENCRYPTED_NOTE}</p>}
-          </>
-        )}
+          )}
+          {form.authMethod === "password" && storedUnencrypted && <p className="secret-note">{UNENCRYPTED_NOTE}</p>}
 
-        <label>
-          Jump host
-          <select value={form.jumpHostId ?? ""} onChange={(e) => setForm({ ...form, jumpHostId: e.target.value || null })}>
-            <option value="">(direct connection)</option>
-            {jumpHostCandidates.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          {form.authMethod === "privateKey" && (
+            <>
+              <label>
+                Private key file path
+                <input
+                  required
+                  value={form.privateKeyPath}
+                  onChange={(e) => setForm({ ...form, privateKeyPath: e.target.value })}
+                  placeholder="/home/you/.ssh/id_ed25519"
+                  list="ssh-key-paths"
+                />
+                <datalist id="ssh-key-paths">
+                  {keyPaths.map((k) => (
+                    <option key={k.path} value={k.path}>
+                      {k.name}
+                    </option>
+                  ))}
+                </datalist>
+              </label>
+              <label>
+                Key passphrase (if any)
+                <input
+                  type="password"
+                  value={form.secret}
+                  placeholder={secretPlaceholder}
+                  onChange={(e) => setForm({ ...form, secret: e.target.value })}
+                />
+              </label>
+              {storedUnencrypted && <p className="secret-note">{UNENCRYPTED_NOTE}</p>}
+            </>
+          )}
+        </section>
 
-        <label className="host-mosh-row">
-          <input type="checkbox" checked={form.mosh ?? false} onChange={(e) => setForm({ ...form, mosh: e.target.checked })} />
-          <span>
-            Connect via Mosh
-            <small>
-              Requires <code>mosh</code> installed on this machine and <code>mosh-server</code> on the remote host. Auth still goes through
-              SSH — a saved password/passphrase is auto-filled the same as a regular connection, but host-key confirmation (for a
-              never-before-seen host) shows up live in the terminal instead of Wharf's own dialog.
-            </small>
-          </span>
-        </label>
+        <section className="host-section">
+          <h3>Organize</h3>
+          <label>
+            Color
+            <div className="host-color-swatches">
+              <button
+                type="button"
+                className={`host-color-swatch none ${!form.color ? "active" : ""}`}
+                title="Default (no color)"
+                onClick={() => setForm({ ...form, color: undefined })}
+              />
+              {HOST_COLOR_PRESETS.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  className={`host-color-swatch ${form.color === c ? "active" : ""}`}
+                  style={{ background: c }}
+                  title={c}
+                  onClick={() => setForm({ ...form, color: c })}
+                />
+              ))}
+            </div>
+          </label>
+
+          <label>
+            Tags
+            <div className="host-tags-input">
+              {(form.tags ?? []).map((tag) => (
+                <span className="host-tag-chip" key={tag}>
+                  {tag}
+                  <button type="button" onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`}>
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                value={tagDraft}
+                onChange={(e) => setTagDraft(e.target.value)}
+                onKeyDown={handleTagInputKeyDown}
+                onBlur={() => {
+                  addTag(tagDraft);
+                  setTagDraft("");
+                }}
+                placeholder={(form.tags ?? []).length ? "" : "prod, db, us-east…"}
+              />
+            </div>
+          </label>
+
+          <label>
+            Group
+            <select value={form.groupId ?? ""} onChange={(e) => setForm({ ...form, groupId: e.target.value || null })}>
+              <option value="">(none)</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+
+        <details className="host-advanced" open={Boolean(form.jumpHostId || form.mosh)}>
+          <summary>Advanced</summary>
+          <label>
+            Jump host
+            <select value={form.jumpHostId ?? ""} onChange={(e) => setForm({ ...form, jumpHostId: e.target.value || null })}>
+              <option value="">(direct connection)</option>
+              {jumpHostCandidates.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="host-mosh-row">
+            <input type="checkbox" checked={form.mosh ?? false} onChange={(e) => setForm({ ...form, mosh: e.target.checked })} />
+            <span>
+              Connect via Mosh
+              <small>
+                Needs <code>mosh</code> on this computer and <code>mosh-server</code> on the host. Sign-in still goes through SSH, and a
+                never-seen-before host key is confirmed in the terminal rather than in a Wharf dialog.
+              </small>
+            </span>
+          </label>
+        </details>
 
         {error && <div className="dialog-error">{error}</div>}
 

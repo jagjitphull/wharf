@@ -51,6 +51,18 @@ export async function run(t, start) {
 
   await app.click(".home-new");
   t.ok("New host opens the host dialog", await app.until(() => app.q(".dialog"), 3000));
+  t.ok(
+    "the host dialog is grouped into Connection, Sign-in and Organize",
+    JSON.stringify(await app.evJson(`[...document.querySelectorAll('.host-dialog .host-section h3')].map((h) => h.textContent)`)) ===
+      '["Connection","Sign-in","Organize"]',
+  );
+  t.ok(
+    "Jump host and Mosh are tucked under a closed Advanced",
+    (await app.evJson(
+      `(() => { const d = document.querySelector('.host-dialog .host-advanced'); return !!d && !d.open && /Jump host/.test(d.textContent) && /Mosh/.test(d.textContent); })()`,
+    )) === true,
+  );
+  await app.shot("host-dialog-grouped");
   await app.press("Escape");
   await app.ev(`document.querySelector('.dialog button:not(.primary)')?.click()`);
   await app.until(async () => !(await app.q(".dialog")), 3000);
