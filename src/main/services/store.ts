@@ -133,6 +133,16 @@ export function setHosts(hosts: HostRecord[]): void {
   store.set("hosts", hosts);
 }
 
+/** Records that a session to `hostId` just connected, for "last connected" and Home's Recent row. */
+export function markHostConnected(hostId: string, at: number = Date.now()): void {
+  const hosts = getHosts();
+  const i = hosts.findIndex((h) => h.id === hostId);
+  if (i === -1) return;
+  const next = [...hosts];
+  next[i] = { ...next[i], lastConnectedAt: at };
+  setHosts(next);
+}
+
 export function getGroups(): GroupRecord[] {
   return store.get("groups");
 }

@@ -27,6 +27,8 @@ export interface HostRecord {
   jumpHostId?: string | null;
   /** Connect via Mosh (mobile shell) instead of a plain SSH session — see moshManager.ts. */
   mosh?: boolean;
+  /** When a session to this host last connected (ms since the epoch); unset until it first does. */
+  lastConnectedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
