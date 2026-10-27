@@ -5,6 +5,8 @@
  */
 import type {
   BackupImportResult,
+  BackupPart,
+  BackupPreview,
   GroupInput,
   GroupRecord,
   HostInput,
@@ -197,10 +199,12 @@ export interface WharfApi {
     onSelfUpdateState(cb: (state: SelfUpdateState) => void): Unsubscribe;
   };
   backup: {
-    /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */
-    export(): Promise<string | null>;
-    /** Opens an open dialog, validates and merges a previously exported file. Returns null if the user canceled; throws on an invalid file. */
-    import(): Promise<BackupImportResult | null>;
+    /** Opens a save dialog and writes a backup: hosts and groups always, plus the `parts` chosen. Saved passwords go in, sealed with `passphrase`, only when one is given. `rendererSettings` is the window's own preferences. Returns the written path, or null if the user canceled. */
+    export(request: { parts: BackupPart[]; passphrase?: string; rendererSettings?: Record<string, string> }): Promise<string | null>;
+    /** Opens a file dialog and reads a backup without importing it, so what it holds can be shown first. Null if canceled; throws if it isn't a Wharf backup. */
+    pick(): Promise<BackupPreview | null>;
+    /** Merges the picked backup in (anything already present is skipped). Throws, changing nothing, on a wrong passphrase. */
+    apply(token: string, options: { parts: BackupPart[]; passphrase?: string; skipSecrets?: boolean }): Promise<BackupImportResult>;
   };
   snippets: {
     list(): Promise<SnippetRecord[]>;
