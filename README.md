@@ -105,6 +105,14 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
+- SSH keys page (the key icon in the left rail): lists the private keys in `~/.ssh` with type, size,
+  comment, SHA256 fingerprint (as `ssh-keygen -l` prints it), whether a passphrase protects them
+  and which saved hosts use them. Generate Ed25519, RSA (2048–4096) or ECDSA keys, optionally
+  passphrase-protected, saved owner-only in OpenSSH format — it never overwrites an existing
+  file. Copy a key's public half, install it on a saved host (appended once to that host's
+  `~/.ssh/authorized_keys` over a connection that uses the host's saved login, with the folder
+  and file created `700`/`600`), or delete a key. The host dialog suggests these keys for its
+  private-key path
 - Backup (Settings → Backup): export hosts and groups — plus, as you choose, tunnels, snippets,
   workspaces and app settings (theme, fonts, history and recording choices) — to a JSON file and
   import it into another Wharf. Passwords and key passphrases are left out unless you give the

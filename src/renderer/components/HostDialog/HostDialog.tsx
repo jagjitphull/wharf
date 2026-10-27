@@ -65,6 +65,14 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
         }
       : emptyForm(defaultGroupId),
   );
+  // Keys found in ~/.ssh, offered as completions for the key path.
+  const [keyPaths, setKeyPaths] = useState<{ name: string; path: string }[]>([]);
+  useEffect(() => {
+    void wharf.sshKeys
+      .list()
+      .then((keys) => setKeyPaths(keys.map((k) => ({ name: k.name, path: k.path }))))
+      .catch(() => setKeyPaths([]));
+  }, []);
   const [secretPlaceholder] = useState(host?.secretId ? "•••••••• (unchanged)" : "");
   // Null until known (and for a keyring-backed install, where there is nothing to say).
   const [storedUnencrypted, setStoredUnencrypted] = useState(false);
@@ -243,7 +251,15 @@ export function HostDialog({ host, groups, hosts, defaultGroupId, onClose, onSav
                 value={form.privateKeyPath}
                 onChange={(e) => setForm({ ...form, privateKeyPath: e.target.value })}
                 placeholder="/home/you/.ssh/id_ed25519"
+                list="ssh-key-paths"
               />
+              <datalist id="ssh-key-paths">
+                {keyPaths.map((k) => (
+                  <option key={k.path} value={k.path}>
+                    {k.name}
+                  </option>
+                ))}
+              </datalist>
             </label>
             <label>
               Key passphrase (if any)

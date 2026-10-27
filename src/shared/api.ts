@@ -6,6 +6,9 @@
 import type {
   BackupImportResult,
   BackupPart,
+  GenerateKeyRequest,
+  InstallKeyResult,
+  SshKeyInfo,
   BackupPreview,
   GroupInput,
   GroupRecord,
@@ -205,6 +208,18 @@ export interface WharfApi {
     pick(): Promise<BackupPreview | null>;
     /** Merges the picked backup in (anything already present is skipped). Throws, changing nothing, on a wrong passphrase. */
     apply(token: string, options: { parts: BackupPart[]; passphrase?: string; skipSecrets?: boolean }): Promise<BackupImportResult>;
+  };
+  sshKeys: {
+    /** The private keys in ~/.ssh, with their fingerprints and which saved hosts use them. */
+    list(): Promise<SshKeyInfo[]>;
+    /** Makes a new key pair in ~/.ssh. Never overwrites a file; throws if the name is taken. */
+    generate(request: GenerateKeyRequest): Promise<SshKeyInfo>;
+    /** The public key line to share, or null when it can't be read (a protected key with no .pub). */
+    publicKey(name: string): Promise<string | null>;
+    /** Deletes the key and its .pub. */
+    remove(name: string): Promise<void>;
+    /** Adds the key's public half to a saved host's authorized_keys (once). */
+    install(name: string, hostId: string): Promise<InstallKeyResult>;
   };
   snippets: {
     list(): Promise<SnippetRecord[]>;

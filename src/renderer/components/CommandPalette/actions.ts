@@ -89,6 +89,13 @@ export function buildPaletteActions(ctx: Context): PaletteAction[] {
     },
     { id: "go.home", title: "Go to Home", subtitle: "All your hosts", keywords: "hosts", featured: activeView !== "home", run: go("home") },
     { id: "go.tunnels", title: "Go to Tunnels", run: go("tunnels") },
+    {
+      id: "go.keys",
+      title: "Go to SSH keys",
+      subtitle: "Generate, copy and install keys",
+      keywords: "ssh key generate ed25519 authorized_keys",
+      run: go("keys"),
+    },
     { id: "go.workspaces", title: "Go to Workspaces", run: go("workspaces") },
     { id: "go.history", title: "Go to History", subtitle: "Commands you've run", run: go("history") },
     {
