@@ -67,6 +67,10 @@ export async function run(t, start) {
   await app.ev(`document.querySelector('.dialog button:not(.primary)')?.click()`);
   await app.until(async () => !(await app.q(".dialog")), 3000);
 
+  t.ok(
+    "a host that never connected says so on its card",
+    (await app.q(".host-card .host-card-last", "(e) => e?.textContent")) === "Never connected",
+  );
   await app.click(".host-card");
   t.ok(
     "a failed connect shows its error on Home and stays there",
@@ -74,8 +78,8 @@ export async function run(t, start) {
     await app.q(".home-error", "(e) => e?.textContent"),
   );
   t.ok(
-    "cards show reachability (port 1 is closed, so offline)",
-    await app.until(async () => (await app.q(".host-card-reach", "(e) => e?.textContent")) === "offline", 10_000),
+    "cards show reachability (port 1 is closed, so unreachable)",
+    await app.until(async () => (await app.q(".host-card-reach", "(e) => e?.textContent")) === "unreachable", 10_000),
   );
 
   await app.newLocalShell();

@@ -302,6 +302,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.host-card-last.never {
+  opacity: 0.7;
+  font-style: italic;
+}
+
 .host-card-tag {
   padding: 2px 8px;
   border-radius: var(--radius-sm);
