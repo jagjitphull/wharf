@@ -6,7 +6,9 @@ import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import { IconFolder, IconPencil, IconPlus, IconSearch, IconServer, IconTerminal } from "../Icons/Icons";
+import { IconFolder, IconPencil, IconPlus, IconSearch, IconServer, IconTerminal, IconTunnel } from "../Icons/Icons";
+import { TunnelDialog } from "../Tunnels/TunnelDialog";
+import { isTunnelLive, useTunnelStatuses } from "../../state/useTunnelStatuses";
 import { REACHABILITY_LABEL, useReachability } from "../../state/useReachability";
 import { buildSections, formatLastConnected, greeting, hostGlyph, type HomeFilter } from "./homeModel";
 import "./HomeView.css";
@@ -17,7 +19,7 @@ function tint(color: string): string {
 }
 
 export function HomeView() {
-  const { hosts, groups, paneMeta, openTerminal, setContextHostId, setActiveView, loadAll, refreshHosts } = useAppStore();
+  const { hosts, groups, paneMeta, tunnels, openTerminal, setContextHostId, setActiveView, loadAll, refreshHosts } = useAppStore();
   const [query, setQuery] = useState("");
   // Coming back to Home (from a terminal you just opened, say) should show the host as just connected.
   useEffect(() => {
@@ -29,6 +31,8 @@ export function HomeView() {
   const [hostDialog, setHostDialog] = useState<{ host: HostRecord | null; groupId: string | null } | null>(null);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [tunnelHost, setTunnelHost] = useState<HostRecord | null>(null);
+  const tunnelStatuses = useTunnelStatuses();
   const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   // Live sessions per host — the only status Wharf actually knows, so it's the only one shown.
@@ -39,6 +43,14 @@ export function HomeView() {
     }
     return counts;
   }, [paneMeta]);
+  // Tunnels that are up (or coming up), per host, for the "⇄ 2" mark on its card.
+  const liveTunnels = useMemo(() => {
+    const byHost = new Map<string, string[]>();
+    for (const t of tunnels) {
+      if (isTunnelLive(tunnelStatuses[t.id]?.status)) byHost.set(t.hostId, [...(byHost.get(t.hostId) ?? []), t.name]);
+    }
+    return byHost;
+  }, [tunnels, tunnelStatuses]);
   const reachability = useReachability(hosts);
   const connectedIds = useMemo(() => new Set(sessions.keys()), [sessions]);
   const sections = useMemo(
@@ -93,6 +105,7 @@ export function HomeView() {
           openMenu(e, [
             { label: "Connect", onClick: () => connect(host) },
             { label: "Files (SFTP)", onClick: () => openFiles(host) },
+            { label: "Port forward…", onClick: () => setTunnelHost(host) },
             { separator: true },
             { label: "Edit…", onClick: () => setHostDialog({ host, groupId: host.groupId }) },
             { label: "Delete", danger: true, onClick: () => deleteHost(host) },
@@ -123,6 +136,11 @@ export function HomeView() {
         </div>
         <div className="host-card-meta">
           {host.mosh && <span className="host-card-tag">Mosh</span>}
+          {liveTunnels.has(host.id) && (
+            <span className="host-card-tag host-card-tunnels" title={`Tunnels up: ${liveTunnels.get(host.id)!.join(", ")}`}>
+              ⇄ {liveTunnels.get(host.id)!.length}
+            </span>
+          )}
           {(host.tags ?? []).map((t) => (
             <span key={t} className="host-card-tag">
               {t}
@@ -140,6 +158,9 @@ export function HomeView() {
           </button>
           <button title="Browse files" onClick={() => openFiles(host)}>
             <IconFolder size={15} />
+          </button>
+          <button title="Port forward…" aria-label="Port forward" onClick={() => setTunnelHost(host)}>
+            <IconTunnel size={15} />
           </button>
           <button title="Edit host" onClick={() => setHostDialog({ host, groupId: host.groupId })}>
             <IconPencil size={15} />
@@ -232,6 +253,8 @@ export function HomeView() {
           </div>
         )}
       </div>
+
+      {tunnelHost && <TunnelDialog host={tunnelHost} onClose={() => setTunnelHost(null)} />}
 
       {hostDialog && (
         <HostDialog
