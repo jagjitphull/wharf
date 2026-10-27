@@ -3,25 +3,29 @@ import type { SnippetRecord } from "@shared/types";
 import { useAppStore } from "../../state/store";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { IconPencil, IconPlus, IconTrash } from "../Icons/Icons";
-import { extractPlaceholders, fillPlaceholders } from "./workflowVars";
+import { snippetVariables, type SnippetVariable } from "@shared/snippetTemplate";
+import { renderForSession } from "./snippetRun";
 import "./SnippetPicker.css";
 
 interface Props {
+  /** The terminal the snippet goes into — decides what {{$host}}, {{$user}} … mean. */
+  sessionId: string;
   onClose(): void;
-  onInsert(command: string): void;
+  /** `run` is the snippet's "press Enter for me" setting. */
+  onInsert(command: string, run: boolean): void;
 }
 
-export function SnippetPicker({ onClose, onInsert }: Props) {
+export function SnippetPicker({ sessionId, onClose, onInsert }: Props) {
   const { snippets, refreshSnippets } = useAppStore();
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<SnippetRecord | "new" | null>(null);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
+  const [runNow, setRunNow] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Warp-style "Workflows": a snippet whose command contains {{placeholder}}
-  // tokens gets a quick fill-in form here instead of inserting immediately —
-  // see workflowVars.ts. A plain snippet skips straight to onInsert, same as always.
-  const [filling, setFilling] = useState<SnippetRecord | null>(null);
+  // A snippet whose command contains {{variables}} gets a quick fill-in form here instead of
+  // inserting immediately — see shared/snippetTemplate.ts. A plain snippet goes straight to onInsert.
+  const [filling, setFilling] = useState<{ snippet: SnippetRecord; variables: SnippetVariable[] } | null>(null);
   const [fillValues, setFillValues] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const firstFillInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +54,7 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
     setEditing("new");
     setName("");
     setCommand("");
+    setRunNow(false);
     setError(null);
   }
 
@@ -57,6 +62,7 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
     setEditing(s);
     setName(s.name);
     setCommand(s.command);
+    setRunNow(s.run === true);
     setError(null);
   }
 
@@ -64,8 +70,8 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
     e.preventDefault();
     setError(null);
     try {
-      if (editing === "new") await wharf.snippets.create({ name, command });
-      else if (editing) await wharf.snippets.update(editing.id, { name, command });
+      if (editing === "new") await wharf.snippets.create({ name, command, run: runNow });
+      else if (editing) await wharf.snippets.update(editing.id, { name, command, run: runNow });
       setEditing(null);
       await refreshSnippets();
     } catch (err) {
@@ -79,20 +85,24 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
     await refreshSnippets();
   }
 
+  async function insert(s: SnippetRecord, values: Record<string, string>) {
+    onInsert(await renderForSession(s.command, values, sessionId), s.run === true);
+  }
+
   function handleRowClick(s: SnippetRecord) {
-    const placeholders = extractPlaceholders(s.command);
-    if (placeholders.length === 0) {
-      onInsert(s.command);
+    const variables = snippetVariables(s.command);
+    if (variables.length === 0) {
+      void insert(s, {});
       return;
     }
-    setFilling(s);
-    setFillValues(Object.fromEntries(placeholders.map((p) => [p, ""])));
+    setFilling({ snippet: s, variables });
+    setFillValues(Object.fromEntries(variables.map((v) => [v.name, v.default ?? ""])));
   }
 
   function handleFillSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!filling) return;
-    onInsert(fillPlaceholders(filling.command, fillValues));
+    void insert(filling.snippet, fillValues);
     setFilling(null);
   }
 
@@ -101,17 +111,30 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
       <div className="snippet-picker">
         {filling ? (
           <form className="snippet-form" onSubmit={handleFillSubmit}>
-            <h3>{filling.name}</h3>
-            <p className="hint snippet-fill-preview">{filling.command}</p>
-            {extractPlaceholders(filling.command).map((placeholder, i) => (
-              <label key={placeholder}>
-                {placeholder}
-                <input
-                  ref={i === 0 ? firstFillInputRef : undefined}
-                  required
-                  value={fillValues[placeholder] ?? ""}
-                  onChange={(e) => setFillValues({ ...fillValues, [placeholder]: e.target.value })}
-                />
+            <h3>{filling.snippet.name}</h3>
+            <p className="hint snippet-fill-preview">{filling.snippet.command}</p>
+            {filling.variables.map((variable, i) => (
+              <label key={variable.name}>
+                {variable.name}
+                {variable.options ? (
+                  <select
+                    value={fillValues[variable.name] ?? ""}
+                    onChange={(e) => setFillValues({ ...fillValues, [variable.name]: e.target.value })}
+                  >
+                    {variable.options.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    ref={i === 0 ? firstFillInputRef : undefined}
+                    required={variable.default === undefined}
+                    value={fillValues[variable.name] ?? ""}
+                    onChange={(e) => setFillValues({ ...fillValues, [variable.name]: e.target.value })}
+                  />
+                )}
               </label>
             ))}
             <div className="snippet-form-actions">
@@ -119,7 +142,7 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
                 Cancel
               </button>
               <button type="submit" className="btn primary small">
-                Insert
+                {filling.snippet.run ? "Run" : "Insert"}
               </button>
             </div>
           </form>
@@ -140,9 +163,15 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
                 rows={3}
               />
             </label>
+            <label className="snippet-run-toggle">
+              <input type="checkbox" checked={runNow} onChange={(e) => setRunNow(e.target.checked)} />
+              Run it right away (press Enter after inserting)
+            </label>
             <p className="hint">
-              Add <code>{"{{name}}"}</code> placeholders to turn this into a Workflow — you'll be prompted to fill them in each time you
-              insert it, e.g. <code>docker logs -f {"{{container}}"}</code>.
+              Add <code>{"{{name}}"}</code> to be asked for a value each time, e.g. <code>docker logs -f {"{{container}}"}</code>.{" "}
+              <code>{"{{name:default}}"}</code> pre-fills one and <code>{"{{env=prod|staging}}"}</code> offers a choice. Built in:{" "}
+              <code>{"{{$host}}"}</code>, <code>{"{{$hostname}}"}</code>, <code>{"{{$user}}"}</code>, <code>{"{{$date}}"}</code>,{" "}
+              <code>{"{{$time}}"}</code>, <code>{"{{$timestamp}}"}</code>, <code>{"{{$clipboard}}"}</code>.
             </p>
             {error && <div className="snippet-error">{error}</div>}
             <div className="snippet-form-actions">
@@ -164,15 +193,20 @@ export function SnippetPicker({ onClose, onInsert }: Props) {
             </div>
             <div className="snippet-list">
               {visible.map((s) => {
-                const placeholders = extractPlaceholders(s.command);
+                const variables = snippetVariables(s.command);
                 return (
                   <div key={s.id} className="snippet-row" onClick={() => handleRowClick(s)}>
                     <div className="snippet-row-text">
                       <div className="snippet-name">
                         {s.name}
-                        {placeholders.length > 0 && (
-                          <span className="snippet-workflow-badge" title={`Fill in: ${placeholders.join(", ")}`}>
+                        {variables.length > 0 && (
+                          <span className="snippet-workflow-badge" title={`Fill in: ${variables.map((v) => v.name).join(", ")}`}>
                             Workflow
+                          </span>
+                        )}
+                        {s.run && (
+                          <span className="snippet-workflow-badge" title="Runs as soon as it is inserted">
+                            ⏎ runs
                           </span>
                         )}
                       </div>

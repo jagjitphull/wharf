@@ -78,6 +78,8 @@ export interface SnippetRecord {
   id: string;
   name: string;
   command: string;
+  /** Press Enter after inserting, so the command runs at once (default: it is only typed, for you to check and run). */
+  run?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -85,6 +87,7 @@ export interface SnippetRecord {
 export interface SnippetInput {
   name: string;
   command: string;
+  run?: boolean;
 }
 
 // ---------------------------------------------------------------------------
