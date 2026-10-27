@@ -17,12 +17,12 @@ export async function run(t, start) {
 
   const sections = () =>
     app.evJson(
-      `[...document.querySelectorAll('.home-section')].map((s) => ({ id: s.dataset.section, title: s.querySelector('h3').firstChild.textContent, hosts: [...s.querySelectorAll('.host-card-name, .host-row-name')].map((n) => n.textContent) }))`,
+      `[...document.querySelectorAll('.home-section')].map((s) => ({ id: s.dataset.section, title: s.querySelector('h3').firstChild.textContent, hosts: [...s.querySelectorAll('.host-card-name, .home-row-name')].map((n) => n.textContent) }))`,
     );
   const hostsNow = () => app.evJson(`window.wharf.hosts.list()`);
   const toasts = () => app.evJson(`[...document.querySelectorAll('.toast')].map((e) => e.textContent).join('|')`);
   const cardOf = (hostName) =>
-    `[...document.querySelectorAll('.host-card, .host-row')].find((c) => c.querySelector('.host-card-name, .host-row-name').textContent.trim() === ${JSON.stringify(hostName)})`;
+    `[...document.querySelectorAll('.host-card, .home-row')].find((c) => c.querySelector('.host-card-name, .home-row-name').textContent.trim() === ${JSON.stringify(hostName)})`;
 
   // --- pinning
   t.ok("with nothing pinned there is no Pinned section", !(await sections()).some((s) => s.title === "Pinned"));
@@ -59,17 +59,27 @@ export async function run(t, start) {
 
   // --- list layout
   await app.ev(`document.querySelector('.home-view-toggle button[aria-label="List"]').click()`);
-  await app.until(() => app.q(".host-row"), 3000);
-  t.ok("the List toggle swaps cards for compact rows", !!(await app.q(".host-row")) && !(await app.q(".host-card")));
+  await app.until(() => app.q(".home-row"), 3000);
+  t.ok("the List toggle swaps cards for compact rows", !!(await app.q(".home-row")) && !(await app.q(".host-card")));
   const row = await app.evJson(
-    `(() => { const r = ${cardOf("web-01")}; return { addr: r.querySelector('.host-row-addr').textContent, h: r.getBoundingClientRect().height }; })()`,
+    `(() => { const r = ${cardOf("web-01")}; return { addr: r.querySelector('.home-row-addr').textContent, h: r.getBoundingClientRect().height }; })()`,
   );
   t.ok("a row shows user@host:port on one short line", row.addr === "admin@web-01.example:22" && row.h < 48, JSON.stringify(row));
-  t.ok("pinned hosts are marked in the list", (await app.evJson(`document.querySelectorAll('.host-row-name svg').length`)) >= 2);
+  t.ok("pinned hosts are marked in the list", (await app.evJson(`document.querySelectorAll('.home-row-name svg').length`)) >= 2);
   await app.shot("home-pinned-list");
   await app.reload();
-  await app.until(() => app.q(".host-row, .host-card"), 10_000);
-  t.ok("the layout choice is remembered", !!(await app.q(".host-row")));
+  await app.until(() => app.q(".home-row, .host-card"), 10_000);
+  t.ok("the layout choice is remembered", !!(await app.q(".home-row")));
+
+  // The list rows' CSS once shared a class name with the sidebar's host rows and crushed them to a few pixels.
+  await app.rail("Tunnels");
+  await app.until(() => app.q(".sidebar .host-row"), 3000);
+  const side = await app.evJson(
+    `(() => { const r = document.querySelector('.sidebar .host-row'); return { display: getComputedStyle(r).display, name: r.querySelector('.host-name').getBoundingClientRect().width, row: r.getBoundingClientRect().width }; })()`,
+  );
+  t.ok("the sidebar's host rows keep their own layout beside the Home list", side.display === "flex" && side.name > 150, JSON.stringify(side));
+  await app.rail("Hosts");
+  await app.until(() => app.q(".home-row"), 3000);
   await app.ev(`${cardOf("router")}.querySelector('button[aria-label="Unpin"]').click()`);
   await app.until(async () => (await sections())[0].hosts.length === 1, 5000);
   t.ok("Unpin from a row removes it from Pinned", JSON.stringify((await sections())[0].hosts) === '["rocky"]');

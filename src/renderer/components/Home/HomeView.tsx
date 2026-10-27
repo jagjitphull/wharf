@@ -270,7 +270,7 @@ export function HomeView() {
     return (
       <div
         key={host.id}
-        className={`host-row ${live ? "live" : ""} ${draggingId === host.id ? "dragging" : ""}`}
+        className={`home-row ${live ? "live" : ""} ${draggingId === host.id ? "dragging" : ""}`}
         role="button"
         tabIndex={0}
         onClick={() => void connect(host)}
@@ -280,17 +280,17 @@ export function HomeView() {
         onContextMenu={(e) => openMenu(e, hostMenu(host))}
         {...dragProps(host)}
       >
-        <span className="host-row-tile" style={{ background: tint(color), color }}>
+        <span className="home-row-tile" style={{ background: tint(color), color }}>
           {hostGlyph(host.name)}
         </span>
-        <span className="host-row-name">
+        <span className="home-row-name">
           {host.name}
           {host.pinned && <IconPin size={11} />}
         </span>
-        <span className="host-row-addr">
+        <span className="home-row-addr">
           {host.username}@{host.hostname}:{host.port}
         </span>
-        <span className="host-row-tags">
+        <span className="home-row-tags">
           {host.mosh && <span className="host-card-tag">Mosh</span>}
           {liveTunnels.has(host.id) && (
             <span className="host-card-tag host-card-tunnels" title={`Tunnels up: ${liveTunnels.get(host.id)!.join(", ")}`}>
@@ -303,7 +303,7 @@ export function HomeView() {
             </span>
           ))}
         </span>
-        <span className="host-row-last" title={host.lastConnectedAt ? new Date(host.lastConnectedAt).toLocaleString() : undefined}>
+        <span className="home-row-last" title={host.lastConnectedAt ? new Date(host.lastConnectedAt).toLocaleString() : undefined}>
           {host.lastConnectedAt ? formatLastConnected(host.lastConnectedAt, now) : ""}
         </span>
         {live > 0 ? (
@@ -317,7 +317,7 @@ export function HomeView() {
             {reach === "online" ? "online" : reach === "offline" ? "offline" : ""}
           </span>
         )}
-        <span className="host-row-actions" onClick={(e) => e.stopPropagation()}>
+        <span className="home-row-actions" onClick={(e) => e.stopPropagation()}>
           <button
             className={host.pinned ? "pinned" : ""}
             title={host.pinned ? "Unpin" : "Pin to top"}

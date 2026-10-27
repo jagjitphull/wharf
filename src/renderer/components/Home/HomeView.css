@@ -399,7 +399,7 @@
 
 /* pinned marks, layout toggle, drag and drop */
 .host-card-name svg,
-.host-row-name svg {
+.home-row-name svg {
   margin-left: 6px;
   vertical-align: -1px;
   color: var(--accent);
@@ -407,7 +407,7 @@
 }
 
 .host-card-actions button.pinned,
-.host-row-actions button.pinned {
+.home-row-actions button.pinned {
   color: var(--accent);
 }
 
@@ -441,7 +441,7 @@
 }
 
 .host-card.dragging,
-.host-row.dragging {
+.home-row.dragging {
   opacity: 0.45;
 }
 
@@ -500,7 +500,7 @@
   gap: 2px;
 }
 
-.host-row {
+.home-row {
   display: grid;
   grid-template-columns: 30px minmax(120px, 1.1fr) minmax(150px, 1.3fr) minmax(0, 1.2fr) 74px 86px auto;
   align-items: center;
@@ -511,18 +511,18 @@
   cursor: pointer;
 }
 
-.host-row:hover,
-.host-row:focus-visible {
+.home-row:hover,
+.home-row:focus-visible {
   background: var(--bg-hover);
   border-color: var(--border);
   outline: none;
 }
 
-.host-row.live {
+.home-row.live {
   border-left: 2px solid var(--success);
 }
 
-.host-row-tile {
+.home-row-tile {
   display: grid;
   place-items: center;
   width: 28px;
@@ -532,7 +532,7 @@
   font-weight: 700;
 }
 
-.host-row-name {
+.home-row-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -540,7 +540,7 @@
   font-weight: 600;
 }
 
-.host-row-addr {
+.home-row-addr {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -550,32 +550,32 @@
   font-size: 12px;
 }
 
-.host-row-tags {
+.home-row-tags {
   display: flex;
   gap: 4px;
   min-width: 0;
   overflow: hidden;
 }
 
-.host-row-last {
+.home-row-last {
   color: var(--text-dim);
   font-size: 11.5px;
   white-space: nowrap;
 }
 
-.host-row-actions {
+.home-row-actions {
   display: flex;
   gap: 1px;
   opacity: 0;
   transition: opacity 0.1s ease;
 }
 
-.host-row:hover .host-row-actions,
-.host-row:focus-within .host-row-actions {
+.home-row:hover .home-row-actions,
+.home-row:focus-within .home-row-actions {
   opacity: 1;
 }
 
-.host-row-actions button {
+.home-row-actions button {
   display: inline-grid;
   place-items: center;
   width: 26px;
@@ -588,11 +588,11 @@
   cursor: pointer;
 }
 
-.host-row-actions button:hover {
+.home-row-actions button:hover {
   color: var(--text);
   background: var(--bg-active);
 }
 
-.host-row-actions button.pinned {
+.home-row-actions button.pinned {
   opacity: 1;
 }
