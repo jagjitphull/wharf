@@ -127,6 +127,16 @@ export function buildPaletteActions(ctx: Context): PaletteAction[] {
       keywords: "host tree",
       run: () => useUiPrefsStore.getState().toggleSidebar(),
     },
+    {
+      id: "density.toggle",
+      title: useUiPrefsStore.getState().density === "compact" ? "Use comfortable layout" : "Use compact layout",
+      subtitle: "Switch the icon rail, sidebar and tabs between roomy and compact",
+      keywords: "density narrow slim tight spacing sidebar rail",
+      run: () => {
+        const { density, setDensity } = useUiPrefsStore.getState();
+        setDensity(density === "compact" ? "comfortable" : "compact");
+      },
+    },
     { id: "shortcuts", title: "Keyboard shortcuts", keys: `${MOD} /`, keywords: "keys help", run: ctx.openShortcuts },
     {
       id: "font.up",

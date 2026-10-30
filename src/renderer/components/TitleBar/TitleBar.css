@@ -203,3 +203,14 @@
 .title-bar-controls .win-btn:hover .win-btn-dot {
   filter: brightness(1.08);
 }
+
+/* Compact: a shorter title bar; the tabs below follow it (see TabStrip.css). */
+:root[data-density="compact"] .title-bar {
+  height: 38px;
+  min-height: 38px;
+}
+
+:root[data-density="compact"] .title-bar-new-tab {
+  width: 26px;
+  height: 26px;
+}

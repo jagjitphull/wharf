@@ -264,3 +264,13 @@
 .tab:not(.active) .tab-duplicate {
   display: none;
 }
+
+:root[data-density="compact"] .tab {
+  height: 28px;
+  gap: 6px;
+  padding: 0 6px 0 10px;
+}
+
+:root[data-density="compact"] .tab.active {
+  height: 32px;
+}

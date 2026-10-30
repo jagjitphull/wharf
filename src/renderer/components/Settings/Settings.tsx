@@ -1,7 +1,7 @@
 import { accentFor, normalizeAccent } from "../../state/accentColors";
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from "../../state/themeStore";
 import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStore } from "../../state/terminalPrefsStore";
-import { MAX_UI_ZOOM, MIN_UI_ZOOM, useUiPrefsStore } from "../../state/uiPrefsStore";
+import { MAX_UI_ZOOM, MIN_UI_ZOOM, useUiPrefsStore, type Density } from "../../state/uiPrefsStore";
 import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
 import { useRestoreTabsPrefsStore } from "../../state/restoreTabsPrefsStore";
 import { wharf } from "../../api/wharf";
@@ -29,11 +29,16 @@ const MODES: { mode: ThemeMode; label: string }[] = [
   { mode: "system", label: "System" },
 ];
 
+const DENSITIES: { density: Density; label: string }[] = [
+  { density: "comfortable", label: "Comfortable" },
+  { density: "compact", label: "Compact" },
+];
+
 export function Settings({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
   const { mode, resolved, accent, setMode, setAccent } = useThemeStore();
   const { fontSize, fontFamily, terminalThemeId, increaseFontSize, decreaseFontSize, setFontFamily, setTerminalThemeId } =
     useTerminalPrefsStore();
-  const { uiZoom, setUiZoom, increaseUiZoom, decreaseUiZoom, resetUiZoom } = useUiPrefsStore();
+  const { uiZoom, setUiZoom, increaseUiZoom, decreaseUiZoom, resetUiZoom, density, setDensity } = useUiPrefsStore();
   const { enabled: restoreTabsEnabled, setEnabled: setRestoreTabsEnabled } = useRestoreTabsPrefsStore();
 
   return (
@@ -51,6 +56,23 @@ export function Settings({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
             ))}
           </div>
         </div>
+
+        <div className="appearance-row">
+          <span className="appearance-label">Layout density</span>
+          <div className="mode-switch" role="group" aria-label="Layout density">
+            {DENSITIES.map((d) => (
+              <button
+                key={d.density}
+                className={`mode-btn ${density === d.density ? "active" : ""}`}
+                aria-pressed={density === d.density}
+                onClick={() => setDensity(d.density)}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="hint">Compact narrows the icon rail and tightens the sidebar and tabs, to leave more room for terminals.</p>
 
         <div className="appearance-row">
           <span className="appearance-label">Accent color</span>
