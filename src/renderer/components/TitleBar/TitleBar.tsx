@@ -22,6 +22,7 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
   const setMode = useThemeStore((s) => s.setMode);
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiPrefsStore((s) => s.toggleSidebar);
+  const tabLayout = useUiPrefsStore((s) => s.tabLayout);
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const openLocalShell = useAppStore((s) => s.openLocalShell);
@@ -56,7 +57,7 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
         >
           <IconHome size={15} /> Home
         </button>
-        <TabStrip />
+        {tabLayout === "top" && <TabStrip />}
         <button
           className="title-bar-icon-btn title-bar-new-tab"
           title="New tab"

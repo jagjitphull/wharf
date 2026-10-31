@@ -1,0 +1,138 @@
+/* The "side" tab layout: the tabs as a column between the icon rail and the page. */
+.tab-panel {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 208px;
+  min-height: 0;
+  box-sizing: border-box;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  transition: width 0.14s ease;
+}
+
+.tab-panel.collapsed {
+  width: 52px;
+}
+
+.tab-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  flex: none;
+  padding: 0 8px 0 14px;
+  color: var(--text-dim);
+}
+
+.tab-panel.collapsed .tab-panel-head {
+  justify-content: center;
+  padding: 0;
+}
+
+.tab-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tab-panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tab-panel-toggle:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.tab-panel-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* The strip, as a column. It scrolls vertically when there are more tabs than fit. */
+.tab-strip.vertical {
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  height: auto;
+  min-height: 0;
+  padding: 0 8px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tab-strip.vertical::-webkit-scrollbar {
+  display: initial;
+  width: 6px;
+}
+
+.tab-strip.vertical .tab,
+.tab-strip.vertical .tab.active {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  padding: 0 6px 0 10px;
+}
+
+.tab-strip.vertical .tab-title,
+.tab-strip.vertical .tab.pinned .tab-title {
+  max-width: none;
+}
+
+.tab-strip.vertical .tab-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 0 4px 6px;
+  border-bottom: none;
+  border-left: 2px solid var(--tab-group-color);
+  border-radius: 0;
+}
+
+.tab-strip.vertical .tab-group-label {
+  align-self: stretch;
+  justify-content: flex-start;
+}
+
+/* Collapsed: a column of numbers with the colour dot and status markers; the name is the tooltip. */
+.tab-panel.collapsed .tab-strip.vertical {
+  align-items: center;
+  padding: 0 6px 10px;
+}
+
+.tab-panel.collapsed .tab-strip.vertical .tab,
+.tab-panel.collapsed .tab-strip.vertical .tab.active {
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.tab-panel.collapsed .tab-title,
+.tab-panel.collapsed .tab-duplicate,
+.tab-panel.collapsed .tab-close,
+.tab-panel.collapsed .tab-group-name {
+  display: none;
+}
+
+.tab-panel.collapsed .tab-group {
+  padding-left: 0;
+  border-left: none;
+  border-top: 2px solid var(--tab-group-color);
+}

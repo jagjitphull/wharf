@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Sidebar } from "./components/Sidebar/Sidebar";
+import { TabPanel } from "./components/Tabs/TabPanel";
 import { SidebarResizeHandle } from "./components/Sidebar/SidebarResizeHandle";
 import { TerminalPanel } from "./components/Terminal/TerminalPanel";
 import { StatusBar } from "./components/StatusBar/StatusBar";
@@ -41,6 +42,7 @@ const KeyboardShortcuts = lazy(() =>
 export default function App() {
   const { activeView, hosts, groups, snippets, loadAll, openTerminal, setContextHostId, setActiveView } = useAppStore();
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
+  const tabLayout = useUiPrefsStore((s) => s.tabLayout);
   const tabCount = useAppStore((s) => s.tabs.length);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -210,6 +212,7 @@ export default function App() {
       {lock === "locked" && <LockScreen onDone={() => setLock("open")} />}
       <div className="app-shell">
         <IconRail />
+        {tabLayout === "side" && <TabPanel />}
         {/* The host tree is for picking a host to open: Home lists every host as a card, and Tunnels, SSH keys,
             History, Workspaces and Settings have their own content to give the room to. */}
         {!sidebarCollapsed && (activeView === "hosts" || activeView === "sftp") && (

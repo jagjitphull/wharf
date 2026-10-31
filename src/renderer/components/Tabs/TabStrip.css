@@ -274,3 +274,16 @@
 :root[data-density="compact"] .tab.active {
   height: 32px;
 }
+
+/* A pinned tab in the top strip shrinks to a chip: its number, colour and status
+   markers and the pin. The name is still its tooltip, and it is still where it was. */
+.tab-strip:not(.vertical) .tab.pinned {
+  min-width: 0;
+  gap: 5px;
+  padding: 0 9px;
+}
+
+.tab-strip:not(.vertical) .tab.pinned .tab-title,
+.tab-strip:not(.vertical) .tab.pinned .tab-duplicate {
+  display: none;
+}
