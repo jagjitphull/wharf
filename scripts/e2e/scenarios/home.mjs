@@ -15,6 +15,12 @@ export async function run(t, start) {
   );
   t.ok("the host sidebar is hidden on Home", !(await app.q(".sidebar, aside")));
   t.ok("the empty state offers a first host", (await app.q(".home-empty h2", "(e) => e?.textContent")) === "Add your first host");
+  await app.until(() => app.q(".getting-started"), 5000);
+  t.ok(
+    "a fresh profile gets a getting-started checklist with nothing done",
+    (await app.q(".getting-started-progress", "(e) => e?.textContent")) === "0 of 3 done",
+    await app.q(".getting-started-progress", "(e) => e?.textContent"),
+  );
 
   const group = await app.ev(`window.wharf.groups.create({ name: "Production", parentId: null }).then((g) => g.id)`);
   for (const [n, g, tags] of [
@@ -34,7 +40,28 @@ export async function run(t, start) {
     JSON.stringify(await cards()) === JSON.stringify(["db-primary", "web-01", "router"]),
     JSON.stringify(await cards()),
   );
-  t.ok("the summary counts hosts", (await app.q(".home-sub", "(e) => e.textContent")).startsWith("3 hosts"));
+  t.ok(
+    "the summary counts hosts and says nothing is connected",
+    (await app.q(".home-sub", "(e) => e.textContent")) === "3 hosts · none connected",
+    await app.q(".home-sub", "(e) => e.textContent"),
+  );
+  t.ok(
+    "the title bar shows the palette shortcut, and it opens the palette",
+    /K/.test((await app.q(".title-bar-palette kbd", "(e) => e?.textContent")) ?? "") &&
+      (await app.click(".title-bar-palette")) &&
+      (await app.until(() => app.q(".palette"), 3000)),
+  );
+  await app.press("Escape");
+  await app.until(async () => !(await app.q(".palette")), 3000);
+  t.ok(
+    "adding hosts ticks the first step",
+    (await app.q(".getting-started-progress", "(e) => e?.textContent")) === "1 of 3 done",
+    await app.q(".getting-started-progress", "(e) => e?.textContent"),
+  );
+  await app.click(".getting-started-hide");
+  await app.reload();
+  await app.until(() => app.q(".host-card"), 10_000);
+  t.ok("hiding the checklist sticks across a restart", !(await app.q(".getting-started")));
   t.ok("there is a greeting", /^(Good|Working)/.test(await app.q(".home h1", "(e) => e.textContent")));
 
   await app.setInput(".home-search input", "nginx");
@@ -51,10 +78,26 @@ export async function run(t, start) {
 
   await app.click(".home-new");
   t.ok("New host opens the host dialog", await app.until(() => app.q(".dialog"), 3000));
+  t.ok(
+    "the host dialog is grouped into Connection, Sign-in and Organize",
+    JSON.stringify(await app.evJson(`[...document.querySelectorAll('.host-dialog .host-section h3')].map((h) => h.textContent)`)) ===
+      '["Connection","Sign-in","Organize"]',
+  );
+  t.ok(
+    "Jump host and Mosh are tucked under a closed Advanced",
+    (await app.evJson(
+      `(() => { const d = document.querySelector('.host-dialog .host-advanced'); return !!d && !d.open && /Jump host/.test(d.textContent) && /Mosh/.test(d.textContent); })()`,
+    )) === true,
+  );
+  await app.shot("host-dialog-grouped");
   await app.press("Escape");
   await app.ev(`document.querySelector('.dialog button:not(.primary)')?.click()`);
   await app.until(async () => !(await app.q(".dialog")), 3000);
 
+  t.ok(
+    "a host that never connected says so on its card",
+    (await app.q(".host-card .host-card-last", "(e) => e?.textContent")) === "Never connected",
+  );
   await app.click(".host-card");
   t.ok(
     "a failed connect shows its error on Home and stays there",
@@ -62,8 +105,8 @@ export async function run(t, start) {
     await app.q(".home-error", "(e) => e?.textContent"),
   );
   t.ok(
-    "cards show reachability (port 1 is closed, so offline)",
-    await app.until(async () => (await app.q(".host-card-reach", "(e) => e?.textContent")) === "offline", 10_000),
+    "cards show reachability (port 1 is closed, so unreachable)",
+    await app.until(async () => (await app.q(".host-card-reach", "(e) => e?.textContent")) === "unreachable", 10_000),
   );
 
   await app.newLocalShell();
@@ -77,6 +120,38 @@ export async function run(t, start) {
   );
   t.ok("the host sidebar returns on the terminal view", await app.q(".sidebar, aside"));
   t.ok("the rail's Hosts stays lit on a terminal", (await railActive()) === "Hosts", await railActive());
+  for (const view of ["Tunnels", "SSH keys", "History", "Workspaces", "Settings"]) {
+    await app.rail(view);
+    await app.sleep(150);
+    t.ok(`the host sidebar stays out of the way on ${view}`, !(await app.q(".sidebar")));
+  }
+  // The views below load lazily, so wait for what each one renders rather than assuming it is there.
+  await app.rail("Tunnels");
+  await app.until(() => app.q(".empty-state-title"), 10_000);
+  t.ok(
+    "Tunnels with none says what they are for and offers a first one",
+    (await app.q(".empty-state-title", "(e) => e?.textContent")) === "No port forwards yet" &&
+      (await app.q(".empty-state-actions .btn.primary")),
+  );
+  await app.rail("History");
+  await app.until(async () => /No commands recorded yet/.test((await app.q(".empty-state-title", "(e) => e?.textContent")) ?? ""), 10_000);
+  t.ok(
+    "History with nothing recorded has a friendly empty state",
+    /No commands recorded yet/.test(await app.q(".empty-state-title", "(e) => e?.textContent")),
+  );
+  await app.rail("Settings");
+  await app.until(() => app.q(".settings-preview-pane button"), 10_000);
+  t.ok(
+    "Settings no longer lists the shortcuts, but offers the full reference",
+    !(await app.q(".settings-preview-pane .shortcut-row")) &&
+      (await app.evJson(
+        `[...document.querySelectorAll('.settings-preview-pane button')].some((b) => /keyboard shortcuts/i.test(b.textContent))`,
+      )),
+  );
+  await app.clickText(".settings-preview-pane button", "View all keyboard shortcuts");
+  t.ok("…and the button opens it", await app.until(() => app.q(".shortcuts-dialog, .dialog"), 3000));
+  await app.press("Escape");
+  await app.until(async () => !(await app.q(".dialog")), 3000);
   await app.rail("Tunnels");
   t.ok(
     "Tunnels via the rail; neither a tab nor Home is lit",

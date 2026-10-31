@@ -1,4 +1,5 @@
 import { useAppStore } from "../../state/store";
+import { useHistoryTab } from "../../state/historyTab";
 import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { useTerminalPrefsStore } from "../../state/terminalPrefsStore";
@@ -88,8 +89,25 @@ export function buildPaletteActions(ctx: Context): PaletteAction[] {
     },
     { id: "go.home", title: "Go to Home", subtitle: "All your hosts", keywords: "hosts", featured: activeView !== "home", run: go("home") },
     { id: "go.tunnels", title: "Go to Tunnels", run: go("tunnels") },
+    {
+      id: "go.keys",
+      title: "Go to SSH keys",
+      subtitle: "Generate, copy and install keys",
+      keywords: "ssh key generate ed25519 authorized_keys",
+      run: go("keys"),
+    },
     { id: "go.workspaces", title: "Go to Workspaces", run: go("workspaces") },
     { id: "go.history", title: "Go to History", subtitle: "Commands you've run", run: go("history") },
+    {
+      id: "go.transcripts",
+      title: "Search session output",
+      subtitle: "Find text your terminal sessions printed",
+      keywords: "transcript recording log find history",
+      run: () => {
+        useHistoryTab.getState().setTab("transcripts");
+        go("history")();
+      },
+    },
     { id: "go.settings", title: "Go to Settings", keywords: "preferences options", run: go("settings") },
     {
       id: "theme.toggle",
@@ -109,6 +127,40 @@ export function buildPaletteActions(ctx: Context): PaletteAction[] {
       keywords: "host tree",
       run: () => useUiPrefsStore.getState().toggleSidebar(),
     },
+    {
+      id: "density.toggle",
+      title: useUiPrefsStore.getState().density === "compact" ? "Use comfortable layout" : "Use compact layout",
+      subtitle: "Switch the icon rail, sidebar and tabs between roomy and compact",
+      keywords: "density narrow slim tight spacing sidebar rail",
+      run: () => {
+        const { density, setDensity } = useUiPrefsStore.getState();
+        setDensity(density === "compact" ? "comfortable" : "compact");
+      },
+    },
+    {
+      id: "tabs.layout",
+      title: useUiPrefsStore.getState().tabLayout === "side" ? "Move tabs to the top" : "Move tabs to the side",
+      subtitle: "Switch the terminal tabs between the title bar and a side panel",
+      keywords: "tab layout vertical horizontal panel warp",
+      run: () => {
+        const { tabLayout, setTabLayout } = useUiPrefsStore.getState();
+        setTabLayout(tabLayout === "side" ? "top" : "side");
+      },
+    },
+    ...(useUiPrefsStore.getState().tabLayout === "side" && tabs.length > 0
+      ? [
+          {
+            id: "tabs.panel",
+            title: useUiPrefsStore.getState().tabPanelCollapsed ? "Expand tab panel" : "Collapse tab panel",
+            subtitle: "Show full tab names, or only their numbers",
+            keywords: "tabs side collapse expand narrow",
+            run: () => {
+              const { tabPanelCollapsed, setTabPanelCollapsed } = useUiPrefsStore.getState();
+              setTabPanelCollapsed(!tabPanelCollapsed);
+            },
+          },
+        ]
+      : []),
     { id: "shortcuts", title: "Keyboard shortcuts", keys: `${MOD} /`, keywords: "keys help", run: ctx.openShortcuts },
     {
       id: "font.up",

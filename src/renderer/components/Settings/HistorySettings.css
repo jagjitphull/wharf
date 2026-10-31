@@ -6,3 +6,8 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+.transcript-settings-actions {
+  display: flex;
+  gap: 4px;
+}

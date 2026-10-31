@@ -16,9 +16,6 @@ export interface Group {
   shortcuts: Shortcut[];
 }
 
-/** Exported so Settings' preview pane can reuse a couple of these groups as
- * a quick-reference card, rather than maintaining a second, driftable copy
- * of the same shortcut list. */
 export const GROUPS: Group[] = [
   {
     title: "Global",

@@ -1,3 +1,61 @@
+.dialog.host-dialog {
+  width: 520px;
+}
+
+.host-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.host-section:first-of-type {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
+.host-section h3,
+.host-advanced summary {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.host-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.host-advanced summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.host-advanced summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 14px;
+}
+
+.host-advanced[open] summary::before {
+  content: "▾";
+}
+
+.host-advanced[open] summary {
+  margin-bottom: 2px;
+}
+
 .host-color-swatches {
   display: flex;
   flex-wrap: wrap;

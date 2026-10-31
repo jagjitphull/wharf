@@ -17,6 +17,7 @@ vi.mock("./secretStore", async () => {
   return { readSecret: (id: string | null) => (id === "pw" ? TEST_PASSWORD : null) };
 });
 vi.mock("./knownHosts", () => ({ verifyHostKeyInteractive: async () => true }));
+vi.mock("./transcripts", () => ({ transcripts: { begin: () => {}, feed: () => {}, end: () => {} } }));
 
 let server: TestSshServer;
 let sftp: typeof import("./sftpManager");

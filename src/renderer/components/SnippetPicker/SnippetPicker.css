@@ -159,7 +159,8 @@
   color: var(--text-dim);
 }
 
-.snippet-form input,
+.snippet-form input:not([type="checkbox"]),
+.snippet-form select,
 .snippet-form textarea {
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -188,4 +189,11 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.snippet-form label.snippet-run-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
 }

@@ -1,11 +1,12 @@
 import { ipcMain } from "electron";
 import { IPC, type CommandHistoryEntry, type CommandHistoryInput, type HistorySettings } from "../../shared/types";
 import { createHistoryRecorder } from "../services/historyRecorder";
-import { clearCommandHistory, getCommandHistory, getHistorySettings, setCommandHistory, setHistorySettings } from "../services/store";
+import { readProtected, writeProtected } from "../services/protectedData";
+import { getHistorySettings, setHistorySettings } from "../services/store";
 
 const recorder = createHistoryRecorder({
-  entries: getCommandHistory,
-  setEntries: setCommandHistory,
+  entries: () => readProtected("commandHistory"),
+  setEntries: (entries) => void writeProtected("commandHistory", entries),
   settings: getHistorySettings,
   now: Date.now,
 });
@@ -19,11 +20,11 @@ export function registerCommandHistoryIpc(): void {
   });
 
   ipcMain.handle(IPC.commandHistory.list, (): CommandHistoryEntry[] => {
-    return getCommandHistory();
+    return readProtected("commandHistory");
   });
 
   ipcMain.handle(IPC.commandHistory.clear, (): void => {
-    clearCommandHistory();
+    writeProtected("commandHistory", []);
   });
 
   ipcMain.handle(

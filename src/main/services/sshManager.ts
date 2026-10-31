@@ -6,6 +6,7 @@ import { IPC } from "../../shared/types";
 import { getCommandBlocksEnabled, getHosts } from "./store";
 import { acquireClient, isPooledClient, releaseClient } from "./connectionPool";
 import { BootstrapEchoSuppressor, buildRemoteBootstrapCommand } from "./shellIntegration";
+import { transcripts } from "./transcripts";
 
 export { buildConnectConfig, connectHostClient } from "./sshConnect";
 
@@ -37,6 +38,12 @@ function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send(channel, payload);
   }
+}
+
+/** Terminal output on its way to the windows — and, when recording is on, into the session's transcript. */
+function sendOutput(sessionId: string, chunk: string): void {
+  broadcast(IPC.ssh.onData, { sessionId, chunk });
+  transcripts.feed(sessionId, chunk);
 }
 
 /** Opens a shell channel on an already-authenticated client. Shared by the
@@ -90,7 +97,7 @@ function wireChannel(sessionId: string, channel: ClientChannel, client: Client):
     const session = sessions.get(sessionId);
     const text = data.toString("utf8");
     const visible = session ? session.echoFilter.feed(text) : text;
-    if (visible) broadcast(IPC.ssh.onData, { sessionId, chunk: visible });
+    if (visible) sendOutput(sessionId, visible);
     // Raw bytes, ANSI codes included — same as what `script`/`asciinema`
     // record, and what the user actually sees in the terminal (echo
     // suppression only holds display back briefly, it never affects what's
@@ -124,6 +131,7 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
       error: `Connection lost${suffix} — gave up after ${RECONNECT_DELAYS_MS.length} reconnect attempts`,
     });
     session.logStream?.end();
+    transcripts.end(sessionId);
     sessions.delete(sessionId);
     return;
   }
@@ -144,6 +152,7 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
   if (!host) {
     broadcast(IPC.ssh.onClosed, { sessionId, error: "Host no longer exists" });
     stillTracked.logStream?.end();
+    transcripts.end(sessionId);
     sessions.delete(sessionId);
     return;
   }
@@ -187,7 +196,7 @@ async function attemptReconnect(sessionId: string, attemptIndex: number, lastErr
       setTimeout(() => {
         const s = sessions.get(sessionId);
         if (!s) return;
-        s.echoFilter.start((pending) => broadcast(IPC.ssh.onData, { sessionId, chunk: pending }));
+        s.echoFilter.start((pending) => sendOutput(sessionId, pending));
         channel.write(buildRemoteBootstrapCommand() + "\r");
       }, 1000);
     }
@@ -233,6 +242,7 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
     reconnecting: false,
     echoFilter: new BootstrapEchoSuppressor(),
   });
+  transcripts.begin(sessionId, { hostId, hostName: host.name });
 
   if (getCommandBlocksEnabled()) {
     // Sent as one real line of input, same as the user typing it — there's
@@ -246,7 +256,7 @@ export async function connect(hostId: string, cols: number, rows: number): Promi
     setTimeout(() => {
       const session = sessions.get(sessionId);
       if (!session) return;
-      session.echoFilter.start((pending) => broadcast(IPC.ssh.onData, { sessionId, chunk: pending }));
+      session.echoFilter.start((pending) => sendOutput(sessionId, pending));
       channel.write(buildRemoteBootstrapCommand() + "\r");
     }, 1000);
   }
@@ -276,6 +286,7 @@ export function disconnect(sessionId: string): void {
   session.channel.end();
   releasePossiblyPooledClient(session.hostId, session.client, session.jumpClient);
   session.logStream?.end();
+  transcripts.end(sessionId);
 }
 
 export function disconnectSessionsForHost(hostId: string): void {

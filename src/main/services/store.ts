@@ -18,6 +18,7 @@ import type {
 } from "../../shared/types";
 import { normalizeAutoLockMinutes } from "../../shared/autoLock";
 import { DEFAULT_HISTORY_SETTINGS, normalizeHistorySettings } from "../../shared/historyFilter";
+import { DEFAULT_TRANSCRIPT_SETTINGS, normalizeTranscriptSettings, type TranscriptSettings } from "../../shared/transcripts";
 
 export interface WindowBounds {
   x: number;
@@ -40,8 +41,12 @@ interface Schema {
   commandHistory: CommandHistoryEntry[];
   /** What Command History keeps: on/off, secret filtering, ignore patterns, retention (see shared/historyFilter.ts). */
   historySettings: HistorySettings;
+  /** Whether terminal sessions are recorded as searchable text transcripts, and for how long they are kept (see transcriptStore.ts). */
+  transcriptSettings: TranscriptSettings;
   /** secretId -> base64-encoded ciphertext produced by Electron's safeStorage. */
   secrets: Record<string, string>;
+  /** With a master password: Command History, workspaces and last-session tabs, each sealed with its key (see protectedData.ts). The plain copies above are empty then. */
+  sealedData: Partial<Record<"commandHistory" | "workspaces" | "lastSessionTabs", string>>;
   /** Set when a master password protects `secrets`: the salt/cost it was derived with and a check value. Never the password or key. */
   masterPassword: MasterPasswordConfig | null;
   /** Minutes without activity before an unlocked master password locks again (0 = never). */
@@ -68,7 +73,9 @@ const defaults: Schema = {
   lastSessionTabs: [],
   commandHistory: [],
   historySettings: DEFAULT_HISTORY_SETTINGS,
+  transcriptSettings: DEFAULT_TRANSCRIPT_SETTINGS,
   secrets: {},
+  sealedData: {},
   masterPassword: null,
   autoLockMinutes: 0,
   aiProvider: "claude",
@@ -133,6 +140,16 @@ export function setHosts(hosts: HostRecord[]): void {
   store.set("hosts", hosts);
 }
 
+/** Records that a session to `hostId` just connected, for "last connected" and Home's Recent row. */
+export function markHostConnected(hostId: string, at: number = Date.now()): void {
+  const hosts = getHosts();
+  const i = hosts.findIndex((h) => h.id === hostId);
+  if (i === -1) return;
+  const next = [...hosts];
+  next[i] = { ...next[i], lastConnectedAt: at };
+  setHosts(next);
+}
+
 export function getGroups(): GroupRecord[] {
   return store.get("groups");
 }
@@ -157,34 +174,6 @@ export function setSnippets(snippets: SnippetRecord[]): void {
   store.set("snippets", snippets);
 }
 
-export function getWorkspaces(): WorkspaceRecord[] {
-  return store.get("workspaces");
-}
-
-export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
-  store.set("workspaces", workspaces);
-}
-
-export function getLastSessionTabs(): WorkspaceTab[] {
-  return store.get("lastSessionTabs");
-}
-
-export function setLastSessionTabs(tabs: WorkspaceTab[]): void {
-  store.set("lastSessionTabs", tabs);
-}
-
-export function getCommandHistory(): CommandHistoryEntry[] {
-  return store.get("commandHistory");
-}
-
-export function setCommandHistory(entries: CommandHistoryEntry[]): void {
-  store.set("commandHistory", entries);
-}
-
-export function clearCommandHistory(): void {
-  store.set("commandHistory", []);
-}
-
 export function getHistorySettings(): HistorySettings {
   return normalizeHistorySettings(store.get("historySettings"));
 }
@@ -192,6 +181,16 @@ export function getHistorySettings(): HistorySettings {
 export function setHistorySettings(settings: HistorySettings): HistorySettings {
   const next = normalizeHistorySettings(settings);
   store.set("historySettings", next);
+  return next;
+}
+
+export function getTranscriptSettings(): TranscriptSettings {
+  return normalizeTranscriptSettings(store.get("transcriptSettings"));
+}
+
+export function setTranscriptSettings(settings: TranscriptSettings): TranscriptSettings {
+  const next = normalizeTranscriptSettings(settings);
+  store.set("transcriptSettings", next);
   return next;
 }
 

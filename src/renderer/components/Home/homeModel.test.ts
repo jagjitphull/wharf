@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { GroupRecord, HostRecord } from "@shared/types";
-import { buildSections, greeting, hostGlyph, hostMatches } from "./homeModel";
+import {
+  buildSections,
+  formatLastConnected,
+  greeting,
+  homeSummary,
+  hostGlyph,
+  hostMatches,
+  isDropSection,
+  sectionGroupId,
+} from "./homeModel";
 
 const host = (id: string, name: string, groupId: string | null, extra: Partial<HostRecord> = {}): HostRecord => ({
   id,
@@ -91,5 +100,157 @@ describe("buildSections", () => {
   it("treats a host whose group is gone as ungrouped", () => {
     const s = buildSections([host("9", "orphan", "gone")], groups, { query: "", filter: "all", connectedHostIds: none });
     expect(s[0].hosts[0].name).toBe("orphan");
+  });
+});
+
+describe("formatLastConnected", () => {
+  const now = Date.UTC(2026, 9, 21, 12, 0, 0);
+  const ago = (ms: number) => formatLastConnected(now - ms, now);
+  it.each([
+    [0, "just now"],
+    [59_000, "just now"],
+    [60_000, "1 min ago"],
+    [59 * 60_000, "59 min ago"],
+    [60 * 60_000, "1 h ago"],
+    [23 * 3_600_000, "23 h ago"],
+    [24 * 3_600_000, "yesterday"],
+    [47 * 3_600_000, "yesterday"],
+    [48 * 3_600_000, "2 d ago"],
+    [13 * 86_400_000, "13 d ago"],
+  ])("%d ms ago -> %s", (ms, text) => expect(ago(ms)).toBe(text));
+  it("falls back to the date after two weeks", () => {
+    expect(ago(30 * 86_400_000)).toMatch(/\d/);
+    expect(ago(30 * 86_400_000)).not.toMatch(/ago/);
+  });
+  it("treats a clock that ran backwards as just now", () => {
+    expect(formatLastConnected(now + 5000, now)).toBe("just now");
+  });
+});
+
+describe("the Recent section", () => {
+  const withTimes = [
+    host("1", "web-02", "p", { lastConnectedAt: 300 }),
+    host("2", "web-01", "p", { lastConnectedAt: 500 }),
+    host("3", "rocky-lab", "l", { lastConnectedAt: 100 }),
+    host("4", "router", null),
+  ];
+  it("lists the most recently connected first, ahead of the groups", () => {
+    const s = buildSections(withTimes, groups, { query: "", filter: "all", connectedHostIds: none });
+    expect(s[0]).toMatchObject({ id: "recent", title: "Recent" });
+    expect(s[0].hosts.map((h) => h.name)).toEqual(["web-01", "web-02", "rocky-lab"]);
+    expect(s.map((x) => x.title)).toEqual(["Recent", "Production", "Lab", "Ungrouped"]);
+  });
+  it("keeps a host in its group too", () => {
+    const s = buildSections(withTimes, groups, { query: "", filter: "all", connectedHostIds: none });
+    expect(s.find((x) => x.title === "Production")?.hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+  });
+  it("shows at most four", () => {
+    const many = Array.from({ length: 7 }, (_, i) => host(String(i), `h${i}`, null, { lastConnectedAt: i + 1 }));
+    const s = buildSections(many, [], { query: "", filter: "all", connectedHostIds: none });
+    expect(s[0].hosts.map((h) => h.name)).toEqual(["h6", "h5", "h4", "h3"]);
+  });
+  it("leaves out hosts that are connected right now (they have their own section)", () => {
+    const s = buildSections(withTimes, groups, { query: "", filter: "all", connectedHostIds: new Set(["2"]) });
+    expect(s.map((x) => x.title).slice(0, 2)).toEqual(["Connected now", "Recent"]);
+    expect(s[1].hosts.map((h) => h.name)).toEqual(["web-02", "rocky-lab"]);
+  });
+  it("is hidden while searching, or when filtering to a group", () => {
+    expect(buildSections(withTimes, groups, { query: "web", filter: "all", connectedHostIds: none }).map((x) => x.title)).toEqual([
+      "Production",
+    ]);
+    expect(buildSections(withTimes, groups, { query: "", filter: "p", connectedHostIds: none }).map((x) => x.title)).toEqual([
+      "Production",
+    ]);
+  });
+  it("is absent when nothing has ever connected", () => {
+    expect(buildSections(hosts, groups, { query: "", filter: "all", connectedHostIds: none }).some((x) => x.id === "recent")).toBe(false);
+  });
+});
+
+describe("the Pinned section", () => {
+  const pinnedHosts = [
+    host("1", "web-02", "p", { pinned: true }),
+    host("2", "web-01", "p"),
+    host("3", "rocky-lab", "l", { pinned: true }),
+    host("4", "router", null),
+  ];
+  const titles = (s: ReturnType<typeof buildSections>) => s.map((x) => x.title);
+
+  it("comes first, sorted by name, and a pinned host is left out of its group", () => {
+    const sections = buildSections(pinnedHosts, groups, { query: "", filter: "all", connectedHostIds: none });
+    expect(titles(sections)).toEqual(["Pinned", "Production", "Lab", "Ungrouped"]);
+    expect(sections[0].hosts.map((h) => h.name)).toEqual(["rocky-lab", "web-02"]);
+    expect(sections[1].hosts.map((h) => h.name)).toEqual(["web-01"]);
+    expect(sections[1].pinnedAbove).toBe(1);
+    expect(sections[3].pinnedAbove).toBeUndefined();
+  });
+
+  it("keeps a group whose hosts are all pinned, so it can still take a drop", () => {
+    const lab = buildSections(pinnedHosts, groups, { query: "", filter: "all", connectedHostIds: none }).find((x) => x.id === "l");
+    expect(lab?.hosts).toEqual([]);
+    expect(lab?.pinnedAbove).toBe(1);
+  });
+
+  it("shows a pinned host in its group when there is no Pinned section (searching, or one group)", () => {
+    const searched = buildSections(pinnedHosts, groups, { query: "web", filter: "all", connectedHostIds: none });
+    expect(searched.find((x) => x.id === "p")?.hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+    const one = buildSections(pinnedHosts, groups, { query: "", filter: "p", connectedHostIds: none });
+    expect(one[0].hosts.map((h) => h.name)).toEqual(["web-01", "web-02"]);
+    expect(one[0].pinnedAbove).toBeUndefined();
+  });
+
+  it("is absent when nothing is pinned, while searching, and when filtering to a group", () => {
+    expect(titles(buildSections(hosts, groups, { query: "", filter: "all", connectedHostIds: none }))).not.toContain("Pinned");
+    expect(titles(buildSections(pinnedHosts, groups, { query: "web", filter: "all", connectedHostIds: none }))).not.toContain("Pinned");
+    expect(titles(buildSections(pinnedHosts, groups, { query: "", filter: "p", connectedHostIds: none }))).toEqual(["Production"]);
+  });
+
+  it("is not repeated under Connected now or Recent", () => {
+    const hs = [
+      host("1", "a", null, { pinned: true, lastConnectedAt: 100 }),
+      host("2", "b", null, { lastConnectedAt: 50 }),
+      host("3", "c", null),
+    ];
+    const sections = buildSections(hs, [], { query: "", filter: "all", connectedHostIds: new Set(["1", "3"]) });
+    expect(titles(sections)).toEqual(["Pinned", "Connected now", "Recent", "All hosts"]);
+    expect(sections[1].hosts.map((h) => h.name)).toEqual(["c"]); // a is pinned, so it isn't listed twice
+    expect(sections[2].hosts.map((h) => h.name)).toEqual(["b"]);
+  });
+
+  it("the Connected filter still lists a pinned host that is connected", () => {
+    const hs = [host("1", "a", null, { pinned: true })];
+    expect(buildSections(hs, [], { query: "", filter: "connected", connectedHostIds: new Set(["1"]) })[0].hosts).toHaveLength(1);
+  });
+});
+
+describe("drop targets", () => {
+  it("only groups and the ungrouped list accept a dropped host", () => {
+    for (const id of ["pinned", "connected", "recent"]) expect(isDropSection(id)).toBe(false);
+    for (const id of ["p", "l", "ungrouped"]) expect(isDropSection(id)).toBe(true);
+  });
+
+  it("maps the ungrouped list to no group", () => {
+    expect(sectionGroupId("ungrouped")).toBeNull();
+    expect(sectionGroupId("p")).toBe("p");
+  });
+});
+
+describe("homeSummary", () => {
+  const now = 10 * 60 * 60 * 1000;
+  it("says so when there are no hosts", () => {
+    expect(homeSummary([], 0, now)).toBe("No hosts yet");
+  });
+
+  it("counts hosts and connections, singular and plural", () => {
+    expect(homeSummary([host("1", "a", null)], 0, now)).toBe("1 host · none connected");
+    expect(homeSummary(hosts, 2, now)).toBe("4 hosts · 2 connected");
+  });
+
+  it("adds when a host was last connected, taking the newest", () => {
+    const hs = [
+      host("1", "a", null, { lastConnectedAt: now - 3 * 60 * 60 * 1000 }),
+      host("2", "b", null, { lastConnectedAt: now - 5 * 60 * 1000 }),
+    ];
+    expect(homeSummary(hs, 1, now)).toBe("2 hosts · 1 connected · last connected 5 min ago");
   });
 });

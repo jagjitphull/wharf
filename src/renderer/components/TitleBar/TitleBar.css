@@ -88,6 +88,47 @@
   color: var(--text);
 }
 
+.title-bar-palette {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  -webkit-app-region: no-drag;
+  margin-right: 4px;
+  padding: 4px 6px 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.title-bar-palette:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.title-bar-palette kbd {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* The label goes first when the tabs need the room; the shortcut chip stays. */
+@media (max-width: 1100px) {
+  .title-bar-palette-label {
+    display: none;
+  }
+}
+
 .title-bar-controls {
   display: flex;
   align-items: center;
@@ -161,4 +202,15 @@
 }
 .title-bar-controls .win-btn:hover .win-btn-dot {
   filter: brightness(1.08);
+}
+
+/* Compact: a shorter title bar; the tabs below follow it (see TabStrip.css). */
+:root[data-density="compact"] .title-bar {
+  height: 38px;
+  min-height: 38px;
+}
+
+:root[data-density="compact"] .title-bar-new-tab {
+  width: 26px;
+  height: 26px;
 }

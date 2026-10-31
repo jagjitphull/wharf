@@ -5,6 +5,11 @@
  */
 import type {
   BackupImportResult,
+  BackupPart,
+  GenerateKeyRequest,
+  InstallKeyResult,
+  SshKeyInfo,
+  BackupPreview,
   GroupInput,
   GroupRecord,
   HostInput,
@@ -24,6 +29,10 @@ import type {
   CommandHistoryEntry,
   CommandHistoryInput,
   HistorySettings,
+  TranscriptContent,
+  TranscriptInfo,
+  TranscriptSearchResult,
+  TranscriptSettings,
   AiSuggestRequest,
   AiProvider,
   AiProviderConfig,
@@ -51,6 +60,8 @@ export interface WharfApi {
     remove(id: string): Promise<void>;
     /** Raw TCP reachability probe against hostname:port — no SSH handshake, no auth, no host-key check. */
     checkReachable(hostname: string, port: number): Promise<boolean>;
+    /** Pins a host to the top of Home (or unpins it). */
+    setPinned(id: string, pinned: boolean): Promise<void>;
   };
   groups: {
     list(): Promise<GroupRecord[]>;
@@ -193,10 +204,24 @@ export interface WharfApi {
     onSelfUpdateState(cb: (state: SelfUpdateState) => void): Unsubscribe;
   };
   backup: {
-    /** Opens a save dialog and writes hosts+groups (no secrets) to JSON. Returns the written path, or null if the user canceled. */
-    export(): Promise<string | null>;
-    /** Opens an open dialog, validates and merges a previously exported file. Returns null if the user canceled; throws on an invalid file. */
-    import(): Promise<BackupImportResult | null>;
+    /** Opens a save dialog and writes a backup: hosts and groups always, plus the `parts` chosen. Saved passwords go in, sealed with `passphrase`, only when one is given. `rendererSettings` is the window's own preferences. Returns the written path, or null if the user canceled. */
+    export(request: { parts: BackupPart[]; passphrase?: string; rendererSettings?: Record<string, string> }): Promise<string | null>;
+    /** Opens a file dialog and reads a backup without importing it, so what it holds can be shown first. Null if canceled; throws if it isn't a Wharf backup. */
+    pick(): Promise<BackupPreview | null>;
+    /** Merges the picked backup in (anything already present is skipped). Throws, changing nothing, on a wrong passphrase. */
+    apply(token: string, options: { parts: BackupPart[]; passphrase?: string; skipSecrets?: boolean }): Promise<BackupImportResult>;
+  };
+  sshKeys: {
+    /** The private keys in ~/.ssh, with their fingerprints and which saved hosts use them. */
+    list(): Promise<SshKeyInfo[]>;
+    /** Makes a new key pair in ~/.ssh. Never overwrites a file; throws if the name is taken. */
+    generate(request: GenerateKeyRequest): Promise<SshKeyInfo>;
+    /** The public key line to share, or null when it can't be read (a protected key with no .pub). */
+    publicKey(name: string): Promise<string | null>;
+    /** Deletes the key and its .pub. */
+    remove(name: string): Promise<void>;
+    /** Adds the key's public half to a saved host's authorized_keys (once). */
+    install(name: string, hostId: string): Promise<InstallKeyResult>;
   };
   snippets: {
     list(): Promise<SnippetRecord[]>;
@@ -236,6 +261,19 @@ export interface WharfApi {
     shellText(input: Pick<CommandHistoryInput, "sessionId" | "hostId" | "hostName">, command: string): Promise<void>;
     getSettings(): Promise<HistorySettings>;
     setSettings(settings: HistorySettings): Promise<HistorySettings>;
+  };
+  transcripts: {
+    /** Recorded sessions, newest first. */
+    list(): Promise<TranscriptInfo[]>;
+    read(id: string): Promise<TranscriptContent | null>;
+    /** Case-insensitive text search across every readable transcript. */
+    search(query: string): Promise<TranscriptSearchResult>;
+    remove(id: string): Promise<void>;
+    clear(): Promise<void>;
+    /** Asks where to save the transcript as plain text, then writes it. Resolves to the path, or null if cancelled. */
+    saveAs(id: string): Promise<string | null>;
+    getSettings(): Promise<TranscriptSettings>;
+    setSettings(settings: TranscriptSettings): Promise<TranscriptSettings>;
   };
   ai: {
     /** Asks the active provider for up to 3 likely completions of the current line. Throws if that provider isn't configured. */

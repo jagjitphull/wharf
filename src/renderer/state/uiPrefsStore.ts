@@ -5,6 +5,20 @@ const SIDEBAR_COLLAPSED_KEY = "wharf-sidebar-collapsed";
 const SIDEBAR_WIDTH_KEY = "wharf-sidebar-width";
 const UI_ZOOM_KEY = "wharf-ui-zoom";
 const COLLAPSED_GROUPS_KEY = "wharf-collapsed-groups";
+const HOME_VIEW_KEY = "wharf-home-view";
+const GETTING_STARTED_KEY = "wharf-getting-started-dismissed";
+const DENSITY_KEY = "wharf-density";
+const TAB_LAYOUT_KEY = "wharf-tab-layout";
+const TAB_PANEL_COLLAPSED_KEY = "wharf-tab-panel-collapsed";
+
+/** How much room the chrome takes: the icon rail, sidebar rows and tab strip. */
+export type Density = "comfortable" | "compact";
+
+/** Where the terminal tabs live: across the top (in the title bar) or in a panel down the left side. */
+export type TabLayout = "top" | "side";
+
+/** How Home lays hosts out: cards, or one compact row each. */
+export type HomeViewMode = "cards" | "list";
 
 export const DEFAULT_UI_ZOOM = 1;
 export const MIN_UI_ZOOM = 0.85;
@@ -48,6 +62,43 @@ function readStoredCollapsedGroups(): Set<string> {
   }
 }
 
+function readStoredTabLayout(): TabLayout {
+  try {
+    return localStorage.getItem(TAB_LAYOUT_KEY) === "side" ? "side" : "top";
+  } catch {
+    return "top";
+  }
+}
+
+function readStoredFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readStoredDensity(): Density {
+  try {
+    return localStorage.getItem(DENSITY_KEY) === "compact" ? "compact" : "comfortable";
+  } catch {
+    return "comfortable";
+  }
+}
+
+/** The stylesheets key off <html data-density>, set as soon as this module loads so the first paint is already right. */
+function applyDensity(density: Density): void {
+  document.documentElement.dataset.density = density;
+}
+
+function readStoredHomeView(): HomeViewMode {
+  try {
+    return localStorage.getItem(HOME_VIEW_KEY) === "list" ? "list" : "cards";
+  } catch {
+    return "cards";
+  }
+}
+
 function readStoredUiZoom(): number {
   try {
     const v = Number(localStorage.getItem(UI_ZOOM_KEY));
@@ -86,6 +137,18 @@ interface UiPrefsState {
    * plus the "__root__" sentinel for the top-level "Hosts" node itself. */
   collapsedGroupIds: Set<string>;
   toggleGroupCollapsed(id: string): void;
+  homeView: HomeViewMode;
+  setHomeView(mode: HomeViewMode): void;
+  density: Density;
+  setDensity(density: Density): void;
+  tabLayout: TabLayout;
+  setTabLayout(layout: TabLayout): void;
+  /** In the side layout: only each tab's number and markers, or the full names. */
+  tabPanelCollapsed: boolean;
+  setTabPanelCollapsed(collapsed: boolean): void;
+  /** Whether the "Getting started" checklist on Home has been hidden for good. */
+  gettingStartedDismissed: boolean;
+  dismissGettingStarted(): void;
 }
 
 const initialUiZoom = readStoredUiZoom();
@@ -145,6 +208,62 @@ export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
     get().setUiZoom(DEFAULT_UI_ZOOM);
   },
 
+  homeView: readStoredHomeView(),
+
+  density: readStoredDensity(),
+
+  setDensity(density) {
+    try {
+      localStorage.setItem(DENSITY_KEY, density);
+    } catch {
+      /* best-effort persistence only */
+    }
+    applyDensity(density);
+    set({ density });
+  },
+
+  tabLayout: readStoredTabLayout(),
+
+  setTabLayout(tabLayout) {
+    try {
+      localStorage.setItem(TAB_LAYOUT_KEY, tabLayout);
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ tabLayout });
+  },
+
+  tabPanelCollapsed: readStoredFlag(TAB_PANEL_COLLAPSED_KEY),
+
+  setTabPanelCollapsed(tabPanelCollapsed) {
+    try {
+      localStorage.setItem(TAB_PANEL_COLLAPSED_KEY, tabPanelCollapsed ? "1" : "0");
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ tabPanelCollapsed });
+  },
+
+  gettingStartedDismissed: readStoredFlag(GETTING_STARTED_KEY),
+
+  dismissGettingStarted() {
+    try {
+      localStorage.setItem(GETTING_STARTED_KEY, "1");
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ gettingStartedDismissed: true });
+  },
+
+  setHomeView(mode) {
+    try {
+      localStorage.setItem(HOME_VIEW_KEY, mode);
+    } catch {
+      /* best-effort persistence only */
+    }
+    set({ homeView: mode });
+  },
+
   collapsedGroupIds: readStoredCollapsedGroups(),
 
   toggleGroupCollapsed(id) {
@@ -159,3 +278,5 @@ export const useUiPrefsStore = create<UiPrefsState>((set, get) => ({
     set({ collapsedGroupIds: next });
   },
 }));
+
+applyDensity(useUiPrefsStore.getState().density);
