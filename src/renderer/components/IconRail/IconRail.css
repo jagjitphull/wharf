@@ -59,3 +59,27 @@
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
+/* Compact: a slimmer rail (about 3/4 of the width) with smaller buttons and icons. */
+:root[data-density="compact"] .icon-rail {
+  width: 46px;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+:root[data-density="compact"] .rail-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+:root[data-density="compact"] .rail-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+:root[data-density="compact"] .rail-btn.active::before {
+  left: -6px;
+  top: 8px;
+  height: 18px;
+}

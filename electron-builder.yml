@@ -21,6 +21,15 @@ directories:
 files:
   - dist-electron/**/*
   - package.json
+  # Nothing at runtime reads these, and they were most of what the AI provider SDKs
+  # weigh: source maps and TypeScript declarations, plus the C++ headers (nan,
+  # node-addon-api) that are only needed to compile a native add-on.
+  - "!**/*.map"
+  - "!**/*.d.ts"
+  - "!**/*.d.mts"
+  - "!**/*.d.cts"
+  - "!node_modules/nan/**"
+  - "!node_modules/node-addon-api/**"
 # BrowserWindow's runtime `icon` option (see src/main/index.ts) reads this at
 # app.isPackaged time via process.resourcesPath — needed because Linux window
 # managers don't reliably pick up the hicolor-theme icon below for an

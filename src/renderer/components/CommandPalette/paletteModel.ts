@@ -1,4 +1,4 @@
-import type { HostRecord } from "@shared/types";
+import type { HostRecord, SnippetRecord } from "@shared/types";
 
 export interface PaletteAction {
   id: string;
@@ -14,7 +14,11 @@ export interface PaletteAction {
   run(): void;
 }
 
-export type PaletteEntry = { type: "action"; action: PaletteAction } | { type: "host"; host: HostRecord };
+export type PaletteEntry =
+  { type: "action"; action: PaletteAction } | { type: "snippet"; snippet: SnippetRecord } | { type: "host"; host: HostRecord };
+
+/** Snippets offered at once; the rest need a more specific query. */
+export const MAX_SNIPPET_RESULTS = 6;
 
 export interface PaletteSection {
   title: string;
@@ -54,6 +58,17 @@ export function rankActions(actions: PaletteAction[], query: string): PaletteAct
     .map((x) => x.a);
 }
 
+/** Snippets that match every word of `query` (name counts more than the command text); none for an empty query. */
+export function rankSnippets(snippets: SnippetRecord[], query: string): SnippetRecord[] {
+  if (!query.trim()) return [];
+  return snippets
+    .map((s) => ({ s, score: Math.max(scoreText(s.name, query) * 2, scoreText(`${s.name} ${s.command}`, query)) }))
+    .filter((x) => x.score > 0)
+    .sort((x, y) => y.score - x.score || x.s.name.localeCompare(y.s.name))
+    .slice(0, MAX_SNIPPET_RESULTS)
+    .map((x) => x.s);
+}
+
 export function rankHosts(hosts: HostRecord[], query: string): HostRecord[] {
   return hosts
     .map((h) => ({
@@ -68,9 +83,14 @@ export function rankHosts(hosts: HostRecord[], query: string): HostRecord[] {
 /**
  * The palette's sections for a query. A leading ">" asks for actions only;
  * otherwise actions come first (a short featured list while the box is empty),
- * then hosts.
+ * then matching snippets, then hosts.
  */
-export function buildSections(actions: PaletteAction[], hosts: HostRecord[], rawQuery: string): PaletteSection[] {
+export function buildSections(
+  actions: PaletteAction[],
+  hosts: HostRecord[],
+  rawQuery: string,
+  snippets: SnippetRecord[] = [],
+): PaletteSection[] {
   const actionsOnly = rawQuery.trimStart().startsWith(">");
   const query = actionsOnly ? rawQuery.trimStart().slice(1) : rawQuery;
   const sections: PaletteSection[] = [];
@@ -78,6 +98,9 @@ export function buildSections(actions: PaletteAction[], hosts: HostRecord[], raw
   const matchedActions = actionsOnly && !query.trim() ? actions : rankActions(actions, query);
   if (matchedActions.length) sections.push({ title: "Actions", entries: matchedActions.map((action) => ({ type: "action", action })) });
   if (!actionsOnly) {
+    const matchedSnippets = rankSnippets(snippets, query);
+    if (matchedSnippets.length)
+      sections.push({ title: "Snippets", entries: matchedSnippets.map((snippet) => ({ type: "snippet", snippet })) });
     const matchedHosts = rankHosts(hosts, query);
     if (matchedHosts.length) sections.push({ title: "Hosts", entries: matchedHosts.map((host) => ({ type: "host", host })) });
   }

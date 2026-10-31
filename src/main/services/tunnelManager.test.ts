@@ -33,6 +33,7 @@ vi.mock("./knownHosts", () => ({
     return true;
   },
 }));
+vi.mock("./transcripts", () => ({ transcripts: { begin: () => {}, feed: () => {}, end: () => {} } }));
 vi.mock("electron-log/main", () => ({ default: { warn: () => {}, error: () => {}, info: () => {} } }));
 
 let server: TestSshServer;
@@ -116,6 +117,16 @@ beforeEach(async () => {
 afterEach(async () => {
   tunnels.stopAll();
   await until(() => server.stats.open === 0, "connections to close");
+});
+
+describe("saving a tunnel", () => {
+  it("refuses one that couldn't work, and stores nothing", async () => {
+    const before = tunnels.list().length;
+    await expect(makeTunnel({ srcPort: 0 })).rejects.toThrow(/listening port/);
+    await expect(makeTunnel({ srcPort: 8080, dstPort: 70000 })).rejects.toThrow(/destination port/);
+    await expect(makeTunnel({ srcPort: 8080, name: " " })).rejects.toThrow(/name/);
+    expect(tunnels.list().length).toBe(before);
+  });
 });
 
 describe("local forwarding", () => {

@@ -150,7 +150,7 @@ export function moveTabBy(tabs: TerminalTab[], tabId: string, delta: -1 | 1): Te
   return next;
 }
 
-export type ActiveView = "home" | "hosts" | "sftp" | "tunnels" | "history" | "settings" | "workspaces";
+export type ActiveView = "home" | "hosts" | "sftp" | "tunnels" | "keys" | "history" | "settings" | "workspaces";
 
 /** All leaf sessionIds under a pane node, in left-to-right/top-to-bottom order. */
 export function flattenPanes(node: PaneNode): string[] {

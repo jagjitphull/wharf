@@ -4,7 +4,7 @@ import { useThemeStore } from "../../state/themeStore";
 import { useUiPrefsStore } from "../../state/uiPrefsStore";
 import { toast } from "../../state/toastStore";
 import { useAppStore } from "../../state/store";
-import { IconAnchor, IconDuplicate, IconHome, IconKeyboard, IconMoon, IconPlus, IconSun } from "../Icons/Icons";
+import { IconAnchor, IconDuplicate, IconHome, IconKeyboard, IconMoon, IconPlus, IconSearch, IconSun } from "../Icons/Icons";
 import { TabStrip } from "../Tabs/TabStrip";
 import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
 import "./TitleBar.css";
@@ -22,6 +22,7 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
   const setMode = useThemeStore((s) => s.setMode);
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiPrefsStore((s) => s.toggleSidebar);
+  const tabLayout = useUiPrefsStore((s) => s.tabLayout);
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const openLocalShell = useAppStore((s) => s.openLocalShell);
@@ -56,7 +57,7 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
         >
           <IconHome size={15} /> Home
         </button>
-        <TabStrip />
+        {tabLayout === "top" && <TabStrip />}
         <button
           className="title-bar-icon-btn title-bar-new-tab"
           title="New tab"
@@ -78,6 +79,16 @@ export function TitleBar({ onOpenShortcuts, onOpenPalette }: Props) {
       </div>
 
       <div className="title-bar-actions">
+        <button
+          className="title-bar-palette"
+          title="Search hosts and actions"
+          aria-label="Open the command palette"
+          onClick={swallow(onOpenPalette)}
+        >
+          <IconSearch size={13} />
+          <span className="title-bar-palette-label">Search</span>
+          <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
+        </button>
         <button
           className="title-bar-icon-btn"
           title={sidebarCollapsed ? "Show sidebar (Ctrl/Cmd+B)" : "Hide sidebar (Ctrl/Cmd+B)"}

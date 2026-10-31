@@ -31,6 +31,7 @@ const api: WharfApi = {
     update: (id, input) => ipcRenderer.invoke(IPC.hosts.update, id, input),
     remove: (id) => ipcRenderer.invoke(IPC.hosts.remove, id),
     checkReachable: (hostname, port) => ipcRenderer.invoke(IPC.hosts.checkReachable, hostname, port),
+    setPinned: (id, pinned) => ipcRenderer.invoke(IPC.hosts.setPinned, id, pinned),
   },
   groups: {
     list: () => ipcRenderer.invoke(IPC.groups.list),
@@ -139,8 +140,16 @@ const api: WharfApi = {
     onSelfUpdateState: (cb) => on(IPC.update.onSelfUpdateState, cb as (...args: unknown[]) => void),
   },
   backup: {
-    export: () => ipcRenderer.invoke(IPC.backup.export),
-    import: () => ipcRenderer.invoke(IPC.backup.import),
+    export: (request) => ipcRenderer.invoke(IPC.backup.export, request),
+    pick: () => ipcRenderer.invoke(IPC.backup.pick),
+    apply: (token, options) => ipcRenderer.invoke(IPC.backup.apply, token, options),
+  },
+  sshKeys: {
+    list: () => ipcRenderer.invoke(IPC.sshKeys.list),
+    generate: (request) => ipcRenderer.invoke(IPC.sshKeys.generate, request),
+    publicKey: (name) => ipcRenderer.invoke(IPC.sshKeys.publicKey, name),
+    remove: (name) => ipcRenderer.invoke(IPC.sshKeys.remove, name),
+    install: (name, hostId) => ipcRenderer.invoke(IPC.sshKeys.install, name, hostId),
   },
   snippets: {
     list: () => ipcRenderer.invoke(IPC.snippets.list),
@@ -171,6 +180,16 @@ const api: WharfApi = {
     shellText: (input, command) => ipcRenderer.invoke(IPC.commandHistory.shellText, input, command),
     getSettings: () => ipcRenderer.invoke(IPC.commandHistory.getSettings),
     setSettings: (settings) => ipcRenderer.invoke(IPC.commandHistory.setSettings, settings),
+  },
+  transcripts: {
+    list: () => ipcRenderer.invoke(IPC.transcripts.list),
+    read: (id) => ipcRenderer.invoke(IPC.transcripts.read, id),
+    search: (query) => ipcRenderer.invoke(IPC.transcripts.search, query),
+    remove: (id) => ipcRenderer.invoke(IPC.transcripts.remove, id),
+    clear: () => ipcRenderer.invoke(IPC.transcripts.clear),
+    saveAs: (id) => ipcRenderer.invoke(IPC.transcripts.saveAs, id),
+    getSettings: () => ipcRenderer.invoke(IPC.transcripts.getSettings),
+    setSettings: (settings) => ipcRenderer.invoke(IPC.transcripts.setSettings, settings),
   },
   ai: {
     suggest: (request) => ipcRenderer.invoke(IPC.ai.suggest, request),

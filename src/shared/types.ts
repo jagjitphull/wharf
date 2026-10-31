@@ -27,6 +27,10 @@ export interface HostRecord {
   jumpHostId?: string | null;
   /** Connect via Mosh (mobile shell) instead of a plain SSH session — see moshManager.ts. */
   mosh?: boolean;
+  /** When a session to this host last connected (ms since the epoch); unset until it first does. */
+  lastConnectedAt?: number;
+  /** Kept at the top of Home as a favourite. */
+  pinned?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -62,11 +66,8 @@ export interface GroupInput {
   color?: string;
 }
 
-/** Result of a successful backup:import; null return from the IPC call means the user canceled the file picker. */
-export interface BackupImportResult {
-  importedGroups: number;
-  importedHosts: number;
-}
+export type { BackupImportResult, BackupPart, BackupPreview } from "./backupFormat";
+export type { GenerateKeyRequest, InstallKeyResult, SshKeyInfo, SshKeyType } from "./sshKeys";
 
 // ---------------------------------------------------------------------------
 // Snippets
@@ -76,6 +77,8 @@ export interface SnippetRecord {
   id: string;
   name: string;
   command: string;
+  /** Press Enter after inserting, so the command runs at once (default: it is only typed, for you to check and run). */
+  run?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -83,6 +86,7 @@ export interface SnippetRecord {
 export interface SnippetInput {
   name: string;
   command: string;
+  run?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +173,14 @@ export interface CommandHistoryEntry {
 export type CommandHistoryInput = Omit<CommandHistoryEntry, "id" | "timestamp">;
 
 export type { HistorySettings } from "./historyFilter";
+export type {
+  TranscriptContent,
+  TranscriptInfo,
+  TranscriptLine,
+  TranscriptMatch,
+  TranscriptSearchResult,
+  TranscriptSettings,
+} from "./transcripts";
 
 // ---------------------------------------------------------------------------
 // AI autocomplete
@@ -405,6 +417,7 @@ export const IPC = {
     update: "hosts:update",
     remove: "hosts:remove",
     checkReachable: "hosts:check-reachable",
+    setPinned: "hosts:set-pinned",
   },
   groups: {
     list: "groups:list",
@@ -519,7 +532,15 @@ export const IPC = {
   },
   backup: {
     export: "backup:export",
-    import: "backup:import",
+    pick: "backup:pick",
+    apply: "backup:apply",
+  },
+  sshKeys: {
+    list: "ssh-keys:list",
+    generate: "ssh-keys:generate",
+    publicKey: "ssh-keys:public-key",
+    remove: "ssh-keys:remove",
+    install: "ssh-keys:install",
   },
   snippets: {
     list: "snippets:list",
@@ -554,6 +575,16 @@ export const IPC = {
     shellText: "command-history:shell-text",
     getSettings: "command-history:get-settings",
     setSettings: "command-history:set-settings",
+  },
+  transcripts: {
+    list: "transcripts:list",
+    read: "transcripts:read",
+    search: "transcripts:search",
+    remove: "transcripts:remove",
+    clear: "transcripts:clear",
+    saveAs: "transcripts:save-as",
+    getSettings: "transcripts:get-settings",
+    setSettings: "transcripts:set-settings",
   },
   ai: {
     suggest: "ai:suggest",

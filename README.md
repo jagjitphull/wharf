@@ -89,9 +89,15 @@ A personal SSH/SFTP terminal client, Termius-style.
   whose SSH connection drops (network change, sleep, server restart) reconnects by itself, waiting
   2s, 4s, 8s … up to 60s between attempts, until you stop it. It gives up at once if the login is
   refused or the host key changed, since retrying a bad password can lock an account.
+  From a host card on Home (**Port forward…** in its menu, or the ⇄ button), a dialog sets one up in
+  a few clicks: pick Local, Remote or SOCKS, tap a common service (PostgreSQL, MySQL, Redis, …) to fill
+  in its port — the listening port stays the same, or moves off a privileged one and past any
+  already used — and create and start it at once. Hosts with tunnels up show a ⇄ count on the card.
 - Optional master password (Settings → saved passwords) that encrypts saved passwords and key
   passphrases with a key derived from it (scrypt, AES-256-GCM) instead of relying on the OS keyring,
-  which is the way to protect them on a Linux machine that has none. Wharf asks for it at launch
+  which is the way to protect them on a Linux machine that has none. It also seals Command
+  History, saved workspaces and the last session's tabs (with their scrollback) in the data
+  file, so what you ran and where you connected is unreadable without it. Wharf asks for it at launch
   (or you can carry on without unlocking: hosts using an agent or an unprotected key still work);
   it can be changed, removed, or locked on demand, and can lock itself after 5 minutes to 4 hours
   without typing or clicking in any Wharf window (Settings; off by default, because a tunnel that
@@ -99,7 +105,29 @@ A personal SSH/SFTP terminal client, Termius-style.
 - Host-key verification against `~/.ssh/known_hosts` (trust-on-first-use,
   with a strong warning if a host's key changes)
 - Status bar showing the active session's connection state and duration
-- Export/import hosts & groups to/from a JSON file (secrets excluded)
+- Home: pin favourites (the pin on a card or row, or **Pin to top** in its menu) to keep them in a
+  Pinned section above everything; switch between cards and a compact one-line-per-host list (the
+  choice is remembered); drag a host onto another group's section or chip — or onto the drop bar
+  that appears while dragging, including **No group** — to move it
+- SSH keys page (the key icon in the left rail): lists the private keys in `~/.ssh` with type, size,
+  comment, SHA256 fingerprint (as `ssh-keygen -l` prints it), whether a passphrase protects them
+  and which saved hosts use them. Generate Ed25519, RSA (2048–4096) or ECDSA keys, optionally
+  passphrase-protected, saved owner-only in OpenSSH format — it never overwrites an existing
+  file. Copy a key's public half, install it on a saved host (appended once to that host's
+  `~/.ssh/authorized_keys` over a connection that uses the host's saved login, with the folder
+  and file created `700`/`600`), or delete a key. The host dialog suggests these keys for its
+  private-key path
+- Backup (Settings → Backup): export hosts and groups — plus, as you choose, tunnels, snippets,
+  workspaces and app settings (theme, fonts, history and recording choices) — to a JSON file and
+  import it into another Wharf. Passwords and key passphrases are left out unless you give the
+  backup its own passphrase, which seals them (scrypt, AES-256-GCM, separate from the master
+  password); terminal scrollback never goes in. Importing shows what the file holds first, merges
+  rather than replaces (a host with the same user@host:port, a group, tunnel, snippet or workspace
+  you already have is skipped, so importing twice adds nothing), gives everything new ids while
+  keeping jump-host, group, tunnel and workspace references intact, and treats the file as
+  untrusted: malformed entries are dropped and counted, and nothing security- or AI-related
+  (auto-lock, the master password, where AI requests go) is ever read from it. Reads files made
+  by earlier versions too
 - Custom title bar with working minimize/maximize/close on every platform;
   remembers window size and position between launches
 - Right-click context menus throughout (hosts, groups, tabs, terminal, SFTP)
@@ -133,6 +161,13 @@ A personal SSH/SFTP terminal client, Termius-style.
   defaults supported), reviewable before importing
 - Per-session logging — record a terminal's raw output to a file, toggled
   from its right-click menu
+- Session transcripts (Settings → Session Transcripts, off by default) — keeps the text each new
+  SSH or local terminal session printed (escape codes removed, progress bars and command-line
+  redrawing reduced to what was on screen, full-screen programs such as vim and top left out,
+  Mosh and Windows local shells not recorded), and searches all of it from History → Session
+  output with the match shown in context and the transcript scrolled to it. Files are readable by
+  your user only, sealed with the master password when one is set, capped at 20 MB per session,
+  and deleted after the retention you choose
 - Keyword highlighting — built-in Error/Warning/OK/Info/Debug/IP-and-MAC
   categories plus custom regex rules, each with its own color, live in every
   terminal
@@ -185,10 +220,13 @@ A personal SSH/SFTP terminal client, Termius-style.
   Block's menu, "Explain & Fix…" sends the command, its output, and exit
   code to the AI and shows a plain-English explanation plus, when it has a
   confident one, a corrected command you can insert with a click
-- Workflows — a Snippet whose command contains `{{placeholder}}` tokens
-  (e.g. `docker logs -f {{container}}`) becomes a small fill-in form on
-  insert instead of pasting immediately; fill in the values once per use,
-  same Insert Snippet flow as any other snippet
+- Workflows — a Snippet whose command contains `{{variables}}` becomes a small fill-in form on
+  insert instead of pasting immediately. `{{name}}` is asked for each time, `{{name:default}}`
+  comes pre-filled, `{{env=prod|staging}}` offers a choice, and built-ins fill themselves:
+  `{{$host}}`, `{{$hostname}}`, `{{$user}}` (of the terminal's host), `{{$date}}`, `{{$time}}`,
+  `{{$timestamp}}` and `{{$clipboard}}`. A snippet can be set to run right away (Enter pressed
+  for you) instead of only being typed for you to check. Quick-run: type a snippet's name or
+  command into the command palette (`Ctrl/Cmd+K`) and Enter puts it into the focused terminal
 - Inline Suggestions — fish/zsh-autosuggestions-style ghost text: as you
   type, the rest of the most recent matching command from that host's
   history is shown dimmed right after the cursor; press `→` or `End` to
@@ -335,9 +373,11 @@ to save a screenshot.
 
 **End-to-end scenarios.** `npm run e2e` (`scripts/e2e/`) goes further than the smoke test: each file
 in `scripts/e2e/scenarios` starts a fresh packaged app (own profile and `$HOME`) and drives it through
-the real UI and IPC. They cover Home and navigation, the tab menu, reconnect, the command palette,
-Command Block marks (against real bash), toasts, History (what is and isn't recorded, including
-that passwords never are), interface size, and the master password with auto-lock. Run one with
+the real UI and IPC. They cover Home (last connected, pinning, list layout, drag and drop) and navigation, the tab menu,
+reconnect, the command palette and snippets, Command Block marks (against real bash), toasts, History
+(what is and isn't recorded, including that passwords never are), session transcripts, port forwards
+from a host card (against a real SSH server), backup export/import, the SSH keys page, interface size,
+and the master password with auto-lock and sealed data. Run one with
 `xvfb-run -a npm run e2e -- <scenario>`; `E2E_SHOTS=dir` saves screenshots. Linux only, because the
 scenarios open a local bash shell. CI runs them after the smoke test.
 

@@ -7,6 +7,7 @@ import { IPC } from "../../shared/types";
 import { loadPty } from "./ptyLoader";
 import { prepareLocalShellIntegration } from "./shellIntegration";
 import { getCommandBlocksEnabled } from "./store";
+import { transcripts } from "./transcripts";
 
 interface LocalSession {
   id: string;
@@ -15,6 +16,10 @@ interface LocalSession {
 }
 
 const sessions = new Map<string, LocalSession>();
+
+// A Windows pty (ConPTY) repaints the screen with cursor-position sequences instead of streaming
+// output, which doesn't reduce to readable lines; its sessions aren't recorded as transcripts.
+const RECORDABLE = process.platform !== "win32";
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -48,16 +53,19 @@ export function connect(cols: number, rows: number): string {
   proc.onData((chunk: string) => {
     broadcast(IPC.ssh.onData, { sessionId, chunk });
     sessions.get(sessionId)?.logStream?.write(chunk);
+    if (RECORDABLE) transcripts.feed(sessionId, chunk);
   });
   proc.onExit(({ exitCode }: { exitCode: number }) => {
     // exitCode 0 is a plain `exit`/Ctrl+D — not worth flagging as an error,
     // same spirit as an SSH channel closing normally.
     broadcast(IPC.ssh.onClosed, { sessionId, error: exitCode === 0 ? undefined : `shell exited (code ${exitCode})` });
     sessions.get(sessionId)?.logStream?.end();
+    transcripts.end(sessionId);
     sessions.delete(sessionId);
   });
 
   sessions.set(sessionId, { id: sessionId, proc });
+  if (RECORDABLE) transcripts.begin(sessionId, { hostId: null, hostName: "Local" });
   return sessionId;
 }
 

@@ -249,20 +249,6 @@
   font-size: 12.5px;
 }
 
-/* .shortcuts-groups (from KeyboardShortcuts.css, reused here rather than
-   duplicated) sets overflow-y:auto for the shortcuts *dialog*, whose own
-   height is capped — nested inside .settings-preview-pane's own scrolling
-   column with no height limit of its own, that same rule just clips the
-   list into an unwanted second scrollbar instead of flowing normally with
-   the rest of the pane. */
-.settings-preview-shortcuts {
-  overflow: visible;
-}
-
-.settings-preview-shortcuts .shortcut-row kbd {
-  min-width: 100px;
-}
-
 .master-password-form {
   display: flex;
   flex-direction: column;

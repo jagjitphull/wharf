@@ -1,4 +1,11 @@
+/* The 8px margin around the text is the pane's padding. The pane is content-box on purpose: the fit
+   addon sizes the terminal from its parent's computed height, which for a border-box element
+   includes the padding — 16px too much, so the last row spilled out under the status bar whenever
+   that was enough for one more row. (The padding must stay on the pane: xterm's scroll viewport is a
+   black element stretched over its parent's whole padding box, so padding on .xterm itself shows up
+   as a black frame around the text.) */
 .terminal-pane {
+  box-sizing: content-box;
   position: absolute;
   inset: 0;
   padding: 8px;
@@ -7,6 +14,14 @@
 
 .terminal-pane .xterm {
   height: 100%;
+  background: inherit;
+}
+
+/* xterm's scroll viewport defaults to black (to keep macOS's scrollbar opaque), which shows as a
+   strip wherever the text doesn't fill it — the few pixels under the last row. It takes the pane's
+   own (theme) background instead, still opaque. */
+.terminal-pane .xterm .xterm-viewport {
+  background-color: inherit;
 }
 
 /* Fish/zsh-autosuggestions-style ghost text, rendered via an xterm

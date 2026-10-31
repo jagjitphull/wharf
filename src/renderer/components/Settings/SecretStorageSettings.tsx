@@ -74,7 +74,7 @@ export function SecretStorageSettings() {
   async function forgot() {
     if (
       !confirm(
-        "This erases every saved password and key passphrase and removes the master password. Hosts and settings are kept. Continue?",
+        "This erases every saved password and key passphrase, your Command History, saved workspaces and the last session (all sealed with the master password), and removes the master password. Hosts and settings are kept. Continue?",
       )
     )
       return;
@@ -106,7 +106,7 @@ export function SecretStorageSettings() {
         ))}
       {master !== "none" && (
         <p className="hint">
-          Saved passwords and key passphrases are encrypted with your master password
+          Saved passwords, key passphrases, Command History, saved workspaces and the last session are encrypted with your master password
           {master === "locked" ? " and are locked until you enter it." : "."} Wharf asks for it each time it starts; there is no way to
           recover it if it is forgotten.
         </p>

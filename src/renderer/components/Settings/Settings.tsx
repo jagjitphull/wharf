@@ -1,34 +1,27 @@
-import { useState } from "react";
 import { accentFor, normalizeAccent } from "../../state/accentColors";
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from "../../state/themeStore";
 import { FONT_FAMILY_PRESETS, MAX_FONT_SIZE, MIN_FONT_SIZE, useTerminalPrefsStore } from "../../state/terminalPrefsStore";
-import { MAX_UI_ZOOM, MIN_UI_ZOOM, useUiPrefsStore } from "../../state/uiPrefsStore";
+import { MAX_UI_ZOOM, MIN_UI_ZOOM, useUiPrefsStore, type Density, type TabLayout } from "../../state/uiPrefsStore";
 import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
-import { useAppStore } from "../../state/store";
 import { useRestoreTabsPrefsStore } from "../../state/restoreTabsPrefsStore";
-import { ipcErrorMessage, wharf } from "../../api/wharf";
+import { wharf } from "../../api/wharf";
 import { KeywordHighlightSettings } from "./KeywordHighlightSettings";
 import { CommandBlocksSettings } from "./CommandBlocksSettings";
 import { HistorySettings } from "./HistorySettings";
+import { TranscriptSettings } from "./TranscriptSettings";
+import { BackupSettings } from "./BackupSettings";
 import { GhostSuggestionSettings } from "./GhostSuggestionSettings";
 import { AiAutocompleteSettings } from "./AiAutocompleteSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { UpdateSettings } from "./UpdateSettings";
 import { SecretStorageSettings } from "./SecretStorageSettings";
 import { TerminalPreview } from "./TerminalPreview";
-import { GROUPS as SHORTCUT_GROUPS } from "../KeyboardShortcuts/KeyboardShortcuts";
 import { IconMinus, IconPlus } from "../Icons/Icons";
 import "../../styles/dialog.css";
-import "../KeyboardShortcuts/KeyboardShortcuts.css";
 import "./Settings.css";
 
 const isMac = wharf.window.platform === "darwin";
 const MOD = isMac ? "Cmd" : "Ctrl";
-/** The preview pane's own quick-reference is just these two groups
- * (app-wide navigation + terminal-specific) — SFTP editor and picker
- * shortcuts are less useful to have on hand while in Settings, and the
- * full list is one keypress away regardless (see the hint below). */
-const PREVIEW_SHORTCUT_GROUPS = SHORTCUT_GROUPS.filter((g) => g.title === "Global" || g.title === "Terminal");
 
 const MODES: { mode: ThemeMode; label: string }[] = [
   { mode: "light", label: "Light" },
@@ -36,51 +29,23 @@ const MODES: { mode: ThemeMode; label: string }[] = [
   { mode: "system", label: "System" },
 ];
 
-export function Settings() {
+const DENSITIES: { density: Density; label: string }[] = [
+  { density: "comfortable", label: "Comfortable" },
+  { density: "compact", label: "Compact" },
+];
+
+const TAB_LAYOUTS: { layout: TabLayout; label: string }[] = [
+  { layout: "top", label: "Top" },
+  { layout: "side", label: "Side" },
+];
+
+export function Settings({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
   const { mode, resolved, accent, setMode, setAccent } = useThemeStore();
   const { fontSize, fontFamily, terminalThemeId, increaseFontSize, decreaseFontSize, setFontFamily, setTerminalThemeId } =
     useTerminalPrefsStore();
-  const { uiZoom, setUiZoom, increaseUiZoom, decreaseUiZoom, resetUiZoom } = useUiPrefsStore();
-  const { loadAll } = useAppStore();
+  const { uiZoom, setUiZoom, increaseUiZoom, decreaseUiZoom, resetUiZoom, density, setDensity, tabLayout, setTabLayout } =
+    useUiPrefsStore();
   const { enabled: restoreTabsEnabled, setEnabled: setRestoreTabsEnabled } = useRestoreTabsPrefsStore();
-  const [backupMessage, setBackupMessage] = useState<string | null>(null);
-  const [backupError, setBackupError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function handleExport() {
-    setBackupError(null);
-    setBackupMessage(null);
-    setBusy(true);
-    try {
-      const path = await wharf.backup.export();
-      if (path) setBackupMessage(`Exported to ${path}`);
-    } catch (err) {
-      setBackupError(ipcErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleImport() {
-    setBackupError(null);
-    setBackupMessage(null);
-    setBusy(true);
-    try {
-      const result = await wharf.backup.import();
-      if (result) {
-        setBackupMessage(
-          `Imported ${result.importedHosts} host${result.importedHosts === 1 ? "" : "s"} and ` +
-            `${result.importedGroups} group${result.importedGroups === 1 ? "" : "s"}. ` +
-            `Passwords/passphrases weren't included in the export — re-enter them via Edit on each host.`,
-        );
-        await loadAll();
-      }
-    } catch (err) {
-      setBackupError(ipcErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="settings-layout">
@@ -97,6 +62,43 @@ export function Settings() {
             ))}
           </div>
         </div>
+
+        <div className="appearance-row">
+          <span className="appearance-label">Layout density</span>
+          <div className="mode-switch" role="group" aria-label="Layout density">
+            {DENSITIES.map((d) => (
+              <button
+                key={d.density}
+                className={`mode-btn ${density === d.density ? "active" : ""}`}
+                aria-pressed={density === d.density}
+                onClick={() => setDensity(d.density)}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="hint">Compact narrows the icon rail and tightens the sidebar and tabs, to leave more room for terminals.</p>
+
+        <div className="appearance-row">
+          <span className="appearance-label">Tab layout</span>
+          <div className="mode-switch" role="group" aria-label="Tab layout">
+            {TAB_LAYOUTS.map((l) => (
+              <button
+                key={l.layout}
+                className={`mode-btn ${tabLayout === l.layout ? "active" : ""}`}
+                aria-pressed={tabLayout === l.layout}
+                onClick={() => setTabLayout(l.layout)}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="hint">
+          Top keeps the tabs across the title bar. Side lists them in a panel next to the icon rail, which you can collapse to just numbers
+          and expand to full names.
+        </p>
 
         <div className="appearance-row">
           <span className="appearance-label">Accent color</span>
@@ -216,6 +218,9 @@ export function Settings() {
         <h2>Command History</h2>
         <HistorySettings />
 
+        <h2>Session Transcripts</h2>
+        <TranscriptSettings />
+
         <h2>Notifications</h2>
         <NotificationSettings />
 
@@ -241,20 +246,7 @@ export function Settings() {
         </p>
 
         <h2>Backup</h2>
-        <p className="hint">
-          Export your hosts and groups to a JSON file, or import one back in. For security, passwords and key passphrases are never included
-          — re-enter them via Edit after importing.
-        </p>
-        <div className="backup-actions">
-          <button className="btn ghost small" onClick={handleExport} disabled={busy}>
-            Export hosts…
-          </button>
-          <button className="btn ghost small" onClick={handleImport} disabled={busy}>
-            Import hosts…
-          </button>
-        </div>
-        {backupMessage && <div className="backup-message">{backupMessage}</div>}
-        {backupError && <div className="dialog-error">{backupError}</div>}
+        <BackupSettings />
 
         <h2>About</h2>
         <p className="hint">
@@ -279,22 +271,15 @@ export function Settings() {
         <p className="hint">Live — reflects the theme and font picked under Terminal.</p>
 
         <span className="settings-preview-label">Keyboard shortcuts</span>
-        <div className="shortcuts-groups settings-preview-shortcuts">
-          {PREVIEW_SHORTCUT_GROUPS.map((group) => (
-            <div key={group.title} className="shortcuts-group">
-              <h3>{group.title}</h3>
-              {group.shortcuts.map((s) => (
-                <div key={s.keys} className="shortcut-row">
-                  <kbd>{s.keys}</kbd>
-                  <span>{s.description}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
         <p className="hint">
-          <code>{MOD}+/</code> for the full shortcuts reference, from anywhere in the app.
+          Press <code>{MOD}+K</code> to jump to a host or run any action, or <code>{MOD}+/</code> for the full list of shortcuts, from
+          anywhere in the app.
         </p>
+        <div>
+          <button className="btn small" onClick={onOpenShortcuts}>
+            View all keyboard shortcuts
+          </button>
+        </div>
       </div>
     </div>
   );
