@@ -127,6 +127,40 @@ export function buildPaletteActions(ctx: Context): PaletteAction[] {
       keywords: "host tree",
       run: () => useUiPrefsStore.getState().toggleSidebar(),
     },
+    {
+      id: "density.toggle",
+      title: useUiPrefsStore.getState().density === "compact" ? "Use comfortable layout" : "Use compact layout",
+      subtitle: "Switch the icon rail, sidebar and tabs between roomy and compact",
+      keywords: "density narrow slim tight spacing sidebar rail",
+      run: () => {
+        const { density, setDensity } = useUiPrefsStore.getState();
+        setDensity(density === "compact" ? "comfortable" : "compact");
+      },
+    },
+    {
+      id: "tabs.layout",
+      title: useUiPrefsStore.getState().tabLayout === "side" ? "Move tabs to the top" : "Move tabs to the side",
+      subtitle: "Switch the terminal tabs between the title bar and a side panel",
+      keywords: "tab layout vertical horizontal panel warp",
+      run: () => {
+        const { tabLayout, setTabLayout } = useUiPrefsStore.getState();
+        setTabLayout(tabLayout === "side" ? "top" : "side");
+      },
+    },
+    ...(useUiPrefsStore.getState().tabLayout === "side" && tabs.length > 0
+      ? [
+          {
+            id: "tabs.panel",
+            title: useUiPrefsStore.getState().tabPanelCollapsed ? "Expand tab panel" : "Collapse tab panel",
+            subtitle: "Show full tab names, or only their numbers",
+            keywords: "tabs side collapse expand narrow",
+            run: () => {
+              const { tabPanelCollapsed, setTabPanelCollapsed } = useUiPrefsStore.getState();
+              setTabPanelCollapsed(!tabPanelCollapsed);
+            },
+          },
+        ]
+      : []),
     { id: "shortcuts", title: "Keyboard shortcuts", keys: `${MOD} /`, keywords: "keys help", run: ctx.openShortcuts },
     {
       id: "font.up",

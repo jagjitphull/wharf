@@ -26,7 +26,11 @@ const TAB_JUMP_MOD = isMac ? "Cmd" : "Ctrl";
 /** The terminal tabs, drawn inside the title bar (see TitleBar). Owns every
  * tab action and its dialogs — rename, pin, move, colour, groups, logging,
  * save as workspace — so the terminal panel itself is only the panes. */
-export function TabStrip() {
+export function TabStrip({
+  orientation = "horizontal",
+  collapsed = false,
+}: { orientation?: "horizontal" | "vertical"; collapsed?: boolean } = {}) {
+  const vertical = orientation === "vertical";
   const {
     tabs,
     tabGroups,
@@ -72,11 +76,11 @@ export function TabStrip() {
   const [edges, setEdges] = useState({ left: false, right: false });
   const measure = useCallback(() => {
     const el = stripRef.current;
-    if (!el) return;
+    if (!el || vertical) return;
     const left = el.scrollLeft > 1;
     const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
     setEdges((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
-  }, []);
+  }, [vertical]);
   useEffect(measure, [measure, tabs, tabGroups, paneMeta]);
   useEffect(() => {
     const el = stripRef.current;
@@ -161,6 +165,8 @@ export function TabStrip() {
         logPath={activeMeta?.logPath}
         themeId={activeMeta?.themeId}
         broadcasting={!!tab.broadcastInput}
+        vertical={vertical}
+        collapsed={collapsed}
         isActive={activeView === "hosts" && tab.tabId === activeTabId}
         draggingId={draggingId}
         dropTargetId={dropTargetId}
@@ -226,15 +232,17 @@ export function TabStrip() {
 
   return (
     <>
-      {edges.left && (
+      {!vertical && edges.left && (
         <button className="tab-scroll-btn" title="Scroll tabs left" aria-label="Scroll tabs left" onClick={() => scrollBy(-1)}>
           <IconChevronLeft size={13} />
         </button>
       )}
       <div
-        className={`tab-strip ${edges.left ? "fade-left" : ""} ${edges.right ? "fade-right" : ""}`}
+        className={`tab-strip ${vertical ? "vertical" : ""} ${collapsed ? "collapsed" : ""} ${!vertical && edges.left ? "fade-left" : ""} ${
+          !vertical && edges.right ? "fade-right" : ""
+        }`}
         ref={stripRef}
-        onWheel={scrollSideways}
+        onWheel={vertical ? undefined : scrollSideways}
       >
         {segments.map((seg, i) =>
           seg.group ? (
@@ -289,7 +297,7 @@ export function TabStrip() {
           ),
         )}
       </div>
-      {edges.right && (
+      {!vertical && edges.right && (
         <button className="tab-scroll-btn" title="Scroll tabs right" aria-label="Scroll tabs right" onClick={() => scrollBy(1)}>
           <IconChevronRight size={13} />
         </button>
@@ -392,6 +400,10 @@ interface TabButtonProps {
   draggingId: string | null;
   dropTargetId: string | null;
   tabCount: number;
+  /** Drawn in the side panel (a column) rather than the top strip. */
+  vertical: boolean;
+  /** Side panel collapsed to numbers and markers: the name moves to the tooltip. */
+  collapsed: boolean;
   globalTerminalThemeId: string;
   groupId?: string;
   tabGroups: TabGroup[];
@@ -469,7 +481,17 @@ function TabButton(p: TabButtonProps) {
       // attention with whichever tab is actually active.
       style={
         {
-          boxShadow: p.isActive ? `inset 0 2px 0 ${hostColor ?? "var(--accent)"}` : hostColor ? `inset 0 1px 0 ${hostColor}55` : undefined,
+          boxShadow: p.vertical
+            ? p.isActive
+              ? `inset 3px 0 0 ${hostColor ?? "var(--accent)"}`
+              : hostColor
+                ? `inset 2px 0 0 ${hostColor}55`
+                : undefined
+            : p.isActive
+              ? `inset 0 2px 0 ${hostColor ?? "var(--accent)"}`
+              : hostColor
+                ? `inset 0 1px 0 ${hostColor}55`
+                : undefined,
           // A tab's own color theme tints its background too (not just the
           // small tab-theme-dot), so tabs on different themes are
           // distinguishable at a glance without hovering or opening each one.
@@ -559,7 +581,7 @@ function TabButton(p: TabButtonProps) {
           },
         ])
       }
-      title={p.closeError}
+      title={p.closeError ?? (p.pinned || p.collapsed ? p.title : undefined)}
     >
       <span className="tab-number" title={p.tabNumber <= 9 ? `${TAB_JUMP_MOD}+${p.tabNumber}` : undefined}>
         {p.tabNumber}
