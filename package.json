@@ -33,12 +33,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
-    "@google/genai": "^2.31.0",
+    "@google/genai": "^2.32.0",
     "electron-log": "^5.4.4",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.8.11",
     "node-pty": "^1.1.0",
-    "openai": "^7.43.0",
+    "openai": "^7.47.0",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {
@@ -57,18 +57,18 @@
     "electron": "^44.9.0",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "prettier": "^3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "typescript": "^5.5.4",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5",
     "vitest": "^5.0.5",
     "wait-on": "^9.5.1",
-    "ws": "^8.22.0",
+    "ws": "^8.22.1",
     "zustand": "^5.0.16"
   }
 }
