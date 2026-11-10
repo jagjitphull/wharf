@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { CommandBlock } from "./commandBlocks";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
 import { IconClose, IconMore, IconStar } from "../Icons/Icons";
 import "./BlocksPanel.css";
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { HostRecord, SftpEntry, SftpTransferProgress } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
 import {
   IconArrowRight,
   IconChevronDown,

@@ -12,10 +12,11 @@ import { resolveXtermTheme } from "../../state/terminalThemes";
 import { flattenPanes, useAppStore } from "../../state/store";
 import { useKeywordHighlightStore } from "../../state/keywordHighlightStore";
 import { useNotificationPrefsStore } from "../../state/notificationPrefsStore";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
 import { SnippetPicker } from "../SnippetPicker/SnippetPicker";
 import { registerTerminalInserter } from "./terminalInsert";
-import { buildTerminalThemeMenuItems } from "./TerminalThemeSwatches";
+import { buildTerminalThemeMenuItems } from "./terminalThemeMenu";
 import {
   compileRules,
   createHighlightState,
@@ -622,7 +623,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
     fitRef.current?.fit();
     if (wasAtBottom) term.scrollToBottom();
     wharf.ssh.resize(sessionId, term.cols, term.rows);
-  }, [fontSize, uiZoom, fontFamily, sessionId]);
+  }, [fontSize, uiZoom, fontFamily, sessionId, disposeGhostSuggestion]);
 
   useEffect(() => {
     if (visible) {
@@ -658,7 +659,7 @@ export function TerminalView({ sessionId, visible, themeOverrideId, logPath, tab
         term.resize(cols, rows);
       });
     }
-  }, [visible]);
+  }, [visible, disposeGhostSuggestion]);
 
   async function toggleLogging() {
     if (logPath) {

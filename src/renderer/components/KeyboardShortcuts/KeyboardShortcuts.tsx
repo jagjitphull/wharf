@@ -16,7 +16,7 @@ export interface Group {
   shortcuts: Shortcut[];
 }
 
-export const GROUPS: Group[] = [
+const GROUPS: Group[] = [
   {
     title: "Global",
     shortcuts: [

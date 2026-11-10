@@ -1,4 +1,3 @@
-import type { ContextMenuItem } from "../ContextMenu/ContextMenu";
 import { TERMINAL_THEME_PRESETS } from "../../state/terminalThemes";
 import "./TerminalThemeSwatches.css";
 
@@ -28,23 +27,4 @@ export function TerminalThemeSwatches({ activeId, onSelect }: Props) {
       </div>
     </div>
   );
-}
-
-/** [separator, custom swatch-grid item] ready to splice into a ContextMenu's
- * item list. `onSelect` already gets the menu-closing wired up. */
-export function buildTerminalThemeMenuItems(activeId: string, onSelect: (id: string) => void): ContextMenuItem[] {
-  return [
-    { separator: true },
-    {
-      custom: (close) => (
-        <TerminalThemeSwatches
-          activeId={activeId}
-          onSelect={(id) => {
-            onSelect(id);
-            close();
-          }}
-        />
-      ),
-    },
-  ];
 }

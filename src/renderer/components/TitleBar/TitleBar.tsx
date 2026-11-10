@@ -6,7 +6,8 @@ import { toast } from "../../state/toastStore";
 import { useAppStore } from "../../state/store";
 import { IconAnchor, IconDuplicate, IconHome, IconKeyboard, IconMoon, IconPlus, IconSearch, IconSun } from "../Icons/Icons";
 import { TabStrip } from "../Tabs/TabStrip";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
 import "./TitleBar.css";
 
 const isMac = wharf.window.platform === "darwin";
