@@ -6,7 +6,8 @@ import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { HostDialog } from "../HostDialog/HostDialog";
 import { GroupDialog } from "../GroupDialog/GroupDialog";
 import { SshConfigImportDialog } from "../SshConfigImport/SshConfigImportDialog";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
 import { IconChevronDown, IconFolder, IconFolderOpen, IconPencil, IconPlay, IconPlus, IconTerminal, IconTrash } from "../Icons/Icons";
 import "./Sidebar.css";
 

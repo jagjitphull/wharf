@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { SftpEntry } from "@shared/types";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
 import { IconChevronUp, IconFile, IconFolder, IconPencil, IconPlus, IconRefresh, IconTrash, IconUpload } from "../Icons/Icons";
 import { formatSize } from "./formatSize";
 import { readTransferData, setTransferData, TRANSFER_MIME } from "./dragTransfer";

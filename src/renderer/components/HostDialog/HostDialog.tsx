@@ -11,7 +11,7 @@ const UNENCRYPTED_NOTE =
  * terminal tabs — deliberately a separate, wider palette from the app's
  * accent-color presets (theme accent is one color for the whole UI; this
  * is per-host identity). */
-export const HOST_COLOR_PRESETS = [
+const HOST_COLOR_PRESETS = [
   "#e0575f", // red
   "#e08a3c", // orange
   "#dbb642", // yellow

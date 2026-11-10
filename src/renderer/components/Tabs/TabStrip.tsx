@@ -5,8 +5,9 @@ import { getTerminalThemePreset } from "../../state/terminalThemes";
 import { ipcErrorMessage, wharf } from "../../api/wharf";
 import { reconnectTab } from "./tabActions";
 import { toast } from "../../state/toastStore";
-import { ContextMenu, useContextMenu } from "../ContextMenu/ContextMenu";
-import { buildTerminalThemeMenuItems } from "../Terminal/TerminalThemeSwatches";
+import { ContextMenu } from "../ContextMenu/ContextMenu";
+import { useContextMenu } from "../ContextMenu/useContextMenu";
+import { buildTerminalThemeMenuItems } from "../Terminal/terminalThemeMenu";
 import { PromptDialog } from "../PromptDialog/PromptDialog";
 import {
   IconBroadcast,

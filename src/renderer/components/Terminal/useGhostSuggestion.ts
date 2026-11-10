@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type { IDecoration, IMarker, Terminal as XTerm } from "@xterm/xterm";
 import { useGhostSuggestionPrefsStore } from "../../state/ghostSuggestionPrefsStore";
 import type { CommandCaptureState } from "./commandCapture";
@@ -47,13 +47,13 @@ export function useGhostSuggestion({
 
   /** Erases the currently-rendered ghost suggestion, if any — always safe to
    * call even when nothing is showing. */
-  function dispose() {
+  const dispose = useCallback(() => {
     const ghost = ghostSuggestionRef.current;
     if (!ghost) return;
     ghost.decoration.dispose();
     ghost.marker.dispose();
     ghostSuggestionRef.current = null;
-  }
+  }, []);
 
   /**
    * What is typed at the prompt right now, or null when that can't be known well enough to act on
@@ -136,7 +136,7 @@ export function useGhostSuggestion({
   useEffect(() => {
     ghostEnabledRef.current = ghostEnabled;
     if (!ghostEnabled) dispose();
-  }, [ghostEnabled]);
+  }, [ghostEnabled, dispose]);
 
   return { ghostSuggestionRef, recompute, accept, dispose };
 }
