@@ -445,6 +445,7 @@ async function main() {
     });
 
     await check("log file was written", async () => {
+      // The app logs a "started" line on every launch, so this doesn't depend on the update check or anything else going wrong.
       // electron-log writes to <userData>/logs, except on macOS where it is ~/Library/Logs/<app>.
       const logFile = isMac ? path.join(homedir(), "Library", "Logs", "Wharf", "main.log") : path.join(userData, "logs", "main.log");
       const size = await until(`${logFile}`, () => existsSync(logFile) && statSync(logFile).size > 0 && statSync(logFile).size);

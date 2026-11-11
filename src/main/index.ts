@@ -299,6 +299,10 @@ function installAppMenu(): void {
 }
 
 app.whenReady().then(() => {
+  // Always leave one line in the log file: it shows which build produced the lines after it in a bug
+  // report, and a launch where nothing else happens to be logged still creates the file (the packaged-app
+  // smoke test checks for it, and shouldn't depend on how the launch update check turns out).
+  log.info(`Wharf ${app.getVersion()} started (${process.platform} ${process.arch}, Electron ${process.versions.electron})`);
   installPermissionHandlers(session.defaultSession, isDev);
   if (permissionsTightened.length > 0) {
     log.warn(`Restricted to owner-only access (it was readable by other users): ${permissionsTightened.join(", ")}`);
